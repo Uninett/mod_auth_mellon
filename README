@@ -1,0 +1,334 @@
+===========================================================================
+ README file for mod_auth_mellon
+===========================================================================
+
+mod_auth_mellon is a authentication module for apache. It authenticates
+the user against a SAML 2.0 IdP, and and grants access to directories
+depending on attributes received from the IdP.
+
+
+===========================================================================
+ Dependencies
+===========================================================================
+
+mod_auth_mellon has four dependencies:
+ * pkg-config
+ * Apache (>=2.0)
+ * OpenSSL
+ * lasso (>=2.1)
+
+You will also require developement headers and tools for all of the
+dependencies.
+
+If OpenSSL or lasso are installed in a "strange" directory, then you may
+have to specify the directory containing "lasso.pc" and/or "openssl.pc" in
+the PKG_CONFIG_PATH environment variable. For example, if openssl is
+installed in /usr/local/openssl (with openssl.pc in
+/usr/local/openssl/lib/pkgconfig/) and lasso is installed in /opt/lasso
+(lasso.pc in /opt/lasso/lib/pkgconfig/), then you can set PKG_CONFIG_PATH
+before running configure like this:
+
+PKG_CONFIG_PATH=/usr/local/openssl/lib/pkgconfig:/opt/lasso/lib/pkgconfig
+export PKG_CONFIG_PATH
+
+
+If Apache is installed in a "strange" directory, then you may have to
+specify the path to apxs2 using the --with-apxs2=/full/path/to/apxs2
+option to configure. If, for example, Apache is installed in /opt/apache,
+with apxs2 in /opt/apache/bin, then you run
+
+./configure --with-apxs2=/opt/apache2/bin/apxs2
+
+Note that, depending on your distribution,  apxs2 may be named apxs.
+
+
+===========================================================================
+ Installing mod_auth_mellon
+===========================================================================
+
+mod_auth_mellon uses autoconf, and can be installed by running the
+following commands:
+
+./configure
+make
+make install
+
+
+===========================================================================
+ Configuring mod_auth_mellon
+===========================================================================
+
+Here we are going to assume that your web servers hostname is
+'example.com', and that the directory you are going to protect is
+'http://example.com/secret/'. We are also going to assume that you have
+configured your web site to use SSL.
+
+You need to edit the configuration file for your web server. Depending on
+your distribution, it may be named '/etc/apache/httpd.conf' or something
+different.
+
+
+You need to add a LoadModule directove for mod_auth_mellon. This will
+look similar to this:
+
+LoadModule auth_mellon_module /usr/lib/apache2/modules/mod_auth_mellon.so
+
+To find the full path to mod_auth_mellon.so, you may run:
+
+apxs2 -q LIBEXECDIR
+
+This will print the path where Apache stores modules. mod_auth_mellon.so
+will be stored in that directory.
+
+
+After you have added the LoadModule directive, you must add configuration
+for mod_auth_mellon. The following is an example configuration:
+
+
+###########################################################################
+# Global configuration for mod_auth_mellon. This configuration is shared by
+# every virtual server and location in this instance of apache.
+###########################################################################
+
+# MellonCacheSize sets the maximum number of sessions which can be active
+# at once. When mod_auth_mellon reaches this limit, it will begin removing
+# the least recently used sessions. The server must be restarted before any
+# changes to this option takes effect.
+# Default: MellonCacheSize 100
+MellonCacheSize 100
+
+# MellonLockFile is the full path to a file used for synchronizing access
+# to the session data. The path should only be used by one instance of
+# apache at a time. The server must be restarted before any changes to this
+# option takes effect.
+# Default: MellonLockFile "/tmp/mellonLock"
+MellonLockFile "/tmp/mellonLock"
+
+###########################################################################
+# End of global configuration for mod_auth_mellon.
+###########################################################################
+
+
+# This defines a directory where mod_auth_mellon should do access control.
+<Location /secret>
+
+        # These are standard Apache apache configuration directives.
+        # See http://httpd.apache.org/docs/2.2/mod/core.html for information
+        # about them.
+        Require valid-user
+        AuthType "Mellon"
+
+
+        # MellonEnable is used to enable auth_mellon on a location.
+        # It has three possible values: "off", "info" and "auth".
+        # They have the following meanings:
+        #   "off":  mod_auth_mellon will not do anything in this location.
+        #           This is the default state.
+        #   "info": If the user is authorized to access the resource, then
+        #           we will populate the environment with information about
+        #           the user. If the user isn't authorized, then we won't
+        #           populate the environment, but we won't deny the user
+        #           access either.
+        #   "auth": We will populate the environment with information about
+        #           the user if he is authorized. If he is authenticated
+        #           (logged in), but not authorized (according to the
+        #           MellonRequire directives, then we will return a 403
+        #           Forbidden error. If he isn't authenticated then we will
+        #           redirect him to the login page of the IdP.
+        #
+        # Default: MellonEnable "off"
+        MellonEnable "auth"
+
+        # MellonDecoder is used to select which decoder mod_auth_mellon
+        # will use when decoding attribute values.
+        # There are two possible values: "none" and "feide". "none" is the
+        # default.
+        # They have the following meanings:
+        #   "none":  mod_auth_mellon will store the attribute as it is
+        #            received from the IdP. This is the default behaviour.
+        #   "feide": FEIDE currently stores several values in a single
+        #            AttributeValue element. The values are base64 encoded
+        #            and separated by a underscore. This decoder reverses
+        #            this encoding.
+        # Default: MellonDecoder "none"
+        MellonDecoder "none"
+
+        # MellonVariable is used to select the name of the cookie which
+        # mod_auth_mellon should use to remember the session id. If you
+        # want to have different sites running on the same host, then
+        # you will have to choose a different name for the cookie for each
+        # site.
+        # Default: "cookie"
+	MellonVariable "cookie"
+
+        # MellonUser selects which attribute we should use for the username.
+        # The username is passed on to other apache modules and to the web
+        # page the user visits. NAME_ID is an attribute which we set to
+        # the id we get from the IdP.
+        # Default: MellonUser "NAME_ID"
+	MellonUser "NAME_ID"
+
+        # MellonSetEnv configuration directives allows you to map
+        # attribute names received from the IdP to names you choose
+        # yourself. The syntax is 'MellonSetEnv <local name> <IdP name>'.
+        # You can list multiple MellonSetEnv directives.
+        # Default. None set.
+	MellonSetEnv "e-mail" "mail"
+
+        # MellonRequire allows you to limit access to those with specific
+        # attributes. The syntax is
+        # 'MellonRequire <attribute name> <list of valid values>'.
+        # Note that the attribute name is the name we received from the
+        # IdP.
+        #
+        # If you don't list any MellonRequire directives, then any user
+        # authenticated by the IdP will have access to this service. If
+        # you list several MellonRequire directives, then all of them
+        # will have to match.
+        #
+        # Default: None set.
+	MellonRequire "eduPersonAffiliation" "student" "employee"
+
+        # MellonEndpointPath selects which directory mod_auth_mellon
+        # should assume contains the SAML 2.0 endpoints. Any request to
+        # this directory will be handled by mod_auth_mellon.
+        #
+        # The path is the full path (from the root of the web server) to
+        # the directory. The directory must be a sub-directory of this
+        # <Location ...>.
+        # Default: MellonEndpointPath "/mellon"
+	MellonEndpointPath "/secret/endpoint"
+
+        # MellonSessionLength sets the maximum lifetime of a session, in
+        # seconds. The actual lifetime may be shorter, depending on the
+        # conditions received from the IdP. The default length is 86400
+        # seconds, which is one day.
+        # Default: MellonSessionLength 86400
+        MellonSessionLength 86400
+
+        # MellonNoCookieErrorPage is the full path to a page which
+        # mod_auth_mellon will redirect the user to if he returns from the
+        # IdP without a cookie with a session id.
+        # Note that the user may also get this error if he for some reason
+        # loses the cookie between being redirected to the IdPs login page
+        # and returning from it.
+        # If this option is unset, then mod_auth_mellon will return a
+        # 400 Bad Request error if the cookie is missing.
+        # Default: unset
+        MellonNoCookieErrorPage "https://example.com/no_cookie.html"
+
+        # MellonSPMetadataFile is the full path to the file containing
+        # the metadata for this service provider. You must configure this
+        # before you can use this module.
+        # Default: None set.
+	MellonSPMetadataFile /etc/apache2/mellon/sp-metadata.xml
+
+        # MellonSPPrivateKeyFile is a .pem file which contains the private
+        # key of the service provider. The .pem-file cannot be encrypted
+        # with a password. This directive is optional.
+        # Default: None set.
+	MellonSPPrivateKeyFile /etc/apache2/mellon/sp-private-key.pem
+
+        # MellonIdPMetadataFile is the full path to the file which contains
+        # metadata for the IdP you are authenticating against. This
+        # directive is required.
+        # Default: None set.
+	MellonIdPMetadataFile /etc/apache2/mellon/idp-metadata.xml
+
+        # MellonIdpPublicKeyFile is the full path of the public key of the
+        # IdP. This parameter is optional if the public key is embedded
+        # in the IdP's metadata file.
+        # Default: None set.
+	MellonIdPPublicKeyFile /etc/apache2/mellon/idp-public-key.pem
+</Location>
+
+
+===========================================================================
+ Service provider metadata
+===========================================================================
+
+The contents of the metadata will depend on your hostname and on what path
+you selected with the MellonEndpointPath configuration directive.
+
+The following is an example of metadata for the example configuration:
+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<EntityDescriptor
+    entityID="examlpe.com"
+    xmlns="urn:oasis:names:tc:SAML:2.0:metadata">
+  <SPSSODescriptor
+      AuthnRequestsSigned="false"
+      WantAssertionsSigned="false"
+      protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <SingleLogoutService
+        Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+        Location="https://example.com/secret/endpoint/logoutRequest" />
+    <NameIDFormat>
+      urn:oasis:names:tc:SAML:2.0:nameid-format:transient
+    </NameIDFormat>
+    <AssertionConsumerService
+        index="0"
+        isDefault="true"
+        Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+        Location="https://example.com/secret/endpoint/postResponse" />
+  </SPSSODescriptor>
+</EntityDescriptor>
+
+
+You should update entityID="example.com" and the two Location attributes.
+Note that '/secret/endpoint' in the two Location attributes matches the
+path set in MellonEndpointPath.
+
+To use HTTP-Artifact binding instead of the HTTP-POST binding, change
+the AssertionConsumerService-element to something like this:
+
+    <AssertionConsumerService
+        index="0"
+        isDefault="true"
+        Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact"
+        Location="https://example.com/secret/endpoint/artifactResponse" />
+
+
+===========================================================================
+ Using mod_auth_mellon
+===========================================================================
+
+After you have set up mod_auth_mellon, you should be able to visit (in our
+example) https://example.com/secret/, and be redirected to the IdP's login
+page. After logging in you should be returned to
+https://example.com/secret/, and get the contents of that page.
+
+When authenticating a user, mod_auth_mellon will set some environment
+variables to the attributes it received from the IdP. The name of the
+variables will be MELLON_<attribute name>. If you have specified a
+different name with the MellonSetEnv configuration directive, then that
+name will be used instead. The name will still be prefixed by 'MELLON_'.
+
+The value of the attribute will be base64 decoded.
+
+mod_auth_mellon supports multivalued attributes with the following format:
+<base64 encoded value>_<base64 encoded value>_<base 64 encoded value>...
+
+If an attribute has multiple values, then they will be stored as
+MELLON_<name>_0, MELLON_<name>_1, MELLON_<name>_2, ...
+
+Since mod_auth_mellon doesn't know which attributes may have multiple
+values, it will store every attribute at least twice. Once named
+MELLON_<name>, and once named <MELLON_<name>_0.
+
+In the case of multivalued attributes MELLON_<name> will contain the first
+value.
+
+
+The following code is a simple php-script which prints out all the
+variables:
+
+<?php
+header('Content-Type: text/plain');
+
+foreach($_SERVER as $key=>$value) {
+  if(substr($key, 0, 7) == 'MELLON_') {
+    echo($key . '=' . $value . "\r\n");
+  }
+}
+?>

@@ -1,0 +1,69 @@
+
+# Source files. mod_auth_mellon.c must be the first file.
+SRC=mod_auth_mellon.c \
+	auth_mellon_cache.c auth_mellon_config.c \
+	auth_mellon_cookie.c auth_mellon_handler.c \
+	auth_mellon_util.c \
+	auth_mellon_session.c \
+	auth_mellon_httpclient.c
+
+# Files to include when making a .tar.gz-file for distribution
+DISTFILES=$(SRC) \
+	auth_mellon.h \
+	configure \
+	configure.ac \
+	Makefile.in \
+	autogen.sh \
+	TODO \
+	README \
+	COPYING \
+	debian/auth_mellon.conf \
+	debian/auth_mellon.load \
+	debian/changelog \
+	debian/compat \
+	debian/control \
+	debian/copyright \
+	debian/dirs \
+	debian/docs \
+	debian/install \
+	debian/rules
+
+
+all:	mod_auth_mellon.la
+
+mod_auth_mellon.la: $(SRC) auth_mellon.h
+	@APXS2@ @OPENSSL_CFLAGS@ @LASSO_CFLAGS@ @CURL_CFLAGS@ @OPENSSL_LIBS@ @LASSO_LIBS@ @CURL_LIBS@ -Wc,-Wall -c $(SRC)
+
+
+# Building configure (for distribution)
+configure:	configure.ac
+	./autogen.sh
+
+@NAMEVER@.tar.gz:	 $(DISTFILES)
+	tar -c --transform="s#^#@NAMEVER@/#" -vzf $@ $(DISTFILES)
+
+
+.PHONY:	install
+install: mod_auth_mellon.la
+	@APXS2@ -i -n auth_mellon $<
+
+.PHONY: distfile
+distfile:	@NAMEVER@.tar.gz
+
+.PHONY:	clean
+clean:
+	rm -f mod_auth_mellon.la
+	rm -f $(SRC:%.c=%.lo)
+	rm -f $(SRC:%.c=%.slo)
+	rm -rf .libs/
+
+.PHONY:	distclean
+distclean:	clean
+	rm -f Makefile config.log config.status @NAMEVER@.tar.gz *~ \
+	build-stamp config.guess config.sub
+	rm -rf debian/mod-auth-mellon
+	rm -f debian/files
+
+.PHONY: fullclean
+fullclean:	distclean
+	rm -f configure aclocal.m4
