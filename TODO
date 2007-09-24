@@ -2,3 +2,4 @@ TODO for auth_mellon:
 
 * Change session storage to use less than 64KiB/session.
 * Optimize session lookup.
+* SP initialized logout
