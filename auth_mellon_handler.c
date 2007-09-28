@@ -214,33 +214,16 @@ static int am_restore_lasso_profile_state(request_rec *r,
  *
  * Parameters:
  *  request_rec *r       The logout request.
+ *  LassoLogout *logout  A LassoLogout object initiatet with
+ *                       the current session.
  *
  * Returns:
  *  OK on success, or an error if any of the steps fail.
  */
-static int am_handle_logout_request(request_rec *r)
+static int am_handle_logout_request(request_rec *r, LassoLogout *logout)
 {
-    LassoServer *server;
-    LassoLogout *logout;
     gint res;
     am_cache_entry_t *session;
-
-    server = am_get_lasso_server(r);
-    if(server == NULL) {
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
-
-    logout = lasso_logout_new(server);
-    if(logout == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Error creating lasso logout object.");
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
-
-    /* Restore lasso profile state. We ignore errors since we want to be able
-     * to redirect the user back to the IdP even in the case of an error.
-     */
-    am_restore_lasso_profile_state(r, LASSO_PROFILE(logout));
 
     /* Process the logout message. Ignore missing signature. */
     res = lasso_logout_process_request_msg(logout, r->args);
@@ -294,6 +277,58 @@ static int am_handle_logout_request(request_rec *r)
      * new target.
      */
     return HTTP_SEE_OTHER;
+}
+
+
+/* This function handles requests to the logout handler.
+ *
+ * Parameters:
+ *  request_rec *r       The request.
+ *
+ * Returns:
+ *  OK on success, or an error if any of the steps fail.
+ */
+static int am_handle_logout(request_rec *r)
+{
+    LassoServer *server;
+    LassoLogout *logout;
+
+    server = am_get_lasso_server(r);
+    if(server == NULL) {
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    logout = lasso_logout_new(server);
+    if(logout == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Error creating lasso logout object.");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* Restore lasso profile state. We ignore errors since we want to be able
+     * to redirect the user back to the IdP even in the case of an error.
+     */
+    am_restore_lasso_profile_state(r, LASSO_PROFILE(logout));
+
+
+    /* Check which type of request to the logout handler this is.
+     * We have three types:
+     * - logout requests: The IdP sends a logout request to this service.
+     * - logout responses: We have sent a logout request to the IdP, and
+     *   are receiving a response.
+     * - We want to initiate a logout request.
+     */
+    if(am_extract_query_parameter(r->pool, r->args, "SAMLRequest") != NULL) {
+        /* SAMLRequest - logout request from the IdP. */
+        return am_handle_logout_request(r, logout);
+    } else {
+        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                      "TODO: handle SP-initiated logout.");
+
+        lasso_logout_destroy(logout);
+
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
 }
 
 
@@ -1050,7 +1085,7 @@ static int am_endpoint_handler(request_rec *r)
         /* logoutRequest is included for backwards-compatibility
          * with version 0.0.6 and older.
          */
-	return am_handle_logout_request(r);
+        return am_handle_logout(r);
     } else {
 	ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
 		      "Endpoint \"%s\" not handled by mod_auth_mellon.",
