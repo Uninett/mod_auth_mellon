@@ -24,11 +24,13 @@
 
 #include <lasso/lasso.h>
 #include <lasso/xml/saml-2.0/samlp2_authn_request.h>
+#include <lasso/xml/saml-2.0/samlp2_logout_request.h>
 #include <lasso/xml/saml-2.0/samlp2_response.h>
 #include <lasso/xml/saml-2.0/saml2_assertion.h>
 #include <lasso/xml/saml-2.0/saml2_attribute_statement.h>
 #include <lasso/xml/saml-2.0/saml2_attribute.h>
 #include <lasso/xml/saml-2.0/saml2_attribute_value.h>
+#include <lasso/xml/saml-2.0/saml2_authn_statement.h>
 #include <lasso/xml/misc_text_node.h>
 
 /* The following are redefined in ap_config_auto.h */

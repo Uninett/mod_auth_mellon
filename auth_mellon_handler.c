@@ -334,6 +334,12 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
 {
     gint res;
     char *redirect_to;
+    LassoProfile *profile;
+    LassoSession *session;
+    LassoNode *assertion_n;
+    LassoSaml2Assertion *assertion;
+    LassoSaml2AuthnStatement *authnStatement;
+    LassoSamlp2LogoutRequest *request;
 
     /* Create the logout request message. */
     res = lasso_logout_init_request(logout, NULL, LASSO_HTTP_METHOD_REDIRECT);
@@ -351,6 +357,44 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
 
         lasso_logout_destroy(logout);
         return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+
+    /* We need to set the SessionIndex in the LogoutRequest to the
+     * SessionIndex we received during the login operation.
+     */
+
+    profile = LASSO_PROFILE(logout);
+    session = lasso_profile_get_session(profile);
+
+    /* We currently only look at the first assertion in the list
+     * lasso_session_get_assertions returns.
+     */
+    assertion_n = lasso_session_get_assertions(
+        session, profile->remote_providerID)->data;
+    if(LASSO_IS_SAML2_ASSERTION(assertion_n) == FALSE) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "No assertions found for the current session.");
+        lasso_logout_destroy(logout);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    assertion = LASSO_SAML2_ASSERTION(assertion_n);
+
+    if(!assertion->AuthnStatement) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "No AuthnStatement found in the current assertion.");
+        lasso_logout_destroy(logout);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* We assume that the first authnStatement contains the data we want. */
+    authnStatement = LASSO_SAML2_AUTHN_STATEMENT(
+        assertion->AuthnStatement->data);
+
+    if(authnStatement->SessionIndex) {
+        request = LASSO_SAMLP2_LOGOUT_REQUEST(profile->request);
+        request->SessionIndex = g_strdup(authnStatement->SessionIndex);
     }
 
     /* Serialize the request message into a url which we can redirect to. */
