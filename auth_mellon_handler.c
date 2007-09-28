@@ -280,6 +280,47 @@ static int am_handle_logout_request(request_rec *r, LassoLogout *logout)
 }
 
 
+/* This function handles a logout response message from the IdP. We get
+ * this message after we have sent a logout request to the IdP.
+ *
+ * Parameters:
+ *  request_rec *r       The logout response request.
+ *  LassoLogout *logout  A LassoLogout object initiated with
+ *                       the current session.
+ *
+ * Returns:
+ *  OK on success, or an error if any of the steps fail.
+ */
+static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
+{
+    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                  "TODO: Handle logout response.");
+
+    lasso_logout_destroy(logout);
+    return HTTP_INTERNAL_SERVER_ERROR;
+}
+
+
+/* This function initiates a logout request and sends it to the IdP.
+ *
+ * Parameters:
+ *  request_rec *r       The logout response request.
+ *  LassoLogout *logout  A LassoLogout object initiated with
+ *                       the current session.
+ *
+ * Returns:
+ *  OK on success, or an error if any of the steps fail.
+ */
+static int am_init_logout_request(request_rec *r, LassoLogout *logout)
+{
+    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                  "TODO: Initiate logout request.");
+
+    lasso_logout_destroy(logout);
+    return HTTP_INTERNAL_SERVER_ERROR;
+}
+
+
 /* This function handles requests to the logout handler.
  *
  * Parameters:
@@ -321,13 +362,13 @@ static int am_handle_logout(request_rec *r)
     if(am_extract_query_parameter(r->pool, r->args, "SAMLRequest") != NULL) {
         /* SAMLRequest - logout request from the IdP. */
         return am_handle_logout_request(r, logout);
+    } else if(am_extract_query_parameter(r->pool, r->args, "SAMLResponse")
+              != NULL) {
+        /* SAMLResponse - logout response from the IdP. */
+        return am_handle_logout_response(r, logout);
     } else {
-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                      "TODO: handle SP-initiated logout.");
-
-        lasso_logout_destroy(logout);
-
-        return HTTP_INTERNAL_SERVER_ERROR;
+        /* Initiate logout request. */
+        return am_init_logout_request(r, logout);
     }
 }
 
