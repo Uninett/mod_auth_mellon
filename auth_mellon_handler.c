@@ -313,11 +313,48 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
  */
 static int am_init_logout_request(request_rec *r, LassoLogout *logout)
 {
-    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                  "TODO: Initiate logout request.");
+    gint res;
+    char *redirect_to;
+
+    /* Create the logout request message. */
+    res = lasso_logout_init_request(logout, NULL, LASSO_HTTP_METHOD_REDIRECT);
+    if(res == LASSO_PROFILE_ERROR_SESSION_NOT_FOUND) {
+        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                      "User attempted to initiate logout without being"
+                      " loggged in.");
+
+        lasso_logout_destroy(logout);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    } else if(res != 0) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Unable to create logout request."
+                      " Lasso error: [%i] %s", res, lasso_strerror(res));
+
+        lasso_logout_destroy(logout);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* Serialize the request message into a url which we can redirect to. */
+    res = lasso_logout_build_request_msg(logout);
+    if(res != 0) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Unable to serialize lasso logout message."
+                      " Lasso error: [%i] %s", res, lasso_strerror(res));
+
+        lasso_logout_destroy(logout);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* Set the redirect url. */
+    redirect_to = apr_pstrdup(r->pool, LASSO_PROFILE(logout)->msg_url);
+    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                  "Redirect to: %s", redirect_to);
+    apr_table_setn(r->headers_out, "Location", redirect_to);
 
     lasso_logout_destroy(logout);
-    return HTTP_INTERNAL_SERVER_ERROR;
+
+    /* Redirect (without including POST data if this was a POST request. */
+    return HTTP_SEE_OTHER;
 }
 
 
