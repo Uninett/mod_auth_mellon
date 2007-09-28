@@ -293,11 +293,30 @@ static int am_handle_logout_request(request_rec *r, LassoLogout *logout)
  */
 static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
 {
-    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                  "TODO: Handle logout response.");
+    gint res;
+    am_cache_entry_t *session;
+
+    res = lasso_logout_process_response_msg(logout, r->args);
+    if(res != 0) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Unable to process logout response."
+                      " Lasso error: [%i] %s", res, lasso_strerror(res));
+
+        lasso_logout_destroy(logout);
+        return HTTP_BAD_REQUEST;
+    }
 
     lasso_logout_destroy(logout);
-    return HTTP_INTERNAL_SERVER_ERROR;
+
+    /* Delete the session. */
+    session = am_get_request_session(r);
+    if(session != NULL) {
+        am_delete_request_session(r, session);
+    }
+
+    /* TODO: Customizable logout location. */
+    apr_table_setn(r->headers_out, "Location", "/");
+    return HTTP_SEE_OTHER;
 }
 
 
