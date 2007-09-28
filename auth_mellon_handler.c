@@ -294,7 +294,9 @@ static int am_handle_logout_request(request_rec *r, LassoLogout *logout)
 static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
 {
     gint res;
+    int rc;
     am_cache_entry_t *session;
+    char *return_to;
 
     res = lasso_logout_process_response_msg(logout, r->args);
     if(res != 0) {
@@ -314,8 +316,23 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
         am_delete_request_session(r, session);
     }
 
-    /* TODO: Customizable logout location. */
-    apr_table_setn(r->headers_out, "Location", "/");
+    return_to = am_extract_query_parameter(r->pool, r->args, "RelayState");
+    if(return_to != NULL) {
+        rc = am_urldecode(return_to);
+        if(rc != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+                          "Could not urldecode RelayState value in logout"
+                          " response.");
+            return HTTP_BAD_REQUEST;
+        }
+    } else {
+        /* No RelayState in - redirect to default location. */
+
+        /* TODO: Customizable default logout location. */
+        return_to = "/";
+    }
+
+    apr_table_setn(r->headers_out, "Location", return_to);
     return HTTP_SEE_OTHER;
 }
 
@@ -332,6 +349,7 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
  */
 static int am_init_logout_request(request_rec *r, LassoLogout *logout)
 {
+    char *return_to;
     gint res;
     char *redirect_to;
     LassoProfile *profile;
@@ -340,6 +358,8 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
     LassoSaml2Assertion *assertion;
     LassoSaml2AuthnStatement *authnStatement;
     LassoSamlp2LogoutRequest *request;
+
+    return_to = am_extract_query_parameter(r->pool, r->args, "ReturnTo");
 
     /* Create the logout request message. */
     res = lasso_logout_init_request(logout, NULL, LASSO_HTTP_METHOD_REDIRECT);
@@ -397,6 +417,12 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
         request->SessionIndex = g_strdup(authnStatement->SessionIndex);
     }
 
+
+    /* Set the RelayState parameter to the return url (if we have one). */
+    if(return_to) {
+        profile->msg_relayState = g_strdup(return_to);
+    }
+
     /* Serialize the request message into a url which we can redirect to. */
     res = lasso_logout_build_request_msg(logout);
     if(res != 0) {
@@ -410,8 +436,21 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
 
     /* Set the redirect url. */
     redirect_to = apr_pstrdup(r->pool, LASSO_PROFILE(logout)->msg_url);
-    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                  "Redirect to: %s", redirect_to);
+
+    /* Check if the lasso library added the RelayState. If lasso didn't add
+     * a RelayState parameter, then we add one ourself. This should hopefully
+     * be removed in the future.
+     */
+    if(strstr(redirect_to, "&RelayState=") == NULL
+       && strstr(redirect_to, "?RelayState=") == NULL) {
+        /* The url didn't contain the relaystate parameter. */
+        redirect_to = apr_pstrcat(
+            r->pool, redirect_to, "&RelayState=",
+            am_urlencode(r->pool, return_to),
+            NULL
+            );
+    }
+
     apr_table_setn(r->headers_out, "Location", redirect_to);
 
     lasso_logout_destroy(logout);
