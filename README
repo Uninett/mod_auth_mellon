@@ -262,7 +262,7 @@ The following is an example of metadata for the example configuration:
       protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
     <SingleLogoutService
         Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
-        Location="https://example.com/secret/endpoint/logoutRequest" />
+        Location="https://example.com/secret/endpoint/logout" />
     <NameIDFormat>
       urn:oasis:names:tc:SAML:2.0:nameid-format:transient
     </NameIDFormat>

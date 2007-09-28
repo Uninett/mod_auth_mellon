@@ -1045,7 +1045,11 @@ static int am_endpoint_handler(request_rec *r)
 	return am_handle_post_reply(r);
     } else if(!strcmp(endpoint, "artifactResponse")) {
         return am_handle_artifact_reply(r);
-    } else if(!strcmp(endpoint, "logoutRequest")) {
+    } else if(!strcmp(endpoint, "logout")
+              || !!strcmp(endpoint, "logoutRequest")) {
+        /* logoutRequest is included for backwards-compatibility
+         * with version 0.0.6 and older.
+         */
 	return am_handle_logout_request(r);
     } else {
 	ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
