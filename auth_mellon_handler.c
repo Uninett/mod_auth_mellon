@@ -1178,7 +1178,7 @@ static int am_endpoint_handler(request_rec *r)
     } else if(!strcmp(endpoint, "artifactResponse")) {
         return am_handle_artifact_reply(r);
     } else if(!strcmp(endpoint, "logout")
-              || !!strcmp(endpoint, "logoutRequest")) {
+              || !strcmp(endpoint, "logoutRequest")) {
         /* logoutRequest is included for backwards-compatibility
          * with version 0.0.6 and older.
          */
