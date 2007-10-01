@@ -17,6 +17,7 @@ DISTFILES=$(SRC) \
 	TODO \
 	README \
 	COPYING \
+	NEWS \
 	debian/auth_mellon.conf \
 	debian/auth_mellon.load \
 	debian/changelog \
