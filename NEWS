@@ -11,3 +11,5 @@ Version 0.0.7
   "https://www.example.com/secret/endpoint/logout
    ?ReturnTo=http://www.example.com/". (Note that this should be on a
   single line.)
+
+* Fixed a memory leak on login.

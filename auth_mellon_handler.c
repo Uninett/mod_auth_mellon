@@ -1329,9 +1329,6 @@ static int am_auth_new_ticket(request_rec *r)
     request->ForceAuthn = FALSE;
     request->IsPassive = FALSE;
 
-    request->NameIDPolicy->Format
-      = g_strdup(LASSO_SAML2_NAME_IDENTIFIER_FORMAT_TRANSIENT);
-
     request->NameIDPolicy->AllowCreate = TRUE;
 
     LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Consent
