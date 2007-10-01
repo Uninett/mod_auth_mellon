@@ -317,19 +317,20 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
     }
 
     return_to = am_extract_query_parameter(r->pool, r->args, "RelayState");
-    if(return_to != NULL) {
-        rc = am_urldecode(return_to);
-        if(rc != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
-                          "Could not urldecode RelayState value in logout"
-                          " response.");
-            return HTTP_BAD_REQUEST;
-        }
-    } else {
-        /* No RelayState in - redirect to default location. */
+    if(return_to == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "No RelayState parameter to logout response handler."
+                      " It is possible that your IdP doesn't support the"
+                      " RelayState parameter.");
+        return HTTP_BAD_REQUEST;
+    }
 
-        /* TODO: Customizable default logout location. */
-        return_to = "/";
+    rc = am_urldecode(return_to);
+    if(rc != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+                      "Could not urldecode RelayState value in logout"
+                      " response.");
+        return HTTP_BAD_REQUEST;
     }
 
     apr_table_setn(r->headers_out, "Location", return_to);
@@ -441,7 +442,8 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
      * a RelayState parameter, then we add one ourself. This should hopefully
      * be removed in the future.
      */
-    if(strstr(redirect_to, "&RelayState=") == NULL
+    if(return_to != NULL
+       && strstr(redirect_to, "&RelayState=") == NULL
        && strstr(redirect_to, "?RelayState=") == NULL) {
         /* The url didn't contain the relaystate parameter. */
         redirect_to = apr_pstrcat(
@@ -505,9 +507,20 @@ static int am_handle_logout(request_rec *r)
               != NULL) {
         /* SAMLResponse - logout response from the IdP. */
         return am_handle_logout_response(r, logout);
-    } else {
-        /* Initiate logout request. */
+    } else if(am_extract_query_parameter(r->pool, r->args, "ReturnTo")
+              != NULL) {
+        /* RedirectTo - SP initiated logout. */
         return am_init_logout_request(r, logout);
+    } else {
+        /* Unknown request to the logout handler. */
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "No known parameters passed to the logout"
+                      " handler. Query string was \"%s\". To initiate"
+                      " a logout, you need to pass a \"ReturnTo\""
+                      " parameter with a url to the web page the user should"
+                      " be redirected to after a successful logout.",
+                      r->args);
+        return HTTP_BAD_REQUEST;
     }
 }
 
