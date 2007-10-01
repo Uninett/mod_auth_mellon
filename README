@@ -332,3 +332,28 @@ foreach($_SERVER as $key=>$value) {
   }
 }
 ?>
+
+
+===========================================================================
+ Logging out
+===========================================================================
+
+mod_auth_mellon supports both IdP initiated and SP initiated logout
+through the same endpoint. The endpoint is located at
+"<endpoint path>/logout". "<endpoint path>/logoutRequest" is an alias for
+this endpoint, provided for compatibility with version 0.0.6 and earlier of
+mod_auth_mellon.
+
+To initiate a logout from your web site, you should redirect or link to
+"<endpoint path>/logout?ReturnTo=<url to redirect to after logout>". For
+example, if the web site is located at "https://www.example.com/secret", and
+the mellon endpoints are located under
+"https://www.example.com/secret/endpoint", then the web site could contain
+a link element like the following:
+
+<a href=
+ "/secret/endpoint/logout?ReturnTo=https://www.example.org/logged_out.html"
+ >Log out</a>
+
+This will return the user to "https://www.example.org/logged_out.html"
+after the logout operation has completed.
