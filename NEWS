@@ -13,3 +13,6 @@ Version 0.0.7
   single line.)
 
 * Fixed a memory leak on login.
+
+* Increased maximum Lasso session size to 8192 from 3074. This allows us to
+  handle users with more attributes.

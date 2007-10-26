@@ -65,7 +65,7 @@
 #define AM_CACHE_ENVSIZE 128
 #define AM_CACHE_USERSIZE 512
 #define AM_CACHE_MAX_LASSO_IDENTITY_SIZE 1024
-#define AM_CACHE_MAX_LASSO_SESSION_SIZE 3074
+#define AM_CACHE_MAX_LASSO_SESSION_SIZE 8192
 
 
 /* This is the length of the session id we use.
