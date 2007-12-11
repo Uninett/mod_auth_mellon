@@ -913,7 +913,7 @@ static int add_attributes(request_rec *r, const char *name_id,
                     value_itr = g_list_next(value_itr)) {
 
                     value = LASSO_SAML2_ATTRIBUTE_VALUE(
-                        attribute->AttributeValue->data
+                        value_itr->data
                         );
 
                     /* value->any is a list with the child nodes of the
