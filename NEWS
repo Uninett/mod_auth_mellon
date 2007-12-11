@@ -16,3 +16,5 @@ Version 0.0.7
 
 * Increased maximum Lasso session size to 8192 from 3074. This allows us to
   handle users with more attributes.
+
+* Fixed handling of multiple AttributeValue elements in response.
