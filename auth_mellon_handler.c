@@ -351,6 +351,7 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
 static int am_init_logout_request(request_rec *r, LassoLogout *logout)
 {
     char *return_to;
+    int rc;
     gint res;
     char *redirect_to;
     LassoProfile *profile;
@@ -361,6 +362,12 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
     LassoSamlp2LogoutRequest *request;
 
     return_to = am_extract_query_parameter(r->pool, r->args, "ReturnTo");
+    rc = am_urldecode(return_to);
+    if (rc != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+                      "Could not urldecode ReturnTo value.");
+        return HTTP_BAD_REQUEST;
+    }
 
     /* Create the logout request message. */
     res = lasso_logout_init_request(logout, NULL, LASSO_HTTP_METHOD_REDIRECT);
