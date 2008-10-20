@@ -1339,6 +1339,13 @@ static int am_auth_new_ticket(request_rec *r)
     }
 
     request = LASSO_SAMLP2_AUTHN_REQUEST(LASSO_PROFILE(login)->request);
+    if(request->NameIDPolicy == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Error creating login request. Please verify the "
+                      "MellonSPMetadataFile directive.");
+        lasso_login_destroy(login);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
 
     request->ForceAuthn = FALSE;
     request->IsPassive = FALSE;
