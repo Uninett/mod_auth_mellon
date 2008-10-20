@@ -24,6 +24,10 @@
 
 #include <curl/curl.h>
 
+#ifdef AP_NEED_SET_MUTEX_PERMS
+#include "unixd.h"
+#endif
+
 
 /* This function is called on server exit. It destroys the shared memory we
  * allocated for storing session data, and the global mutex we used to
@@ -164,6 +168,19 @@ static int am_global_init(apr_pool_t *conf, apr_pool_t *log,
                      apr_strerror(rv, buffer, sizeof(buffer)));
         return !OK;
     }
+
+#ifdef AP_NEED_SET_MUTEX_PERMS
+    /* On some platforms the mutex is implemented as a file. To allow child
+     * processes running as a different user to open it, it is necessary to
+     * change the permissions on it. */
+    rv = unixd_set_global_mutex_perms(mod->lock);
+    if (rv != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+                     "Failed to set permissions on session table lock;"
+                     " check User and Group directives");
+        return rv;
+    }
+#endif
 
     return OK;
 }
