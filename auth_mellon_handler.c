@@ -1304,9 +1304,16 @@ static int am_auth_new_ticket(request_rec *r)
     LassoSamlp2AuthnRequest *request;
     gint ret;
     char *redirect_to;
+    am_cache_entry_t *session;
 
     /* Create session. */
-    am_release_request_session(r, am_new_request_session(r));
+    session = am_new_request_session(r);
+    if(session == NULL) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
+                     "am_new_request_session() failed");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+    am_release_request_session(r, session);
 
 
     server = am_get_lasso_server(r);

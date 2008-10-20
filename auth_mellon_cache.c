@@ -38,6 +38,8 @@ am_cache_entry_t *am_cache_lock(server_rec *s, const char *key)
     am_mod_cfg_rec *mod_cfg;
     am_cache_entry_t *table;
     int i;
+    int rv;
+    char buffer[512];
 
 
     /* Check if we have a valid session key. We abort if we don't. */
@@ -50,7 +52,13 @@ am_cache_entry_t *am_cache_lock(server_rec *s, const char *key)
 
 
     /* Lock the table. */
-    apr_global_mutex_lock(mod_cfg->lock);
+    if((rv = apr_global_mutex_lock(mod_cfg->lock)) != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                     "apr_global_mutex_lock() failed [%d]: %s",
+                     rv, apr_strerror(rv, buffer, sizeof(buffer)));
+        return NULL;
+    }
+
     table = apr_shm_baseaddr_get(mod_cfg->cache);
 
 
@@ -95,6 +103,8 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
     apr_time_t current_time;
     int i;
     apr_time_t age;
+    int rv;
+    char buffer[512];
 
     /* Check if we have a valid session key. We abort if we don't. */
     if(key == NULL || strlen(key) != AM_SESSION_ID_LENGTH) {
@@ -115,7 +125,13 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
 
 
         /* Lock the table. */
-        apr_global_mutex_lock(mod_cfg->lock);
+        if((rv = apr_global_mutex_lock(mod_cfg->lock)) != APR_SUCCESS) {
+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                         "apr_global_mutex_lock() failed [%d]: %s",
+                         rv, apr_strerror(rv, buffer, sizeof(buffer)));
+            return NULL;
+        }
+
         table = apr_shm_baseaddr_get(mod_cfg->cache);
 
         /* Get current time. If we find a entry with expires <= the current
