@@ -34,7 +34,8 @@ static LassoServer *am_get_lasso_server(request_rec *r)
     if(cfg->server == NULL) {
         cfg->server = lasso_server_new(cfg->sp_metadata_file,
 				       cfg->sp_private_key_file,
-				       NULL, NULL);
+				       NULL,
+				       cfg->sp_cert_file);
         if(cfg->server == NULL) {
 	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
 			  "Error initializing lasso server object. Please"
@@ -48,7 +49,8 @@ static LassoServer *am_get_lasso_server(request_rec *r)
       
 	ret = lasso_server_add_provider(cfg->server, LASSO_PROVIDER_ROLE_IDP,
 					cfg->idp_metadata_file,
-					cfg->idp_public_key_file, NULL);
+					cfg->idp_public_key_file,
+					cfg->idp_ca_file);
 	if(ret != 0) {
 	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
 			  "Error adding IdP to lasso server object. Please"

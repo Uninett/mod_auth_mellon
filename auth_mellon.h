@@ -139,8 +139,10 @@ typedef struct am_dir_cfg_rec {
     /* Lasso configuration variables. */
     const char *sp_metadata_file;
     const char *sp_private_key_file;
+    const char *sp_cert_file;
     const char *idp_metadata_file;
     const char *idp_public_key_file;
+    const char *idp_ca_file;
 
     /* Maximum number of seconds a session is valid for. */
     int session_length;

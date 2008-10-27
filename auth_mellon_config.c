@@ -372,6 +372,13 @@ const command_rec auth_mellon_commands[] = {
         "Full path to pem file with the private key for the SP."
         ),
     AP_INIT_TAKE1(
+        "MellonSPCertFile",
+        ap_set_string_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_cert_file),
+        OR_AUTHCFG,
+        "Full path to pem file with certificate for the SP."
+        ),
+    AP_INIT_TAKE1(
         "MellonIdPMetadataFile",
         ap_set_string_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, idp_metadata_file),
@@ -384,6 +391,13 @@ const command_rec auth_mellon_commands[] = {
         (void *)APR_OFFSETOF(am_dir_cfg_rec, idp_public_key_file),
         OR_AUTHCFG,
         "Full path to pem file with the public key for the IdP."
+        ),
+    AP_INIT_TAKE1(
+        "MellonIdPCAFile",
+        ap_set_string_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, idp_ca_file),
+        OR_AUTHCFG,
+        "Full path to pem file with CA chain for the IdP."
         ),
     AP_INIT_TAKE1(
         "MellonEndpointPath",
@@ -431,8 +445,10 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
 
     dir->sp_metadata_file = NULL;
     dir->sp_private_key_file = NULL;
+    dir->sp_cert_file = NULL;
     dir->idp_metadata_file = NULL;
     dir->idp_public_key_file = NULL;
+    dir->idp_ca_file = NULL;
 
 
     apr_thread_mutex_create(&dir->server_mutex, APR_THREAD_MUTEX_DEFAULT, p);
@@ -515,6 +531,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                                     add_cfg->sp_private_key_file :
                                     base_cfg->sp_private_key_file);
 
+    new_cfg->sp_cert_file = (add_cfg->sp_cert_file ?
+                             add_cfg->sp_cert_file :
+                             base_cfg->sp_cert_file);
+
     new_cfg->idp_metadata_file = (add_cfg->idp_metadata_file ?
                                   add_cfg->idp_metadata_file :
                                   base_cfg->idp_metadata_file);
@@ -522,6 +542,11 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->idp_public_key_file = (add_cfg->idp_public_key_file ?
                                     add_cfg->idp_public_key_file :
                                     base_cfg->idp_public_key_file);
+
+    new_cfg->idp_ca_file = (add_cfg->idp_ca_file ?
+                            add_cfg->idp_ca_file :
+                            base_cfg->idp_ca_file);
+
 
 
     apr_thread_mutex_create(&new_cfg->server_mutex,
