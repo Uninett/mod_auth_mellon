@@ -673,7 +673,7 @@ static void am_handle_condition(request_rec *r, am_cache_entry_t *session,
     not_on_or_after = assertion->Conditions->NotOnOrAfter;
 
     if(not_on_or_after == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                       "Condition without NotOnOrAfter attribute.");
         return;
     }
@@ -844,7 +844,7 @@ static int add_attributes(request_rec *r, const char *name_id,
     if(session == NULL) {
         if(am_cookie_get(r) == NULL) {
             /* Missing cookie. */
-            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
                           "User has disabled cookies, or has lost"
                           " the cookie before returning from the SAML2"
                           " login server.");
