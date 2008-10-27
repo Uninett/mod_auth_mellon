@@ -46,7 +46,7 @@ configure:	configure.ac
 
 .PHONY:	install
 install: mod_auth_mellon.la
-	@APXS2@ -i -n auth_mellon $<
+	@APXS2@ -i -n auth_mellon mod_auth_mellon.la
 
 .PHONY: distfile
 distfile:	@NAMEVER@.tar.gz
