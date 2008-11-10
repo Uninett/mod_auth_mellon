@@ -813,6 +813,7 @@ static int am_store_attribute(request_rec *r, am_cache_entry_t *session,
  * attributes it finds to the session data for the current user.
  *
  * Parameters:
+ *  am_cache_entry_t *s  The current session.
  *  request_rec *r       The current request.
  *  const char *name_id  The name identifier we received from the IdP.
  *  GList *assertions    A list of LassoSaml2Assertion objects.
@@ -821,11 +822,10 @@ static int am_store_attribute(request_rec *r, am_cache_entry_t *session,
  *  HTTP_BAD_REQUEST if we couldn't find the session id of the user, or
  *  OK if no error occured.
  */
-static int add_attributes(request_rec *r, const char *name_id,
-                          GList *assertions)
+static int add_attributes(am_cache_entry_t *session, request_rec *r,
+                          const char *name_id, GList *assertions)
 {
     am_dir_cfg_rec *dir_cfg;
-    am_cache_entry_t *session;
     GList *asrt_itr;
     LassoSaml2Assertion *assertion;
     GList *atr_stmt_itr;
@@ -838,36 +838,6 @@ static int add_attributes(request_rec *r, const char *name_id,
     int ret;
 
     dir_cfg = am_get_dir_cfg(r);
-
-    /* Get the session this request belongs to. */
-    session = am_get_request_session(r);
-    if(session == NULL) {
-        if(am_cookie_get(r) == NULL) {
-            /* Missing cookie. */
-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                          "User has disabled cookies, or has lost"
-                          " the cookie before returning from the SAML2"
-                          " login server.");
-            if(dir_cfg->no_cookie_error_page != NULL) {
-                apr_table_setn(r->headers_out, "Location",
-                               dir_cfg->no_cookie_error_page);
-                return HTTP_SEE_OTHER;
-            } else {
-                /* Return 400 Bad Request when the user hasn't set a
-                 * no-cookie error page.
-                 */
-                return HTTP_BAD_REQUEST;
-            }
-        } else {
-            /* Missing session data. */
-            ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
-                          "User has returned from the IdP with a session"
-                          " id we can't locate in the table. This may be"
-                          " caused by the MellonCacheSize being set to"
-                          " low.");
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
-    }
 
     /* Set expires to whatever is set by MellonSessionLength. */
     if(dir_cfg->session_length == -1) {
@@ -885,7 +855,6 @@ static int add_attributes(request_rec *r, const char *name_id,
     /* Save session information. */
     ret = am_cache_env_append(session, "NAME_ID", name_id);
     if(ret != OK) {
-        am_release_request_session(r, session);
         return ret;
     }
 
@@ -951,7 +920,6 @@ static int add_attributes(request_rec *r, const char *name_id,
                     ret = am_store_attribute(r, session, attribute->Name,
                                              value_text->content);
                     if(ret != OK) {
-                        am_release_request_session(r, session);
                         return ret;
                     }
                 }
@@ -965,8 +933,6 @@ static int add_attributes(request_rec *r, const char *name_id,
          */
         break;
     }
-
-    am_release_request_session(r, session);
 
     return OK;
 }
@@ -992,6 +958,9 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
 {
     const char *name_id;
     GList *assertions;
+    const char *in_response_to;
+    am_dir_cfg_rec *dir_cfg;
+    am_cache_entry_t *session;
     int rc;
 
     if(LASSO_PROFILE(login)->nameIdentifier == NULL) {
@@ -1008,12 +977,47 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     assertions = LASSO_SAMLP2_RESPONSE(LASSO_PROFILE(login)->response)
         ->Assertion;
 
+    in_response_to = LASSO_SAMLP2_RESPONSE(LASSO_PROFILE(login)->response)
+        ->parent.InResponseTo;
 
-    rc = add_attributes(r, name_id, assertions);
+
+    if(in_response_to != NULL) {
+        /* This is SP-initiated login. Check that we have a cookie. */
+        if(am_cookie_get(r) == NULL) {
+            /* Missing cookie. */
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                          "User has disabled cookies, or has lost"
+                          " the cookie before returning from the SAML2"
+                          " login server.");
+            dir_cfg = am_get_dir_cfg(r);
+            if(dir_cfg->no_cookie_error_page != NULL) {
+                apr_table_setn(r->headers_out, "Location",
+                               dir_cfg->no_cookie_error_page);
+                return HTTP_SEE_OTHER;
+            } else {
+                /* Return 400 Bad Request when the user hasn't set a
+                 * no-cookie error page.
+                 */
+                return HTTP_BAD_REQUEST;
+            }
+        }
+    }
+
+    /* Create a new session. */
+    session = am_new_request_session(r);
+    if(session == NULL) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
+                    "am_new_request_session() failed");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    rc = add_attributes(session, r, name_id, assertions);
     if(rc != OK) {
+        am_release_request_session(r, session);
         lasso_login_destroy(login);
         return rc;
     }
+    am_release_request_session(r, session);
 
     rc = lasso_login_accept_sso(login);
     if(rc < 0) {
@@ -1306,16 +1310,13 @@ static int am_auth_new_ticket(request_rec *r)
     LassoSamlp2AuthnRequest *request;
     gint ret;
     char *redirect_to;
-    am_cache_entry_t *session;
 
-    /* Create session. */
-    session = am_new_request_session(r);
-    if(session == NULL) {
-        ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
-                     "am_new_request_session() failed");
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
-    am_release_request_session(r, session);
+
+    /* Add cookie for cookie test. We know that we should have
+     * a valid cookie when we return from the IdP after SP-initiated
+     * login.
+     */
+    am_cookie_set(r, "cookietest");
 
 
     server = am_get_lasso_server(r);
