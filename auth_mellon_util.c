@@ -516,3 +516,56 @@ char *am_generate_session_id(request_rec *r)
 
     return ret;
 }
+
+/*
+ * malloc a buffer and fill it with a given file
+ *
+ * Parameters:
+ *   apr_pool_t *conf   The configuration pool. Valid as long as this
+ *   server_rec *s      The server record for the current server.
+ *   const char *file   The file path
+ *
+ * Returns:
+ *   char *             The file content
+ */
+char *am_getfile(apr_pool_t *conf, server_rec *s, const char *file)
+{
+    apr_status_t rv;
+    char buffer[512];
+    apr_finfo_t finfo;
+    char *data;
+    apr_file_t *fd;
+    apr_size_t nbytes;
+
+    if (file == NULL)
+        return NULL;
+
+    if ((rv = apr_file_open(&fd, file, APR_READ, 0, conf)) != 0) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                     "apr_file_open: Error opening \"%s\" [%d] \"%s\"",
+                     file, rv, apr_strerror(rv, buffer, sizeof(buffer)));
+        return NULL;
+    }
+
+    if ((rv = apr_file_info_get(&finfo, APR_FINFO_SIZE, fd)) != 0) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                     "apr_file_info_get: Error opening \"%s\" [%d] \"%s\"",
+                     file, rv, apr_strerror(rv, buffer, sizeof(buffer)));
+        (void)apr_file_close(fd);
+        return NULL;
+    }
+
+    nbytes = finfo.size;
+    data = (char *)apr_palloc(conf, nbytes + 1);
+
+    if ((rv = apr_file_read(fd, (void *)data, &nbytes)) != 0) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                     "apr_file_read: Error reading \"%s\" [%d] \"%s\"",
+                     file, rv, apr_strerror(rv, buffer, sizeof(buffer)));
+    }
+    data[finfo.size] = '\0';
+
+    (void)apr_file_close(fd);
+
+    return data;
+}

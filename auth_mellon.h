@@ -47,6 +47,8 @@
 #include "apr_strings.h"
 #include "apr_shm.h"
 #include "apr_md5.h"
+#include "apr_file_info.h"
+#include "apr_file_io.h"
 
 #include "ap_config.h"
 #include "httpd.h"
@@ -227,6 +229,7 @@ char *am_extract_query_parameter(apr_pool_t *pool,
 char *am_urlencode(apr_pool_t *pool, const char *str);
 int am_urldecode(char *data);
 char *am_generate_session_id(request_rec *r);
+char *am_getfile(apr_pool_t *conf, server_rec *s, const char *file);
 
 
 int am_auth_mellon_user(request_rec *r);

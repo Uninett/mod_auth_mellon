@@ -47,6 +47,10 @@ AC_SUBST(APXS2)
 
 # We need the lasso library for SAML2 communication.
 PKG_CHECK_MODULES(LASSO, lasso)
+saved_LIBS=$LIBS; LIBS="$LIBS $LASSO_LIBS";
+AC_CHECK_LIB(lasso, lasso_server_new_from_buffers,
+	     LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_lasso_server_new_from_buffers")
+LIBS=$saved_LIBS;
 AC_SUBST(LASSO_CFLAGS)
 AC_SUBST(LASSO_LIBS)
 

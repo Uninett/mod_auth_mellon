@@ -40,6 +40,40 @@ static const char *default_user_attribute = "NAME_ID";
 static const char *default_cookie_name = "cookie";
 
 
+/* This function handles configuration directives which set a file
+ * slot in the module configuration. If lasso is recent enough, it
+ * attempts to read the file immediatly.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *                       This value isn't used by this function.
+ *  const char *arg      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_filestring_slot(cmd_parms *cmd,
+                                          void *struct_ptr,
+                                          const char *arg)
+{
+    const char *data;
+
+#ifdef HAVE_lasso_server_new_from_buffers
+    if ((data = am_getfile(cmd->pool, cmd->server, arg)) == NULL)
+        return apr_psprintf(cmd->pool, "%s - Cannot read file %s",
+                            cmd->cmd->name, arg);
+#else
+    data = arg;
+#endif
+
+    return ap_set_string_slot(cmd, struct_ptr, data);
+}
+
+
 /* This function handles configuration directives which set a string
  * slot in the module configuration.
  *
@@ -359,21 +393,21 @@ const command_rec auth_mellon_commands[] = {
         ),
     AP_INIT_TAKE1(
         "MellonSPMetadataFile",
-        ap_set_string_slot,
+        am_set_filestring_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_metadata_file),
         OR_AUTHCFG,
         "Full path to xml file with metadata for the SP."
         ),
     AP_INIT_TAKE1(
         "MellonSPPrivateKeyFile",
-        ap_set_string_slot,
+        am_set_filestring_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_private_key_file),
         OR_AUTHCFG,
         "Full path to pem file with the private key for the SP."
         ),
     AP_INIT_TAKE1(
         "MellonSPCertFile",
-        ap_set_string_slot,
+        am_set_filestring_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_cert_file),
         OR_AUTHCFG,
         "Full path to pem file with certificate for the SP."

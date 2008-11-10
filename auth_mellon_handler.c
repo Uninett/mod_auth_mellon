@@ -23,6 +23,13 @@
 #include "auth_mellon.h"
 
 
+#ifdef HAVE_lasso_server_new_from_buffers
+#  define SERVER_NEW lasso_server_new_from_buffers
+#else /* HAVE_lasso_server_new_from_buffers */
+#  define SERVER_NEW lasso_server_new
+#endif /* HAVE_lasso_server_new_from_buffers */
+
+
 static LassoServer *am_get_lasso_server(request_rec *r)
 {
     am_dir_cfg_rec *cfg;
@@ -32,10 +39,10 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 
     apr_thread_mutex_lock(cfg->server_mutex);
     if(cfg->server == NULL) {
-        cfg->server = lasso_server_new(cfg->sp_metadata_file,
-				       cfg->sp_private_key_file,
-				       NULL,
-				       cfg->sp_cert_file);
+        cfg->server = SERVER_NEW(cfg->sp_metadata_file,
+                                 cfg->sp_private_key_file,
+                                 NULL,
+                                 cfg->sp_cert_file);
         if(cfg->server == NULL) {
 	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
 			  "Error initializing lasso server object. Please"
