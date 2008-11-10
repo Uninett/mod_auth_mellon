@@ -535,6 +535,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                              add_cfg->sp_cert_file :
                              base_cfg->sp_cert_file);
 
+    new_cfg->sp_cert_file = (add_cfg->sp_cert_file ?
+                             add_cfg->sp_cert_file :
+                             base_cfg->sp_cert_file);
+
     new_cfg->idp_metadata_file = (add_cfg->idp_metadata_file ?
                                   add_cfg->idp_metadata_file :
                                   base_cfg->idp_metadata_file);
@@ -548,6 +552,9 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                             base_cfg->idp_ca_file);
 
 
+    new_cfg->idp_ca_file = (add_cfg->idp_ca_file ?
+                            add_cfg->idp_ca_file :
+                            base_cfg->idp_ca_file);
 
     apr_thread_mutex_create(&new_cfg->server_mutex,
                             APR_THREAD_MUTEX_DEFAULT, p);
