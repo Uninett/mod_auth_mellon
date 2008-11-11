@@ -152,6 +152,9 @@ typedef struct am_dir_cfg_rec {
     /* No cookie error page. */
     const char *no_cookie_error_page;
 
+    /* Login path for IdP initiated logins */
+    const char *login_path;
+
     /* Mutex to prevent us from creating several lasso server objects. */
     apr_thread_mutex_t *server_mutex;
     /* Cached lasso server object. */

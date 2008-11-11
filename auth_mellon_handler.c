@@ -1046,11 +1046,11 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     lasso_login_destroy(login);
 
 
-    /* No RelayState - we don't know what to do. */
+    /* No RelayState - we don't know what to do. Use default login path. */
     if(relay_state == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "RelayState wasn't included in reply from IdP.");
-        return HTTP_INTERNAL_SERVER_ERROR;
+       dir_cfg = am_get_dir_cfg(r);
+       apr_table_setn(r->headers_out, "Location", dir_cfg->login_path);
+       return HTTP_SEE_OTHER;
     }
 
     rc = am_urldecode(relay_state);

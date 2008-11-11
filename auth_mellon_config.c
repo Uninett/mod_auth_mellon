@@ -39,6 +39,11 @@ static const char *default_user_attribute = "NAME_ID";
  */
 static const char *default_cookie_name = "cookie";
 
+/* This is the default IdP initiated login location
+ * the MellonDefaultLoginPath configuration directive if you change this.
+ */
+static const char *default_login_path = "/";
+
 
 /* This function handles configuration directives which set a file
  * slot in the module configuration. If lasso is recent enough, it
@@ -434,6 +439,14 @@ const command_rec auth_mellon_commands[] = {
         "Full path to pem file with CA chain for the IdP."
         ),
     AP_INIT_TAKE1(
+        "MellonDefaultLoginPath",
+        ap_set_string_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, login_path),
+        OR_AUTHCFG,
+        "The location where to redirect after IdP initiated login."
+        " Default value is \"/\"."
+        ),
+    AP_INIT_TAKE1(
         "MellonEndpointPath",
         am_set_endpoint_path,
         NULL,
@@ -483,6 +496,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->idp_metadata_file = NULL;
     dir->idp_public_key_file = NULL;
     dir->idp_ca_file = NULL;
+    dir->login_path = default_login_path;
 
 
     apr_thread_mutex_create(&dir->server_mutex, APR_THREAD_MUTEX_DEFAULT, p);
@@ -569,10 +583,6 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                              add_cfg->sp_cert_file :
                              base_cfg->sp_cert_file);
 
-    new_cfg->sp_cert_file = (add_cfg->sp_cert_file ?
-                             add_cfg->sp_cert_file :
-                             base_cfg->sp_cert_file);
-
     new_cfg->idp_metadata_file = (add_cfg->idp_metadata_file ?
                                   add_cfg->idp_metadata_file :
                                   base_cfg->idp_metadata_file);
@@ -585,10 +595,9 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                             add_cfg->idp_ca_file :
                             base_cfg->idp_ca_file);
 
-
-    new_cfg->idp_ca_file = (add_cfg->idp_ca_file ?
-                            add_cfg->idp_ca_file :
-                            base_cfg->idp_ca_file);
+    new_cfg->login_path = (add_cfg->login_path != default_login_path ?
+                           add_cfg->login_path :
+                           base_cfg->login_path);
 
     apr_thread_mutex_create(&new_cfg->server_mutex,
                             APR_THREAD_MUTEX_DEFAULT, p);

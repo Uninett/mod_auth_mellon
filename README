@@ -199,6 +199,11 @@ MellonLockFile "/tmp/mellonLock"
         # Default: MellonEndpointPath "/mellon"
 	MellonEndpointPath "/secret/endpoint"
 
+        # MellonDefaultLoginPath is the location where one should be
+        # redirected after an IdP-initiated login. Default is "/"
+        # Default: MellonDefaultLoginPath "/"
+        MellonDefaultLoginPath "/"
+
         # MellonSessionLength sets the maximum lifetime of a session, in
         # seconds. The actual lifetime may be shorter, depending on the
         # conditions received from the IdP. The default length is 86400
