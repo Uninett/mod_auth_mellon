@@ -1,3 +1,21 @@
+Version 0.1.0
+---------------------------------------------------------------------------
+
+* Better support for BSD.
+
+* Support for setting a IdP CA certificate and SP certificate.
+
+* Support for loading the private key during web server initialization.
+  With this, the private key only needs to be readable by root. This
+  requires a recent version of Lasso to work.
+
+* Better DOS resistance, by only allocating a session when the user has
+  authenticated with the IdP.
+
+* Support for IdP initiated login. The MellonDefaultLoginPath option can
+  be to configure which page the user should land on after authentication.
+
+
 Version 0.0.7
 ---------------------------------------------------------------------------
 
