@@ -234,6 +234,11 @@ MellonLockFile "/tmp/mellonLock"
         # Default: None set.
 	MellonSPPrivateKeyFile /etc/apache2/mellon/sp-private-key.pem
 
+        # MellonSPCertFile is a .pem file with the certificate for the
+        # service provider. This directive is optional.
+        # Default: None set.
+        MellonSPCertFile /etc/apache2/mellon/sp-cert.pem
+
         # MellonIdPMetadataFile is the full path to the file which contains
         # metadata for the IdP you are authenticating against. This
         # directive is required.
@@ -242,9 +247,17 @@ MellonLockFile "/tmp/mellonLock"
 
         # MellonIdpPublicKeyFile is the full path of the public key of the
         # IdP. This parameter is optional if the public key is embedded
-        # in the IdP's metadata file.
+        # in the IdP's metadata file, or if a certificate authority is
+        # used.
         # Default: None set.
 	MellonIdPPublicKeyFile /etc/apache2/mellon/idp-public-key.pem
+
+        # MellonIdPCAFile is te full path to the certificate of the
+        # certificate authority. This can be used instead of an
+        # certificate for the IdP.
+        # Default: None set.
+        MellonIdPCAFile /etc/apache2/mellon/ca.pem
+
 </Location>
 
 
