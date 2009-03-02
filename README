@@ -161,6 +161,13 @@ MellonLockFile "/tmp/mellonLock"
         # Default: "cookie"
 	MellonVariable "cookie"
 
+        # MellonSecureCookie enforces the HttpOnly and secure flags
+        # for the mod_mellon cookie
+        # Default: Off
+        MellonSecureCookie On
+
+        # MellonSecureCookie enforces the HttpOnly and secure flags
+        # for the mod_mellon cookie
         # MellonUser selects which attribute we should use for the username.
         # The username is passed on to other apache modules and to the web
         # page the user visits. NAME_ID is an attribute which we set to

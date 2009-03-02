@@ -140,13 +140,18 @@ void am_cookie_set(request_rec *r, const char *id)
 {
     const char *name;
     char *cookie;
+    int secure_cookie;
 
     if (id == NULL)
         return;
 
+    secure_cookie = ((am_dir_cfg_rec *)am_get_dir_cfg(r))->secure;
     name = am_cookie_name(r);
 
-    cookie = apr_psprintf(r->pool, "%s=%s; Version=1; Path=/", name, id);
+    cookie = apr_psprintf(r->pool,
+                         "%s=%s; Version=1; Path=/; Domain=%s%s;",
+                         name, id, r->server->server_hostname,
+                         secure_cookie ? "; HttpOnly; secure" : "");
     ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, r->server,
                  "cookie_set: %s", cookie);
 

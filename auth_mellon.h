@@ -127,6 +127,7 @@ typedef struct am_dir_cfg_rec {
     am_decoder_t decoder;
 
     const char *varname;
+    int secure;
     apr_hash_t *require;
     apr_hash_t *envattr;
     const char *userattr;

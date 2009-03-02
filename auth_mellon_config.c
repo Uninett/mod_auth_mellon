@@ -39,6 +39,10 @@ static const char *default_user_attribute = "NAME_ID";
  */
 static const char *default_cookie_name = "cookie";
 
+/* The default setting for cookie flags is to not enforce HttpOnly and secure
+ */
+static const int default_secure_cookie = 0; 
+
 /* This is the default IdP initiated login location
  * the MellonDefaultLoginPath configuration directive if you change this.
  */
@@ -352,6 +356,14 @@ const command_rec auth_mellon_commands[] = {
         " be 'mellon-cookie'."
         ),
     AP_INIT_TAKE1(
+        "MellonSecureCookie",
+        ap_set_flag_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, secure),
+        OR_AUTHCFG,
+        "Whether the cookie set by auth_mellon should have HttpOnly and"
+        " secure flags set. Default is off."
+        ),
+    AP_INIT_TAKE1(
         "MellonUser",
         ap_set_string_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, userattr),
@@ -480,6 +492,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->decoder = am_decoder_default;
 
     dir->varname = default_cookie_name;
+    dir->secure = default_secure_cookie;
     dir->require   = apr_hash_make(p);
     dir->envattr   = apr_hash_make(p);
     dir->userattr  = default_user_attribute;
@@ -540,6 +553,12 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->varname = (add_cfg->varname != default_cookie_name ?
                         add_cfg->varname :
                         base_cfg->varname);
+
+    
+    new_cfg->secure = (add_cfg->secure != default_secure_cookie ?
+                        add_cfg->secure :
+                        base_cfg->secure);
+
 
     new_cfg->require = apr_hash_copy(p,
                                      (apr_hash_count(add_cfg->require) > 0) ?
