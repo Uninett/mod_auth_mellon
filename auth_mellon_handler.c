@@ -386,7 +386,10 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
                       " loggged in.");
 
         lasso_logout_destroy(logout);
-        return HTTP_INTERNAL_SERVER_ERROR;
+
+        /* Redirect to the page the user should be sent to after logout. */
+        apr_table_setn(r->headers_out, "Location", return_to);
+        return HTTP_SEE_OTHER;
     } else if(res != 0) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Unable to create logout request."
