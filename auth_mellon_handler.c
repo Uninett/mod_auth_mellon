@@ -30,6 +30,108 @@
 #endif /* HAVE_lasso_server_new_from_buffers */
 
 
+#ifdef HAVE_lasso_server_new_from_buffers
+/* This function produces the endpoint URL
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  the endpoint URL
+ */
+static char *am_get_endpoint_url(request_rec *r)
+{
+    static APR_OPTIONAL_FN_TYPE(ssl_is_https) *am_is_https = NULL;
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    apr_pool_t *p = r->pool;
+    server_rec *s = r->server;
+    apr_port_t default_port;
+    char *port;
+    char *scheme;
+
+    am_is_https = APR_RETRIEVE_OPTIONAL_FN(ssl_is_https);
+
+    if (am_is_https && am_is_https(r->connection)) {
+        scheme = "https://";
+        default_port = DEFAULT_HTTPS_PORT;
+    } else {
+        scheme = "http://";
+        default_port = DEFAULT_HTTP_PORT;
+    }
+
+    if (s->addrs->host_port != default_port)
+        port = apr_psprintf(p, ":%d", s->addrs->host_port);
+    else
+        port = "";
+
+    return apr_psprintf(p, "%s%s%s%s", scheme,
+                        s->server_hostname,
+                        port,  cfg->endpoint_path);
+}
+
+/* This function generates metadata
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  the metadata, or NULL if an error occured
+ */
+static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    char *url = am_get_endpoint_url(r);
+    char *cert = "";
+
+    if (cfg->sp_cert_file)
+        cert = apr_psprintf(p,
+          "<KeyDescriptor use=\"signing\">"
+            "<ds:KeyInfo xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">"
+              "<ds:X509Data>"
+                "<ds:X509Certificate>%s</ds:X509Certificate>"
+              "</ds:X509Data>"
+            "</ds:KeyInfo>"
+          "</KeyDescriptor>"
+          "<KeyDescriptor use=\"encryption\">"
+            "<ds:KeyInfo xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">"
+              "<ds:X509Data>"
+                "<ds:X509Certificate>%s</ds:X509Certificate>"
+              "</ds:X509Data>"
+            "</ds:KeyInfo>"
+          "</KeyDescriptor>",
+          cfg->sp_cert_file,
+          cfg->sp_cert_file);
+
+    return apr_psprintf(p,
+      "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+      "<EntityDescriptor "
+        "entityID=\"%smetadata\" "
+        "xmlns=\"urn:oasis:names:tc:SAML:2.0:metadata\">"
+        "<SPSSODescriptor "
+          "AuthnRequestsSigned=\"true\" "
+          "WantAssertionsSigned=\"true\" "
+          "protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"
+          "%s"
+          "<SingleLogoutService "
+            "Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect\" "
+            "Location=\"%slogout\" />"
+          "<ManageNameIDService "
+            "Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:SOAP\" "
+            "Location=\"%slogoutRequest\"/>"
+          "<NameIDFormat>"
+            "urn:oasis:names:tc:SAML:2.0:nameid-format:transient"
+          "</NameIDFormat>"
+          "<AssertionConsumerService "
+            "index=\"0\" "
+            "isDefault=\"true\" "
+            "Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\" "
+            "Location=\"%spostResponse\" />"
+        "</SPSSODescriptor>"
+      "</EntityDescriptor>",
+      url, cert, url, url, url);
+}
+#endif /* HAVE_lasso_server_new_from_buffers */
+
 static LassoServer *am_get_lasso_server(request_rec *r)
 {
     am_dir_cfg_rec *cfg;
@@ -39,6 +141,17 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 
     apr_thread_mutex_lock(cfg->server_mutex);
     if(cfg->server == NULL) {
+#ifdef HAVE_lasso_server_new_from_buffers
+        /*
+         * If we have no metadata, try to generate them now
+         */
+        if(cfg->sp_metadata_file == NULL) {
+            apr_pool_t *pool = r->server->process->pconf;
+
+            cfg->sp_metadata_file = am_generate_metadata(pool, r);
+        }
+#endif /* HAVE_lasso_server_new_from_buffers */
+
         cfg->server = SERVER_NEW(cfg->sp_metadata_file,
                                  cfg->sp_private_key_file,
                                  NULL,
@@ -1270,6 +1383,75 @@ static int am_handle_artifact_reply(request_rec *r)
 }
 
 
+/* This function handles responses to metadata request
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  OK on success, or an error on failure.
+ */
+int am_handle_metadata(request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    const char *endpoint;
+#ifdef HAVE_lasso_server_new_from_buffers
+    LassoServer *server;
+    const char *data;
+#endif
+
+    /* Check if this is a request for one of our endpoints. We check if
+     * the uri starts with the path set with the MellonEndpointPath
+     * configuration directive.
+     */
+    if(strstr(r->uri, cfg->endpoint_path) != r->uri)
+        return DECLINED;
+
+    endpoint = &r->uri[strlen(cfg->endpoint_path)];
+    if (strcmp(endpoint, "metadata") != 0)
+        return DECLINED;
+
+#ifdef HAVE_lasso_server_new_from_buffers
+    /* Make sure that this is a GET request. */
+    if(r->method_number != M_GET) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Exptected GET request for the metadata endpoint."
+                      " Got a %s request instead.", r->method);
+
+        /* According to the documentation for request_rec, a handler which
+         * doesn't handle a request method, should set r->allowed to the
+         * methods it handles, and return DECLINED.
+         * However, the default handler handles GET-requests, so for GET
+         * requests the handler should return HTTP_METHOD_NOT_ALLOWED.
+         * This endpoints handles GET requests, so it isn't necessary to
+         * check for method_number == M_GET.
+         */
+        r->allowed = M_GET;
+
+        return DECLINED;
+    }
+
+    server = am_get_lasso_server(r);
+    if(server == NULL)
+        return HTTP_INTERNAL_SERVER_ERROR;
+
+    data = cfg->sp_metadata_file;
+    if (data == NULL)
+        return HTTP_INTERNAL_SERVER_ERROR;
+
+    r->content_type = "application/samlmetadata+xml";
+
+    ap_rputs(data, r);
+
+    return OK;
+#else  /* ! HAVE_lasso_server_new_from_buffers */
+    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                  "metadata publishing require lasso 2.2.2 or higher");
+    return HTTP_NOT_FOUND;
+#endif
+}
+
+
 /* This function takes a request for an endpoint and passes it on to the
  * correct handler function.
  *
@@ -1296,6 +1478,8 @@ static int am_endpoint_handler(request_rec *r)
 	return am_handle_post_reply(r);
     } else if(!strcmp(endpoint, "artifactResponse")) {
         return am_handle_artifact_reply(r);
+    } else if(!strcmp(endpoint, "metadata")) {
+        return OK;
     } else if(!strcmp(endpoint, "logout")
               || !strcmp(endpoint, "logoutRequest")) {
         /* logoutRequest is included for backwards-compatibility

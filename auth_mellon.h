@@ -57,6 +57,7 @@
 #include "http_log.h"
 #include "http_protocol.h"
 #include "http_request.h"
+#include "mod_ssl.h"
 
 
 /* Size definitions for the session cache.
@@ -238,6 +239,7 @@ char *am_getfile(apr_pool_t *conf, server_rec *s, const char *file);
 
 int am_auth_mellon_user(request_rec *r);
 int am_check_uid(request_rec *r);
+int am_handle_metadata(request_rec *r);
 
 
 int am_httpclient_get(request_rec *r, const char *uri,

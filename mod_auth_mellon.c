@@ -234,6 +234,7 @@ static void register_hooks(apr_pool_t *p)
     ap_hook_check_user_id(am_check_uid, NULL, NULL, APR_HOOK_MIDDLE);
     ap_hook_post_config(am_global_init, NULL, NULL, APR_HOOK_MIDDLE);
     ap_hook_child_init(am_child_init, NULL, NULL, APR_HOOK_MIDDLE);
+    ap_hook_handler(am_handle_metadata, NULL, NULL, APR_HOOK_MIDDLE);
     return;
 }
 
