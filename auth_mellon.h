@@ -49,6 +49,7 @@
 #include "apr_md5.h"
 #include "apr_file_info.h"
 #include "apr_file_io.h"
+#include "apr_xml.h"
 
 #include "ap_config.h"
 #include "httpd.h"
@@ -116,7 +117,6 @@ typedef enum {
     am_decoder_feide,
 } am_decoder_t;
 
-
 typedef struct am_dir_cfg_rec {
     /* enable_mellon is used to enable auth_mellon for a location.
      */
@@ -144,7 +144,7 @@ typedef struct am_dir_cfg_rec {
     const char *sp_metadata_file;
     const char *sp_private_key_file;
     const char *sp_cert_file;
-    const char *idp_metadata_file;
+    apr_hash_t *idp_metadata_files; 
     const char *idp_public_key_file;
     const char *idp_ca_file;
 
@@ -156,6 +156,9 @@ typedef struct am_dir_cfg_rec {
 
     /* Login path for IdP initiated logins */
     const char *login_path;
+
+    /* IdP discovery service */
+    const char *discovery_url;
 
     /* Mutex to prevent us from creating several lasso server objects. */
     apr_thread_mutex_t *server_mutex;
@@ -242,8 +245,9 @@ int am_check_uid(request_rec *r);
 int am_handle_metadata(request_rec *r);
 
 
-int am_httpclient_get(request_rec *r, const char *uri,
-                      void **buffer, apr_size_t *size);
+int am_httpclient_get(request_rec *r, const char *uri, 
+                      void **buffer, apr_size_t *size, 
+                      apr_time_t timeout, long *status);
 int am_httpclient_post(request_rec *r, const char *uri,
                        const void *post_data, apr_size_t post_length,
                        const char *content_type,

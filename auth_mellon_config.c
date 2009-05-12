@@ -83,6 +83,103 @@ static const char *am_set_filestring_slot(cmd_parms *cmd,
 }
 
 
+/* This function extracts an IdP ProviderID from metadata
+ *
+ * Parameters:
+ *  apr_pool_t *p        Pool to allocate temporary items from.
+ *  server_rec *s        The server.
+ *  const char *file     File containing metadata.
+ *  const char **provider      The providerID
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ *  
+ */
+static const char *am_get_proovider_id(apr_pool_t *p,
+                                       server_rec *s,
+                                       const char *file,
+                                       const char **provider)
+{
+    char *data;
+    apr_xml_parser *xp;
+    apr_xml_doc *xd;
+    apr_xml_attr *xa;
+    char error[1024];
+
+    *provider = NULL;
+
+    /*
+     *  Get the data
+     */
+    if ((data = am_getfile(p, s, file)) == NULL)
+        return apr_psprintf(p, "Cannot read file %s", file);
+
+    /* 
+     * Parse 
+     */
+    xp = apr_xml_parser_create(p);
+    if (apr_xml_parser_feed(xp, data, strlen(data)) != 0)
+        return apr_psprintf(p, "Cannot parse %s: %s", file, 
+                            apr_xml_parser_geterror(xp, error, sizeof(error)));
+
+    if (apr_xml_parser_done(xp, &xd) != 0)
+        return apr_psprintf(p, "Parse error %s: %s", file, 
+                            apr_xml_parser_geterror(xp, error, sizeof(error)));
+
+    /*
+     * Extract /EntityDescriptor@EntityID
+     */
+    if (strcasecmp(xd->root->name, "EntityDescriptor") != 0)
+        return apr_psprintf(p, "<EntityDescriptor> is not root in %s", file);
+
+    for (xa = xd->root->attr; xa; xa = xa->next) 
+        if (strcasecmp(xa->name, "entityID") == 0)
+            break;	
+
+    if (xa  == NULL)
+        return apr_psprintf(p, "entityID not found in %s", file);
+
+    *provider = xa->value;
+    return NULL;
+}
+
+/* This function handles configuration directives which set an 
+ * idp related slot in the module configuration. 
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *  const char *arg      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *ap_set_idp_string_slot(cmd_parms *cmd,
+                                          void *struct_ptr,
+                                          const char *arg)
+{
+    server_rec *s = cmd->server;
+    apr_pool_t *pconf = s->process->pconf;
+    am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
+    const char *error;
+    const char *provider_id;
+
+    if ((error = am_get_proovider_id(cmd->pool, s, 
+                                     arg, &provider_id)) != NULL)
+        return apr_psprintf(cmd->pool, "%s - %s", cmd->cmd->name, error);
+
+    apr_hash_set(cfg->idp_metadata_files,
+                 apr_pstrdup(pconf, provider_id),
+                 APR_HASH_KEY_STRING,
+                 apr_pstrdup(pconf, arg));
+
+    return NULL;
+}
+
+
 /* This function handles configuration directives which set a string
  * slot in the module configuration.
  *
@@ -431,8 +528,8 @@ const command_rec auth_mellon_commands[] = {
         ),
     AP_INIT_TAKE1(
         "MellonIdPMetadataFile",
-        ap_set_string_slot,
-        (void *)APR_OFFSETOF(am_dir_cfg_rec, idp_metadata_file),
+        ap_set_idp_string_slot,
+	NULL,
         OR_AUTHCFG,
         "Full path to xml metadata file for the IdP."
         ),
@@ -457,6 +554,13 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "The location where to redirect after IdP initiated login."
         " Default value is \"/\"."
+        ),
+    AP_INIT_TAKE1(
+        "MellonDiscoveryURL",
+        ap_set_string_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, discovery_url),
+        OR_AUTHCFG,
+        "The URL of IdP discovery service. Default is unset."
         ),
     AP_INIT_TAKE1(
         "MellonEndpointPath",
@@ -506,11 +610,11 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->sp_metadata_file = NULL;
     dir->sp_private_key_file = NULL;
     dir->sp_cert_file = NULL;
-    dir->idp_metadata_file = NULL;
+    dir->idp_metadata_files = apr_hash_make(p);
     dir->idp_public_key_file = NULL;
     dir->idp_ca_file = NULL;
     dir->login_path = default_login_path;
-
+    dir->discovery_url = NULL;
 
     apr_thread_mutex_create(&dir->server_mutex, APR_THREAD_MUTEX_DEFAULT, p);
 
@@ -602,9 +706,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                              add_cfg->sp_cert_file :
                              base_cfg->sp_cert_file);
 
-    new_cfg->idp_metadata_file = (add_cfg->idp_metadata_file ?
-                                  add_cfg->idp_metadata_file :
-                                  base_cfg->idp_metadata_file);
+    new_cfg->idp_metadata_files = apr_hash_copy(p,
+                         (apr_hash_count(add_cfg->idp_metadata_files) > 0) ?
+                         add_cfg->idp_metadata_files :
+                         base_cfg->idp_metadata_files);
 
     new_cfg->idp_public_key_file = (add_cfg->idp_public_key_file ?
                                     add_cfg->idp_public_key_file :
@@ -617,6 +722,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->login_path = (add_cfg->login_path != default_login_path ?
                            add_cfg->login_path :
                            base_cfg->login_path);
+
+    new_cfg->discovery_url = (add_cfg->discovery_url ?
+                              add_cfg->discovery_url :
+                              base_cfg->discovery_url);
 
     apr_thread_mutex_create(&new_cfg->server_mutex,
                             APR_THREAD_MUTEX_DEFAULT, p);

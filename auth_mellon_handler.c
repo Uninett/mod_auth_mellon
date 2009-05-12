@@ -30,7 +30,6 @@
 #endif /* HAVE_lasso_server_new_from_buffers */
 
 
-#ifdef HAVE_lasso_server_new_from_buffers
 /* This function produces the endpoint URL
  *
  * Parameters:
@@ -69,6 +68,7 @@ static char *am_get_endpoint_url(request_rec *r)
                         port,  cfg->endpoint_path);
 }
 
+#ifdef HAVE_lasso_server_new_from_buffers
 /* This function generates metadata
  *
  * Parameters:
@@ -132,12 +132,213 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
 }
 #endif /* HAVE_lasso_server_new_from_buffers */
 
+/* This function returns the first configured IdP
+ *
+ * Parameters: 
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  the providerID, or NULL if an error occured
+ */
+static const char *am_first_idp(request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    apr_hash_index_t *index;
+    const char *provider_id;
+    apr_ssize_t len;
+    void *idp_metadata_file;
+
+    index = apr_hash_first(r->pool, cfg->idp_metadata_files);
+    if (index == NULL)
+        return NULL;
+
+    apr_hash_this(index, (const void **)&provider_id, 
+                  &len, &idp_metadata_file);
+    return provider_id;
+}
+
+/* This returns built-in IdP discovery timeout
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  the timeout, -1 if not enabled.
+ */
+static long am_builtin_discovery_timeout(request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    const char *builtin = "builtin:get-metadata";
+    const char *timeout = "?timeout=";
+    const char *cp;
+    const long default_timeout = 1L;
+
+    if ((cfg->discovery_url == NULL) ||
+        (strncmp(cfg->discovery_url, builtin, strlen(builtin)) != 0))
+        return -1;
+    
+    cp = cfg->discovery_url + strlen(builtin);
+    if (strncmp(cp, timeout, strlen(timeout)) != 0)
+        return default_timeout;
+
+    cp += strlen(timeout);
+    return atoi(cp);
+}
+
+/* This function selects an IdP and returns its provider_id
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  the provider_id, or NULL if an error occured
+ */
+static const char *am_get_idp(request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    const char *idp_provider_id;
+    const char *idp_metadata_file;
+    apr_hash_index_t *index;
+    long timeout;
+    
+    /*
+     * If we have a single IdP, return that one.
+     */
+    if (apr_hash_count(cfg->idp_metadata_files) == 1) 
+        return am_first_idp(r);
+
+    /* 
+     * If IdP discovery handed us an IdP, try to use it.
+     */ 
+    idp_provider_id = am_extract_query_parameter(r->pool, r->args, "IdP");
+    if (idp_provider_id != NULL) {
+        int rc;
+
+        rc = am_urldecode((char *)idp_provider_id);
+        if (rc != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+                          "Could not urldecode IdP discovery value.");
+            idp_provider_id = NULL;
+        } else {
+            idp_metadata_file = apr_hash_get(cfg->idp_metadata_files, 
+                                             idp_provider_id, 
+                                             APR_HASH_KEY_STRING);
+            if (idp_metadata_file == NULL)
+                idp_provider_id = NULL;
+        }
+
+        /*
+         * If we do not know about it, fall back to default.
+         */
+        if (idp_provider_id == NULL) {
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                          "IdP discovery returned unknown or inexistant IdP");
+            idp_provider_id = am_first_idp(r);
+        }
+
+        return idp_provider_id;
+    }
+
+    /*
+     * If built-in IdP discovery is not configured, return default.
+     */
+    timeout = am_builtin_discovery_timeout(r);
+    if (timeout == -1)
+        return am_first_idp(r);
+
+    /*
+     * Otherwise, proceed with built-in IdP discovery:
+     * send probes for all configures IdP to check availability.
+     * The first to answer is chosen. On error, use default.
+     */
+    for (index = apr_hash_first(r->pool, cfg->idp_metadata_files);
+         index;
+         index = apr_hash_next(index)) {
+        void *buffer;
+        apr_size_t len;
+        apr_ssize_t slen;
+        long status;
+ 
+        apr_hash_this(index, 
+                      (const void **)&idp_provider_id, 
+                      &slen,
+                      (void *)&idp_metadata_file);
+
+        status = 0;
+        if (am_httpclient_get(r, idp_provider_id, &buffer, &len, 
+                              timeout, &status) != OK)
+            continue;
+
+        if (status != HTTP_OK) {
+	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+			  "Cannot probe %s: IdP returned HTTP %ld",
+			  idp_provider_id, status);
+            continue;
+        }
+
+        /* We got some succes */
+        return idp_provider_id;
+    }
+
+    /* 
+     * No IdP answered, use default 
+     * Perhaps we should redirect to an error page instead.
+     */
+    return am_first_idp(r);
+}
+
+/*
+ * This function loads all IdP metadata in a lasso server
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  number of loaded providers
+ */
+static int am_server_add_providers(request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    const char *idp_metadata_file;
+    const char *idp_public_key_file;
+    apr_hash_index_t *index;
+    int count = 0;
+
+    if (apr_hash_count(cfg->idp_metadata_files) == 1)
+        idp_public_key_file = cfg->idp_public_key_file;
+    else
+        idp_public_key_file = NULL;
+
+    for (index = apr_hash_first(r->pool, cfg->idp_metadata_files);
+         index;
+         index = apr_hash_next(index)) {
+        const char *idp_provider_id;
+        apr_ssize_t len;
+        int ret;
+ 
+        apr_hash_this(index, (const void **)&idp_provider_id, 
+                      &len, (void *)&idp_metadata_file);
+
+      
+	ret = lasso_server_add_provider(cfg->server, LASSO_PROVIDER_ROLE_IDP,
+					idp_metadata_file,
+					idp_public_key_file,
+					cfg->idp_ca_file);
+	if (ret != 0) {
+	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+			  "Error adding IdP \"%s\" to lasso server object.",
+			  idp_provider_id);
+        } else {
+            count++;
+        }
+    }
+
+    return count;
+}
+
 static LassoServer *am_get_lasso_server(request_rec *r)
 {
-    am_dir_cfg_rec *cfg;
-    gint ret;
-
-    cfg = am_get_dir_cfg(r);
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
 
     apr_thread_mutex_lock(cfg->server_mutex);
     if(cfg->server == NULL) {
@@ -166,12 +367,7 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 	    return NULL;
 	}
 
-      
-	ret = lasso_server_add_provider(cfg->server, LASSO_PROVIDER_ROLE_IDP,
-					cfg->idp_metadata_file,
-					cfg->idp_public_key_file,
-					cfg->idp_ca_file);
-	if(ret != 0) {
+        if (am_server_add_providers(r) == 0) {
 	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
 			  "Error adding IdP to lasso server object. Please"
 			  " verify the following configuration directives:"
@@ -1452,59 +1648,58 @@ int am_handle_metadata(request_rec *r)
 }
 
 
-/* This function takes a request for an endpoint and passes it on to the
- * correct handler function.
- *
- * Parameters:
- *  request_rec *r       The request we are currently handling.
- *
- * Returns:
- *  The return value of the endpoint handler function,
- *  or HTTP_NOT_FOUND if we don't have a handler for the requested
- *  endpoint.
- */
-static int am_endpoint_handler(request_rec *r)
-{
-    const char *endpoint;
-    am_dir_cfg_rec *dir = am_get_dir_cfg(r);
-
-    /* r->uri starts with cfg->endpoint_path, so we can find the endpoint
-     * by extracting the string following chf->endpoint_path.
-     */
-    endpoint = &r->uri[strlen(dir->endpoint_path)];
-
-
-    if(!strcmp(endpoint, "postResponse")) {
-	return am_handle_post_reply(r);
-    } else if(!strcmp(endpoint, "artifactResponse")) {
-        return am_handle_artifact_reply(r);
-    } else if(!strcmp(endpoint, "metadata")) {
-        return OK;
-    } else if(!strcmp(endpoint, "logout")
-              || !strcmp(endpoint, "logoutRequest")) {
-        /* logoutRequest is included for backwards-compatibility
-         * with version 0.0.6 and older.
-         */
-        return am_handle_logout(r);
-    } else {
-	ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-		      "Endpoint \"%s\" not handled by mod_auth_mellon.",
-		      endpoint);
-
-	return HTTP_NOT_FOUND;
-    }
-    
-}
-
-
 static int am_auth_new_ticket(request_rec *r)
 {
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     LassoServer *server;
     LassoLogin *login;
     LassoSamlp2AuthnRequest *request;
     gint ret;
     char *redirect_to;
+    const char *relay_state;
 
+    relay_state = am_reconstruct_url(r);
+
+    /* Check if IdP discovery is in use and no IdP was selected yet */
+    if ((cfg->discovery_url != NULL) && 
+        (am_builtin_discovery_timeout(r) == -1) && /* no built-in discovery */
+        (am_extract_query_parameter(r->pool, r->args, "IdP") == NULL)) {
+        char *discovery_url;
+	char *return_url;
+	char *endpoint = am_get_endpoint_url(r);
+        char *sep;
+
+        /* If discovery URL already has a ? we append a & */
+        sep = (strchr(cfg->discovery_url, '?')) ? "&" : "?";
+
+	return_url = apr_psprintf(r->pool, "%sauth?ReturnTo=%s",
+                                  endpoint, 
+                                  am_urlencode(r->pool, relay_state));
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+		      "return_url = %s", return_url);
+        discovery_url = apr_psprintf(r->pool, "%s%sentityID=%smetadata&"
+                                     "return=%s&returnIDParam=IdP",
+                                     cfg->discovery_url, sep, 
+                                     am_urlencode(r->pool, endpoint),
+                                     am_urlencode(r->pool, return_url));
+	
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+		      "discovery_url = %s", discovery_url);
+        apr_table_setn(r->headers_out, "Location", discovery_url);
+        return HTTP_SEE_OTHER;
+    }
+
+    /* If IdP discovery is in use and we have an IdP selected, 
+     * set the relay_state
+     */
+    if ((cfg->discovery_url != NULL) &&
+        (am_builtin_discovery_timeout(r) == -1)) { /* no built-in discovery */
+        char *return_url;
+
+        return_url = am_extract_query_parameter(r->pool, r->args, "ReturnTo");
+        if ((return_url != NULL) && am_urldecode((char *)return_url) == 0)
+            relay_state = return_url;
+    }
 
     /* Add cookie for cookie test. We know that we should have
      * a valid cookie when we return from the IdP after SP-initiated
@@ -1525,7 +1720,7 @@ static int am_auth_new_ticket(request_rec *r)
 	return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    ret = lasso_login_init_authn_request(login, NULL,
+    ret = lasso_login_init_authn_request(login, am_get_idp(r),
 					 LASSO_HTTP_METHOD_REDIRECT);
     if(ret != 0) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
@@ -1552,7 +1747,7 @@ static int am_auth_new_ticket(request_rec *r)
     LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Consent
       = g_strdup(LASSO_SAML2_CONSENT_IMPLICIT);
 
-    LASSO_PROFILE(login)->msg_relayState = g_strdup(am_reconstruct_url(r));
+    LASSO_PROFILE(login)->msg_relayState = g_strdup(relay_state);
 
     ret = lasso_login_build_authn_request_msg(login);
     if(ret != 0) {
@@ -1588,6 +1783,53 @@ static int am_auth_new_ticket(request_rec *r)
     return HTTP_SEE_OTHER;
 }
 
+/* This function takes a request for an endpoint and passes it on to the
+ * correct handler function.
+ *
+ * Parameters:
+ *  request_rec *r       The request we are currently handling.
+ *
+ * Returns:
+ *  The return value of the endpoint handler function,
+ *  or HTTP_NOT_FOUND if we don't have a handler for the requested
+ *  endpoint.
+ */
+static int am_endpoint_handler(request_rec *r)
+{
+    const char *endpoint;
+    am_dir_cfg_rec *dir = am_get_dir_cfg(r);
+
+    /* r->uri starts with cfg->endpoint_path, so we can find the endpoint
+     * by extracting the string following chf->endpoint_path.
+     */
+    endpoint = &r->uri[strlen(dir->endpoint_path)];
+
+
+    if(!strcmp(endpoint, "postResponse")) {
+	return am_handle_post_reply(r);
+    } else if(!strcmp(endpoint, "artifactResponse")) {
+        return am_handle_artifact_reply(r);
+    } else if(!strcmp(endpoint, "auth")) {
+        return am_auth_new_ticket(r);
+    } else if(!strcmp(endpoint, "metadata")) {
+        return OK;
+    } else if(!strcmp(endpoint, "logout")
+              || !strcmp(endpoint, "logoutRequest")) {
+        /* logoutRequest is included for backwards-compatibility
+         * with version 0.0.6 and older.
+         */
+        return am_handle_logout(r);
+    } else {
+	ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+		      "Endpoint \"%s\" not handled by mod_auth_mellon.",
+		      endpoint);
+
+	return HTTP_NOT_FOUND;
+    }
+    
+}
+
+
 
 int am_auth_mellon_user(request_rec *r)
 {
@@ -1605,7 +1847,6 @@ int am_auth_mellon_user(request_rec *r)
        || dir->enable_mellon == am_enable_default) {
 	return DECLINED;
     }
-
 
     /* Disable all caching within this location. */
     am_set_nocache(r);

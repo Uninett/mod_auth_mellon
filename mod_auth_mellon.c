@@ -47,6 +47,7 @@ static apr_status_t am_global_kill(void *p)
     server_rec     *s = (server_rec *) p;
     am_mod_cfg_rec *m = am_get_mod_cfg(s);
 
+
     if (m->cache) {
         /* Destroy the shared memory for session data. */
         apr_shm_destroy(m->cache);

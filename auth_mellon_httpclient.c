@@ -246,6 +246,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
                                      am_hc_block_header_t *bh,
                                      char *curl_error)
 {
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     CURL *curl;
     CURLcode res;
 
@@ -311,6 +312,17 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
         goto cleanup_fail;
     }
 
+    /* If we have a CA configured, try to use it */
+    if (cfg->idp_ca_file != NULL) {
+        res = curl_easy_setopt(curl, CURLOPT_CAINFO, cfg->idp_ca_file);
+        if(res != CURLE_OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Failed to set SSL CA info %s:"
+                          " [%u] %s", cfg->idp_ca_file, res, curl_error);
+            goto cleanup_fail;
+        }
+    }
+
     /* Enable fail on http error. */
     res = curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
     if(res != CURLE_OK) {
@@ -359,7 +371,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
 }
 
 
-/* This function downloads data from a specified URI.
+/* This function downloads data from a specified URI, with specified timeout
  *
  * Parameters:
  *  request_rec *r       The apache request this download is associated
@@ -371,13 +383,16 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
  *  apr_size_t *size     This is a pointer to where we will store the length
  *                       of the downloaded data, not including the
  *                       null-terminator we add. This parameter can be NULL.
+ *  apr_time_t timeout   Timeout in seconds, 0 for no timeout.
+ *  long *status         Pointer to HTTP status code. 
  *
  * Returns:
  *  OK on success, or HTTP_INTERNAL_SERVER_ERROR on failure. On failure we
  *  will write a log message describing the error.
  */
 int am_httpclient_get(request_rec *r, const char *uri,
-                      void **buffer, apr_size_t *size)
+                      void **buffer, apr_size_t *size,
+                      apr_time_t timeout, long *status)
 {
     am_hc_block_header_t bh;
     CURL *curl;
@@ -393,15 +408,45 @@ int am_httpclient_get(request_rec *r, const char *uri,
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
+    if(res != CURLE_OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Failed to download data from the uri \"%s\", "
+                      "cannot set timeout to %ld: [%u] %s",
+                      uri, (long)timeout, res, curl_error);
+        goto cleanup_fail;
+    }
+    
+    res = curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, timeout);
+    if(res != CURLE_OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Failed to download data from the uri \"%s\", "
+                      "cannot set connect timeout to %ld: [%u] %s",
+                      uri, (long)timeout,  res, curl_error);
+        goto cleanup_fail;
+    }
+
     /* Do the download. */
     res = curl_easy_perform(curl);
     if(res != CURLE_OK) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Failed to download data from the uri \"%s\": [%u] %s",
+                      "Failed to download data from the uri \"%s\", "
+                      "transaction aborted: [%u] %s",
                       uri, res, curl_error);
         goto cleanup_fail;
     }
 
+    if (status != NULL) {
+        res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, status);
+        if(res != CURLE_OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Failed to download data from the uri \"%s\", "
+                          "no status report: [%u] %s",
+                          uri, res, curl_error);
+            goto cleanup_fail;
+       }
+    }
+    
     /* Free the curl object. */
     curl_easy_cleanup(curl);
 
