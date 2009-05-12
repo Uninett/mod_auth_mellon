@@ -29,41 +29,6 @@
 #endif
 
 
-/* This function is called on server exit. It destroys the shared memory we
- * allocated for storing session data, and the global mutex we used to
- * synchronize access to the shared memory.
- *
- * The function is registered as a cleanup-function on the configuration
- * pool.
- *
- * Parameters:
- *  void *p              A pointer to the current server record.
- *
- * Returns:
- *  This function always return OK.
- */
-static apr_status_t am_global_kill(void *p)
-{
-    server_rec     *s = (server_rec *) p;
-    am_mod_cfg_rec *m = am_get_mod_cfg(s);
-
-
-    if (m->cache) {
-        /* Destroy the shared memory for session data. */
-        apr_shm_destroy(m->cache);
-        m->cache = NULL;
-    }
-
-    if(m->lock) {
-        /* Destroy the mutex. */
-        apr_global_mutex_destroy(m->lock);
-        m->lock = NULL;
-    }
-
-    return OK;
-}
-
-
 /* This function is called after the configuration of the server is parsed
  * (it's a post-config hook).
  *
@@ -132,11 +97,6 @@ static int am_global_init(apr_pool_t *conf, apr_pool_t *log,
 
     /* find out the memory size of the cache */
     mem_size = sizeof(am_cache_entry_t) * mod->init_cache_size;
-
-    /* register a function to clean up the whole mess on exit */
-    apr_pool_cleanup_register(conf, s, 
-                              am_global_kill,
-                              apr_pool_cleanup_null);
 
 
     /* Create the shared memory, exit if it fails. */
