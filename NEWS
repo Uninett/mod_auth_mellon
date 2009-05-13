@@ -1,3 +1,16 @@
+Version 0.2.0
+---------------------------------------------------------------------------
+
+* Autogeneration of SP metadata. (Requires Lasso 2.2.2 or newer.)
+
+* Multiple IdP support, with discovery service.
+
+* Built in discovery service which tests the availability of each IdP,
+  and uses the first available IdP.
+
+* Fix a mutex leak.
+
+
 Version 0.1.1
 ---------------------------------------------------------------------------
 
