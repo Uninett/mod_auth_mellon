@@ -29,7 +29,7 @@
  *
  * Returns:
  *  The session associated with the user who places the request, or
- *  NULL if we don't have a session yes.
+ *  NULL if we don't have a session yet.
  */
 am_cache_entry_t *am_get_request_session(request_rec *r)
 {
