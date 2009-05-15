@@ -113,6 +113,9 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
           "protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"
           "%s"
           "<SingleLogoutService "
+            "Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:SOAP\" "
+            "Location=\"%slogout\" />"
+          "<SingleLogoutService "
             "Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect\" "
             "Location=\"%slogout\" />"
           "<ManageNameIDService "
@@ -128,7 +131,7 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
             "Location=\"%spostResponse\" />"
         "</SPSSODescriptor>"
       "</EntityDescriptor>",
-      url, cert, url, url, url);
+      url, cert, url, url, url, url);
 }
 #endif /* HAVE_lasso_server_new_from_buffers */
 
@@ -532,19 +535,20 @@ static int am_restore_lasso_profile_state(request_rec *r,
  *
  * Parameters:
  *  request_rec *r       The logout request.
- *  LassoLogout *logout  A LassoLogout object initiatet with
+ *  LassoLogout *logout  A LassoLogout object initiated with
  *                       the current session.
  *
  * Returns:
  *  OK on success, or an error if any of the steps fail.
  */
-static int am_handle_logout_request(request_rec *r, LassoLogout *logout)
+static int am_handle_logout_request(request_rec *r, 
+                                    LassoLogout *logout, char *msg)
 {
     gint res;
     am_cache_entry_t *session;
 
     /* Process the logout message. Ignore missing signature. */
-    res = lasso_logout_process_request_msg(logout, r->args);
+    res = lasso_logout_process_request_msg(logout, msg);
     if(res != 0 && res != LASSO_DS_ERROR_SIGNATURE_NOT_FOUND) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error processing logout request message."
@@ -556,7 +560,9 @@ static int am_handle_logout_request(request_rec *r, LassoLogout *logout)
 
     /* Validate the logout message. Ignore missing signature. */
     res = lasso_logout_validate_request(logout);
-    if(res != 0 && res != LASSO_DS_ERROR_SIGNATURE_NOT_FOUND) {
+    if(res != 0 && 
+       res != LASSO_DS_ERROR_SIGNATURE_NOT_FOUND &&
+       res != LASSO_PROFILE_ERROR_SESSION_NOT_FOUND) {
         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
                       "Error validating logout request."
                       " Lasso error: [%i] %s", res, lasso_strerror(res));
@@ -566,11 +572,22 @@ static int am_handle_logout_request(request_rec *r, LassoLogout *logout)
     }
 
 
-    /* Delete the session. */
+    /* Search session using cookie */
     session = am_get_request_session(r);
-    if(session != NULL) {
-        am_delete_request_session(r, session);
+
+    /* If no session found, search by NameID, for IdP initiated SOAP SLO */
+    if (session == NULL) {
+            LassoSaml2NameID *nameid;
+
+            nameid = LASSO_SAML2_NAME_ID(LASSO_PROFILE(logout)->nameIdentifier);
+
+            if (nameid != NULL)
+                session = am_get_request_session_by_nameid(r, nameid->content);
     }
+
+    /* Delete the session. */
+    if (session != NULL)
+        am_delete_request_session(r, session);
 
 
     /* Create response message. */
@@ -824,21 +841,40 @@ static int am_handle_logout(request_rec *r)
     /* Check which type of request to the logout handler this is.
      * We have three types:
      * - logout requests: The IdP sends a logout request to this service.
+     *                    it can be either through HTTP-Redirect or SOAP.
      * - logout responses: We have sent a logout request to the IdP, and
      *   are receiving a response.
      * - We want to initiate a logout request.
      */
-    if(am_extract_query_parameter(r->pool, r->args, "SAMLRequest") != NULL) {
+
+    /* First check for IdP-initiated SOAP logout request */
+    if ((r->args == NULL) && (r->method_number == M_POST)) {
+        int rc;
+        char *post_data;
+
+        rc = am_read_post_data(r, &post_data, NULL);
+        if (rc != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+                          "Error reading POST data.");
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+        return am_handle_logout_request(r, logout, post_data);
+
+    } else if(am_extract_query_parameter(r->pool, r->args, 
+                                         "SAMLRequest") != NULL) {
         /* SAMLRequest - logout request from the IdP. */
-        return am_handle_logout_request(r, logout);
-    } else if(am_extract_query_parameter(r->pool, r->args, "SAMLResponse")
-              != NULL) {
+        return am_handle_logout_request(r, logout, r->args);
+
+    } else if(am_extract_query_parameter(r->pool, r->args, 
+                                         "SAMLResponse") != NULL) {
         /* SAMLResponse - logout response from the IdP. */
         return am_handle_logout_response(r, logout);
-    } else if(am_extract_query_parameter(r->pool, r->args, "ReturnTo")
-              != NULL) {
+
+    } else if(am_extract_query_parameter(r->pool, r->args, 
+                                         "ReturnTo") != NULL) {
         /* RedirectTo - SP initiated logout. */
         return am_init_logout_request(r, logout);
+
     } else {
         /* Unknown request to the logout handler. */
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,

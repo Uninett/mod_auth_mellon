@@ -28,12 +28,15 @@
  *
  * Parameters:
  *  server_rec *s        The current server.
- *  const char *key      The session key.
+ *  const char *key      The session key or user
+ *  am_cache_key_t type  AM_CACHE_SESSION or AM_CACHE_NAMEID
  *
  * Returns:
  *  The session entry on success or NULL on failure.
  */
-am_cache_entry_t *am_cache_lock(server_rec *s, const char *key)
+am_cache_entry_t *am_cache_lock(server_rec *s, 
+                                am_cache_key_t type,
+                                const char *key)
 {
     am_mod_cfg_rec *mod_cfg;
     am_cache_entry_t *table;
@@ -43,10 +46,22 @@ am_cache_entry_t *am_cache_lock(server_rec *s, const char *key)
 
 
     /* Check if we have a valid session key. We abort if we don't. */
-    if(key == NULL || strlen(key) != AM_SESSION_ID_LENGTH) {
+    if (key == NULL)
         return NULL;
-    }
 
+    switch (type) {
+    case AM_CACHE_SESSION:
+        if (strlen(key) != AM_SESSION_ID_LENGTH)
+            return NULL;
+        break;
+    case AM_CACHE_NAMEID:
+        if (strlen(key) > AM_CACHE_MAX_LASSO_IDENTITY_SIZE)
+            return NULL;
+        break;
+    default:
+        return NULL;
+        break;
+    }
 
     mod_cfg = am_get_mod_cfg(s);
 
@@ -63,7 +78,25 @@ am_cache_entry_t *am_cache_lock(server_rec *s, const char *key)
 
 
     for(i = 0; i < mod_cfg->init_cache_size; i++) {
-        if(strcmp(table[i].key, key) == 0) {
+        const char *tablekey;
+
+        switch (type) {
+        case AM_CACHE_SESSION:
+            tablekey = table[i].key;
+            break;
+        case AM_CACHE_NAMEID:
+            /* tablekey may be NULL */
+            tablekey = am_cache_env_fetch_first(&table[i], "NAME_ID");
+            break;
+        default:
+            tablekey = NULL;
+            break;
+        }
+
+        if (tablekey == NULL)
+            continue;
+
+        if(strcmp(tablekey, key) == 0) {
             /* We found the entry. */
             if(table[i].expires > apr_time_now()) {
                 /* And it hasn't expired. */
@@ -113,7 +146,7 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
 
 
     /* First we try to find another session with the given key. */
-    t = am_cache_lock(s, key);
+    t = am_cache_lock(s, AM_CACHE_SESSION, key);
 
 
     if(t == NULL) {
@@ -286,6 +319,29 @@ int am_cache_env_append(am_cache_entry_t *t,
     t->size++;
 
     return OK;
+}
+
+/* This function fetches a value from a session.
+ * If multiple values are available, the first one is returned.
+ *
+ * Parameters:
+ *  am_cache_entry_t *t  The current session.
+ *  const char *var      The name of the value to be stored.
+ *
+ * Returns:
+ *  The first value, NULL if it does not exist.
+ */
+const char *am_cache_env_fetch_first(am_cache_entry_t *t,
+                                     const char *var)
+{
+    int i;
+
+    for (i = 0; t->size; i++) {
+        if (strcmp(t->env[i].varname, var) == 0)
+            return t->env[i].value;
+    }
+
+    return NULL;
 }
 
 

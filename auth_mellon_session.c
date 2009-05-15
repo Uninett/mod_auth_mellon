@@ -22,7 +22,7 @@
 #include "auth_mellon.h"
 
 
-/* This function gets the session associated with a user.
+/* This function gets the session associated with a user, using a cookie
  *
  * Parameters:
  *  request_rec *r       The request we received from the user.
@@ -42,9 +42,23 @@ am_cache_entry_t *am_get_request_session(request_rec *r)
         return NULL;
     }
 
-    return am_cache_lock(r->server, session_id);
+    return am_cache_lock(r->server, AM_CACHE_SESSION, session_id);
 }
 
+/* This function gets the session associated with a user, using a NameID
+ *
+ * Parameters:
+ *  request_rec *r       The request we received from the user.
+ *  char *nameid         The NameID
+ *
+ * Returns:
+ *  The session associated with the user who places the request, or
+ *  NULL if we don't have a session yet.
+ */
+am_cache_entry_t *am_get_request_session_by_nameid(request_rec *r, char *nameid)
+{
+    return am_cache_lock(r->server, AM_CACHE_NAMEID, nameid);
+}
 
 /* This function creates a new session.
  *

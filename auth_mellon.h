@@ -189,7 +189,10 @@ typedef struct am_cache_entry_t {
     am_cache_env_t env[AM_CACHE_ENVSIZE];
 } am_cache_entry_t;
 
-
+typedef enum { 
+    AM_CACHE_SESSION, 
+    AM_CACHE_NAMEID 
+} am_cache_key_t;
 
 extern const command_rec auth_mellon_commands[];
 
@@ -203,7 +206,8 @@ void am_cookie_set(request_rec *r, const char *id);
 void am_cookie_delete(request_rec *r);
 
 
-am_cache_entry_t *am_cache_lock(server_rec *s, const char *key);
+am_cache_entry_t *am_cache_lock(server_rec *s, 
+                                am_cache_key_t type, const char *key);
 am_cache_entry_t *am_cache_new(server_rec *s, const char *key);
 void am_cache_unlock(server_rec *s, am_cache_entry_t *entry);
 
@@ -212,6 +216,8 @@ void am_cache_update_expires(am_cache_entry_t *t, apr_time_t expires);
 void am_cache_env_populate(request_rec *r, am_cache_entry_t *session);
 int am_cache_env_append(am_cache_entry_t *session,
                         const char *var, const char *val);
+const char *am_cache_env_fetch_first(am_cache_entry_t *t,
+                                     const char *var);
 void am_cache_delete(server_rec *s, am_cache_entry_t *session);
 
 int am_cache_set_lasso_state(am_cache_entry_t *session,
@@ -222,6 +228,8 @@ const char *am_cache_get_lasso_session(am_cache_entry_t *session);
 
 
 am_cache_entry_t *am_get_request_session(request_rec *r);
+am_cache_entry_t *am_get_request_session_by_nameid(request_rec *r, 
+                                                   char *nameid);
 am_cache_entry_t *am_new_request_session(request_rec *r);
 void am_release_request_session(request_rec *r, am_cache_entry_t *session);
 void am_delete_request_session(request_rec *r, am_cache_entry_t *session);
