@@ -43,6 +43,10 @@ static const char *default_cookie_name = "cookie";
  */
 static const int default_secure_cookie = 0; 
 
+/* The default setting for setting MELLON_SESSION
+ */
+static const int default_dump_session = 0; 
+
 /* This is the default IdP initiated login location
  * the MellonDefaultLoginPath configuration directive if you change this.
  */
@@ -452,7 +456,7 @@ const command_rec auth_mellon_commands[] = {
         " cookie name, and the default name of the cookie will therefore"
         " be 'mellon-cookie'."
         ),
-    AP_INIT_TAKE1(
+    AP_INIT_FLAG(
         "MellonSecureCookie",
         ap_set_flag_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, secure),
@@ -475,6 +479,13 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Renames attributes received from the server. The format is"
         " MellonSetEnv <old name> <new name>."
+        ),
+    AP_INIT_FLAG(
+        "MellonSessionDump",
+        ap_set_flag_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, dump_session),
+        OR_AUTHCFG,
+        "Dump session in environement. Default is off"
         ),
     AP_INIT_RAW_ARGS(
         "MellonRequire",
@@ -600,6 +611,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->require   = apr_hash_make(p);
     dir->envattr   = apr_hash_make(p);
     dir->userattr  = default_user_attribute;
+    dir->dump_session = default_dump_session;
 
     dir->endpoint_path = default_endpoint_path;
 
@@ -678,6 +690,9 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                          add_cfg->userattr :
                          base_cfg->userattr);
 
+    new_cfg->dump_session = (add_cfg->dump_session != default_dump_session ?
+                             add_cfg->dump_session :
+                             base_cfg->dump_session);
 
     new_cfg->endpoint_path = (
         add_cfg->endpoint_path != default_endpoint_path ?

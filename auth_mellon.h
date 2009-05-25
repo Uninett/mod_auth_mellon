@@ -69,7 +69,7 @@
 #define AM_CACHE_ENVSIZE 128
 #define AM_CACHE_USERSIZE 512
 #define AM_CACHE_MAX_LASSO_IDENTITY_SIZE 1024
-#define AM_CACHE_MAX_LASSO_SESSION_SIZE 8192
+#define AM_CACHE_MAX_LASSO_SESSION_SIZE 16384
 
 
 /* This is the length of the session id we use.
@@ -132,6 +132,7 @@ typedef struct am_dir_cfg_rec {
     apr_hash_t *require;
     apr_hash_t *envattr;
     const char *userattr;
+    int dump_session;
 
     /* The "root directory" of our SAML2 endpoints. This path is relative
      * to the root of the web server.

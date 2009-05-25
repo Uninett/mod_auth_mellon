@@ -182,6 +182,10 @@ MellonLockFile "/tmp/mellonLock"
         # Default. None set.
 	MellonSetEnv "e-mail" "mail"
 
+        # If MellonSessionDump is set, then the SAML session will be
+        # available in the MELLON_SESSION environment variable
+        MellonSessionDump Off
+ 
         # MellonRequire allows you to limit access to those with specific
         # attributes. The syntax is
         # 'MellonRequire <attribute name> <list of valid values>'.

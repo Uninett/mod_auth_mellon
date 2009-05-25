@@ -434,6 +434,19 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
         /* Increase the count. */
         ++(*count);
     }
+
+    /* Populate with the assertion? */
+    if (d->dump_session) {
+        char *session;
+        int srclen, dstlen;
+
+        srclen = strlen(t->lasso_session);
+        dstlen = apr_base64_encode_len(srclen);
+
+        session = apr_palloc(r->pool, dstlen);
+        (void)apr_base64_encode(session, t->lasso_session, srclen);
+        apr_table_set(r->subprocess_env, "MELLON_SESSION", session);
+    }
 }
 
 
