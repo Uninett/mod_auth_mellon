@@ -47,6 +47,10 @@ static const int default_secure_cookie = 0;
  */
 static const int default_dump_session = 0; 
 
+/* The default setting for setting MELLON_SAML_RESPONSE
+ */
+static const int default_dump_saml_response = 0; 
+
 /* This is the default IdP initiated login location
  * the MellonDefaultLoginPath configuration directive if you change this.
  */
@@ -487,6 +491,13 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Dump session in environement. Default is off"
         ),
+    AP_INIT_FLAG(
+        "MellonSamlResponseDump",
+        ap_set_flag_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, dump_saml_response),
+        OR_AUTHCFG,
+        "Dump SAML authentication response in environement. Default is off"
+        ),
     AP_INIT_RAW_ARGS(
         "MellonRequire",
         am_set_require_slot,
@@ -612,6 +623,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->envattr   = apr_hash_make(p);
     dir->userattr  = default_user_attribute;
     dir->dump_session = default_dump_session;
+    dir->dump_saml_response = default_dump_saml_response;
 
     dir->endpoint_path = default_endpoint_path;
 
@@ -693,6 +705,11 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->dump_session = (add_cfg->dump_session != default_dump_session ?
                              add_cfg->dump_session :
                              base_cfg->dump_session);
+
+    new_cfg->dump_saml_response = 
+        (add_cfg->dump_saml_response != default_dump_saml_response ?
+         add_cfg->dump_saml_response :
+         base_cfg->dump_saml_response);
 
     new_cfg->endpoint_path = (
         add_cfg->endpoint_path != default_endpoint_path ?

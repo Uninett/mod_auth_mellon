@@ -69,7 +69,8 @@
 #define AM_CACHE_ENVSIZE 128
 #define AM_CACHE_USERSIZE 512
 #define AM_CACHE_MAX_LASSO_IDENTITY_SIZE 1024
-#define AM_CACHE_MAX_LASSO_SESSION_SIZE 16384
+#define AM_CACHE_MAX_LASSO_SESSION_SIZE 8192
+#define AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE 16384
 
 
 /* This is the length of the session id we use.
@@ -133,6 +134,7 @@ typedef struct am_dir_cfg_rec {
     apr_hash_t *envattr;
     const char *userattr;
     int dump_session;
+    int dump_saml_response;
 
     /* The "root directory" of our SAML2 endpoints. This path is relative
      * to the root of the web server.
@@ -186,6 +188,7 @@ typedef struct am_cache_entry_t {
      */
     char lasso_identity[AM_CACHE_MAX_LASSO_IDENTITY_SIZE];
     char lasso_session[AM_CACHE_MAX_LASSO_SESSION_SIZE];
+    char lasso_saml_response[AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE];
 
     am_cache_env_t env[AM_CACHE_ENVSIZE];
 } am_cache_entry_t;
@@ -223,7 +226,8 @@ void am_cache_delete(server_rec *s, am_cache_entry_t *session);
 
 int am_cache_set_lasso_state(am_cache_entry_t *session,
                              const char *lasso_identity,
-                             const char *lasso_session);
+                             const char *lasso_session,
+                             const char *lasso_saml_response);
 const char *am_cache_get_lasso_identity(am_cache_entry_t *session);
 const char *am_cache_get_lasso_session(am_cache_entry_t *session);
 

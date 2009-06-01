@@ -402,7 +402,9 @@ static LassoServer *am_get_lasso_server(request_rec *r)
  * Returns:
  *  OK on success or HTTP_INTERNAL_SERVER_ERROR on failure.
  */
-static int am_save_lasso_profile_state(request_rec *r, LassoProfile *profile)
+static int am_save_lasso_profile_state(request_rec *r, 
+                                       LassoProfile *profile, 
+                                       char *saml_response)
 {
     am_cache_entry_t *am_session;
     LassoIdentity *lasso_identity;
@@ -456,7 +458,10 @@ static int am_save_lasso_profile_state(request_rec *r, LassoProfile *profile)
     }
 
     /* Save the profile state. */
-    ret = am_cache_set_lasso_state(am_session, identity_dump, session_dump);
+    ret = am_cache_set_lasso_state(am_session, 
+                                   identity_dump, 
+                                   session_dump,
+                                   saml_response);
 
     am_release_request_session(r, am_session);
 
@@ -1309,7 +1314,7 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
  *  A HTTP status code which should be returned to the client.
  */
 static int am_handle_reply_common(request_rec *r, LassoLogin *login,
-                                  char *relay_state)
+                                  char *relay_state, char *saml_response)
 {
     const char *name_id;
     GList *assertions;
@@ -1385,7 +1390,7 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
 
 
     /* Save the profile state. */
-    rc = am_save_lasso_profile_state(r, LASSO_PROFILE(login));
+    rc = am_save_lasso_profile_state(r, LASSO_PROFILE(login), saml_response);
     if(rc != OK) {
         lasso_login_destroy(login);
         return rc;
@@ -1509,7 +1514,7 @@ static int am_handle_post_reply(request_rec *r)
                                                "RelayState");
 
     /* Finish handling the reply with the common handler. */
-    return am_handle_reply_common(r, login, relay_state);
+    return am_handle_reply_common(r, login, relay_state, saml_response);
 }
 
 
@@ -1611,7 +1616,7 @@ static int am_handle_artifact_reply(request_rec *r)
                                                "RelayState");
 
     /* Finish handling the reply with the common handler. */
-    return am_handle_reply_common(r, login, relay_state);
+    return am_handle_reply_common(r, login, relay_state, "");
 }
 
 
