@@ -301,6 +301,16 @@ MellonLockFile "/tmp/mellonLock"
         #
         # Default: None set.
         MellonDiscoveryURL "http://www.example.net/idp-discovery"
+
+        # This option will make the SAML authentication assertion 
+        # available in the MELLON_SAML_RESPONSE environement 
+        # variable. This assertion holds a verifiable signature
+        # that can be checked again. Default is Off.
+	MellonSamlResponseDump Off
+
+        # This option will make the Lasso session available in 
+	# the MELLON_SESSION environement variable. Default is Off.
+	MellonSessionDump Off
 </Location>
 
 
