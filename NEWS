@@ -1,3 +1,9 @@
+Version 0.2.1
+---------------------------------------------------------------------------
+
+* Make SAML authentication assertion and Lasso session available in the
+  environement.
+
 Version 0.2.0
 ---------------------------------------------------------------------------
 
