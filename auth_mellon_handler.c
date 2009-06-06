@@ -83,7 +83,27 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
     char *url = am_get_endpoint_url(r);
     char *cert = "";
 
-    if (cfg->sp_cert_file)
+    if (cfg->sp_cert_file) {
+	char *sp_cert_file;
+        char *cp;
+        const char *begin = "-----BEGIN CERTIFICATE-----";
+        const char *end = "-----END CERTIFICATE-----";
+
+        /* 
+         * Try to remove leading and trailing garbage, as it can
+         * wreak havoc XML parser if it contains [<>&]
+         */
+	sp_cert_file = apr_pstrdup(p, cfg->sp_cert_file);
+
+        cp = strstr(sp_cert_file, begin);
+        if (cp != NULL) 
+            sp_cert_file = cp;
+
+        cp = strstr(sp_cert_file, end);
+        if (cp != NULL)
+            *(cp + strlen(end)) = '\0';
+        
+
         cert = apr_psprintf(p,
           "<KeyDescriptor use=\"signing\">"
             "<ds:KeyInfo xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">"
@@ -99,8 +119,9 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
               "</ds:X509Data>"
             "</ds:KeyInfo>"
           "</KeyDescriptor>",
-          cfg->sp_cert_file,
-          cfg->sp_cert_file);
+          sp_cert_file,
+          sp_cert_file);
+    }
 
     return apr_psprintf(p,
       "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
