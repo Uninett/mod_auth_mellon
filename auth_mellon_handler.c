@@ -86,6 +86,7 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
     if (cfg->sp_cert_file) {
 	char *sp_cert_file;
         char *cp;
+        char *bp;
         const char *begin = "-----BEGIN CERTIFICATE-----";
         const char *end = "-----END CERTIFICATE-----";
 
@@ -97,12 +98,21 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
 
         cp = strstr(sp_cert_file, begin);
         if (cp != NULL) 
-            sp_cert_file = cp;
+            sp_cert_file = cp + strlen(begin);
 
         cp = strstr(sp_cert_file, end);
         if (cp != NULL)
-            *(cp + strlen(end)) = '\0';
+            *cp = '\0';
         
+	/* 
+	 * And remove any non printing char (CR, spaces...)
+	 */
+	bp = sp_cert_file;
+	for (cp = sp_cert_file; *cp; cp++) {
+		if (apr_isgraph(*cp))
+			*bp++ = *cp;
+	}
+	*bp = '\0';
 
         cert = apr_psprintf(p,
           "<KeyDescriptor use=\"signing\">"

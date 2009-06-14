@@ -50,6 +50,7 @@
 #include "apr_file_info.h"
 #include "apr_file_io.h"
 #include "apr_xml.h"
+#include "apr_lib.h"
 
 #include "ap_config.h"
 #include "httpd.h"
