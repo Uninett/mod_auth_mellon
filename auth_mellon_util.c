@@ -558,12 +558,13 @@ char *am_getfile(apr_pool_t *conf, server_rec *s, const char *file)
     nbytes = finfo.size;
     data = (char *)apr_palloc(conf, nbytes + 1);
 
-    if ((rv = apr_file_read(fd, (void *)data, &nbytes)) != 0) {
+    rv = apr_file_read_full(fd, data, nbytes, NULL);
+    if (rv != 0) {
         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
-                     "apr_file_read: Error reading \"%s\" [%d] \"%s\"",
+                     "apr_file_read_full: Error reading \"%s\" [%d] \"%s\"",
                      file, rv, apr_strerror(rv, buffer, sizeof(buffer)));
     }
-    data[finfo.size] = '\0';
+    data[nbytes] = '\0';
 
     (void)apr_file_close(fd);
 
