@@ -69,6 +69,78 @@ static char *am_get_endpoint_url(request_rec *r)
 }
 
 #ifdef HAVE_lasso_server_new_from_buffers
+/* This function generates optional metadata for a given element
+ *
+ * Parameters:
+ *  apr_pool_t *p        Pool to allocate memory from
+ *  apr_hash_t *t        Hash of lang -> strings
+ *  const char *e        Name of the element
+ *
+ * Returns:
+ *  the metadata, or NULL if an error occured
+ */
+static char *am_optional_metadata_element(apr_pool_t *p,
+                                          apr_hash_t *h,
+                                          const char *e)
+{
+    apr_hash_index_t *index;
+    char *data = "";
+
+    for (index = apr_hash_first(p, h); index; index = apr_hash_next(index)) {
+        char *lang;
+        char *value;
+        apr_ssize_t slen;
+	char *xmllang = "";
+
+        apr_hash_this(index, (const void **)&lang, &slen, (void *)&value);
+        
+        if (*lang != '\0')
+            xmllang = apr_psprintf(p, " xml:lang=\"%s\"", lang);
+
+        data = apr_psprintf(p, "%s<%s%s>%s</%s>",
+                            data, e, xmllang, value, e);
+    }
+
+    return data;
+}
+
+/* This function generates optinal metadata
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  the metadata, or NULL if an error occured
+ */
+static char *am_optional_metadata(apr_pool_t *p, request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    int count = 0;
+    char *org_data = NULL;
+    char *org_name = NULL;
+    char *org_display_name = NULL;
+    char *org_url = NULL;
+
+    count += apr_hash_count(cfg->sp_org_name);
+    count += apr_hash_count(cfg->sp_org_display_name);
+    count += apr_hash_count(cfg->sp_org_url);
+
+    if (count == 0) 
+        return "";
+
+    org_name = am_optional_metadata_element(p, cfg->sp_org_name,
+                                            "OrganizationName");
+    org_display_name = am_optional_metadata_element(p, cfg->sp_org_display_name,
+                                                    "OrganizationDisplayName");
+    org_url = am_optional_metadata_element(p, cfg->sp_org_url,
+                                           "OrganizationURL");
+    org_data = apr_psprintf(p, "<Organization>%s%s%s</Organization>",
+                            org_name, org_display_name, org_url);
+
+    return org_data;
+}
+
+
 /* This function generates metadata
  *
  * Parameters:
@@ -161,8 +233,9 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
             "Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\" "
             "Location=\"%spostResponse\" />"
         "</SPSSODescriptor>"
+        "%s"
       "</EntityDescriptor>",
-      url, cert, url, url, url, url);
+      url, cert, url, url, url, url, am_optional_metadata(p, r));
 }
 #endif /* HAVE_lasso_server_new_from_buffers */
 

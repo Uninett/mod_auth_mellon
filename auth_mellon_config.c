@@ -399,6 +399,36 @@ static const char *am_set_require_slot(cmd_parms *cmd,
     return NULL;
 }
 
+/* This function handles the MellonOrganization* directives, which
+ * which specify language-qualified strings
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for the MellonOrganization*
+ *                       configuration directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *  const char *lang     Pointer to the language string (optional)
+ *  const char *value    Pointer to the data
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_langstring_slot(cmd_parms *cmd,
+                                          void *struct_ptr,
+                                          const char *lang,
+                                          const char *value)
+{
+    apr_hash_t *h = *(apr_hash_t **)(struct_ptr + (apr_uintptr_t)cmd->info);
+
+    if (value == NULL || *value == '\0') {
+        value = lang;
+        lang = "";
+    }
+
+    apr_hash_set(h, lang, APR_HASH_KEY_STRING, 
+		 apr_pstrdup(cmd->server->process->pconf, value));
+
+    return NULL;
+}
 
 /* This array contains all the configuration directive which are handled
  * by auth_mellon.
@@ -569,6 +599,27 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Full path to pem file with CA chain for the IdP."
         ),
+    AP_INIT_TAKE12(
+        "MellonOrganizationName",
+        am_set_langstring_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_org_name),
+        OR_AUTHCFG,
+        "Language-qualified oranization name."
+        ),
+    AP_INIT_TAKE12(
+        "MellonOrganizationDisplayName",
+        am_set_langstring_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_org_display_name),
+        OR_AUTHCFG,
+        "Language-qualified oranization name, human redable."
+        ),
+    AP_INIT_TAKE12(
+        "MellonOrganizationURL",
+        am_set_langstring_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_org_url),
+        OR_AUTHCFG,
+        "Language-qualified oranization URL."
+        ),
     AP_INIT_TAKE1(
         "MellonDefaultLoginPath",
         ap_set_string_slot,
@@ -639,6 +690,10 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->idp_ca_file = NULL;
     dir->login_path = default_login_path;
     dir->discovery_url = NULL;
+
+    dir->sp_org_name = apr_hash_make(p);
+    dir->sp_org_display_name = apr_hash_make(p);
+    dir->sp_org_url = apr_hash_make(p);
 
     apr_thread_mutex_create(&dir->server_mutex, APR_THREAD_MUTEX_DEFAULT, p);
 
@@ -750,6 +805,21 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->idp_ca_file = (add_cfg->idp_ca_file ?
                             add_cfg->idp_ca_file :
                             base_cfg->idp_ca_file);
+
+    new_cfg->sp_org_name = apr_hash_copy(p,
+                          (apr_hash_count(add_cfg->sp_org_name) > 0) ?
+                           add_cfg->sp_org_name : 
+                           base_cfg->sp_org_name);
+
+    new_cfg->sp_org_display_name = apr_hash_copy(p,
+                          (apr_hash_count(add_cfg->sp_org_display_name) > 0) ?
+                           add_cfg->sp_org_display_name : 
+                           base_cfg->sp_org_display_name);
+
+    new_cfg->sp_org_url = apr_hash_copy(p,
+                          (apr_hash_count(add_cfg->sp_org_url) > 0) ?
+                           add_cfg->sp_org_url : 
+                           base_cfg->sp_org_url);
 
     new_cfg->login_path = (add_cfg->login_path != default_login_path ?
                            add_cfg->login_path :

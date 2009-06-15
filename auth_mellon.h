@@ -152,6 +152,11 @@ typedef struct am_dir_cfg_rec {
     const char *idp_public_key_file;
     const char *idp_ca_file;
 
+    /* metadata autogeneration helper */
+    apr_hash_t *sp_org_name;
+    apr_hash_t *sp_org_display_name;
+    apr_hash_t *sp_org_url;
+
     /* Maximum number of seconds a session is valid for. */
     int session_length;
 
