@@ -439,3 +439,16 @@ could contain a link element like the following:
 
 This will return the user to "https://www.example.org/logged_out.html"
 after the logout operation has completed.
+
+
+===========================================================================
+ Contributors
+===========================================================================
+
+Thanks to Emmanuel Dreyfus <manu@netbsd.org> for many new features,
+including:
+- Metadata autogeneration support.
+- Support for multiple IdPs.
+- IdP discovery service support.
+- SOAP logout support.
+
