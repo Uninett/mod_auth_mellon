@@ -1,3 +1,9 @@
+Version 0.2.3
+---------------------------------------------------------------------------
+
+* Bugfix for session lifetime. Take the session lifetime from the
+  SessionNotOnOrAfter attribute if it is present.
+
 Version 0.2.2
 ---------------------------------------------------------------------------
 
