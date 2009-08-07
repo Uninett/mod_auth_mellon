@@ -417,7 +417,7 @@ static const char *am_set_langstring_slot(cmd_parms *cmd,
                                           const char *lang,
                                           const char *value)
 {
-    apr_hash_t *h = *(apr_hash_t **)(struct_ptr + (apr_uintptr_t)cmd->info);
+    apr_hash_t *h = *(apr_hash_t **)(struct_ptr + (apr_size_t)cmd->info);
 
     if (value == NULL || *value == '\0') {
         value = lang;
