@@ -1119,39 +1119,38 @@ static apr_time_t am_parse_timestamp(request_rec *r, const char *timestamp)
  * Returns:
  *  Nothing.
  */
-static void am_handle_condition(request_rec *r, am_cache_entry_t *session,
+static void am_handle_session_expire(request_rec *r, am_cache_entry_t *session,
                                 LassoSaml2Assertion *assertion)
 {
+    GList *authn_itr;
+    LassoSaml2AuthnStatement *authn;
     const char *not_on_or_after;
     apr_time_t t;
 
+    for(authn_itr = g_list_first(assertion->AuthnStatement); authn_itr != NULL;
+        authn_itr = g_list_next(authn_itr)) {
 
-    /* Find timestamp. */
+        authn = LASSO_SAML2_AUTHN_STATEMENT(authn_itr->data);
 
-    if(assertion->Conditions == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                      "Did not receive conditions for an assertion.");
-        return;
+
+        /* Find timestamp. */
+        not_on_or_after = authn->SessionNotOnOrAfter;
+        if(not_on_or_after == NULL) {
+            continue;
+        }
+
+
+        /* Parse timestamp. */
+        t = am_parse_timestamp(r, not_on_or_after);
+        if(t == 0) {
+            continue;
+        }
+
+        /* Updates the expires timestamp if this one is earlier than the
+         * previous timestamp.
+         */
+        am_cache_update_expires(session, t);
     }
-
-    not_on_or_after = assertion->Conditions->NotOnOrAfter;
-
-    if(not_on_or_after == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                      "Condition without NotOnOrAfter attribute.");
-        return;
-    }
-
-    /* Parse timestamp. */
-    t = am_parse_timestamp(r, not_on_or_after);
-    if(t == 0) {
-        return;
-    }
-
-    /* Updates the expires timestamp if this one is earlier than the
-     * previous timestamp.
-     */
-    am_cache_update_expires(session, t);
 }
 
 
@@ -1329,7 +1328,7 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
         assertion = LASSO_SAML2_ASSERTION(asrt_itr->data);
 
         /* Update expires timestamp of session. */
-        am_handle_condition(r, session, assertion);
+        am_handle_session_expire(r, session, assertion);
 
         /* assertion->AttributeStatement is a list of
          * LassoSaml2AttributeStatement objects.
