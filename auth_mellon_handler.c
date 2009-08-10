@@ -796,6 +796,7 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
 {
     char *return_to;
     int rc;
+    am_cache_entry_t *mellon_session;
     gint res;
     char *redirect_to;
     LassoProfile *profile;
@@ -811,6 +812,13 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
         ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
                       "Could not urldecode ReturnTo value.");
         return HTTP_BAD_REQUEST;
+    }
+
+    /* Disable the the local session (in case the IdP doesn't respond). */
+    mellon_session = am_get_request_session(r);
+    if(mellon_session != NULL) {
+        mellon_session->logged_in = 0;
+        am_release_request_session(r, mellon_session);
     }
 
     /* Create the logout request message. */
