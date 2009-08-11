@@ -1,3 +1,11 @@
+Version 0.2.4
+---------------------------------------------------------------------------
+
+* Fix for downloads of files with Internet Explorer with SSL enabled.
+
+* Mark session as disabled as soon as logout starts, in case the IdP
+  doesn't respond.
+
 Version 0.2.3
 ---------------------------------------------------------------------------
 

@@ -1,3 +1,9 @@
+libapache2-mod-auth-mellon (0.2.4-1) unstable; urgency=low
+
+  * Update version to 0.2.4.
+
+ -- Olav Morken <olav.morken@uninett.no>  Tue, 11 Aug 2009 15:48:35 +0200
+
 libapache2-mod-auth-mellon (0.2.3-1) unstable; urgency=low
 
   * Update version to 0.2.3.
