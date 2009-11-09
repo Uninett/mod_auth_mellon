@@ -30,43 +30,6 @@
 #endif /* HAVE_lasso_server_new_from_buffers */
 
 
-/* This function produces the endpoint URL
- *
- * Parameters:
- *  request_rec *r       The request we received.
- *
- * Returns:
- *  the endpoint URL
- */
-static char *am_get_endpoint_url(request_rec *r)
-{
-    static APR_OPTIONAL_FN_TYPE(ssl_is_https) *am_is_https = NULL;
-    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
-    apr_pool_t *p = r->pool;
-    server_rec *s = r->server;
-    apr_port_t default_port;
-    char *port;
-    char *scheme;
-
-    am_is_https = APR_RETRIEVE_OPTIONAL_FN(ssl_is_https);
-
-    if (am_is_https && am_is_https(r->connection)) {
-        scheme = "https://";
-        default_port = DEFAULT_HTTPS_PORT;
-    } else {
-        scheme = "http://";
-        default_port = DEFAULT_HTTP_PORT;
-    }
-
-    if (s->addrs->host_port != default_port)
-        port = apr_psprintf(p, ":%d", s->addrs->host_port);
-    else
-        port = "";
-
-    return apr_psprintf(p, "%s%s%s%s", scheme,
-                        s->server_hostname,
-                        port,  cfg->endpoint_path);
-}
 
 #ifdef HAVE_lasso_server_new_from_buffers
 /* This function generates optional metadata for a given element
@@ -1730,6 +1693,129 @@ static int am_handle_artifact_reply(request_rec *r)
     return am_handle_reply_common(r, login, relay_state, "");
 }
 
+/* This function handles responses to repost request
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  OK on success, or an error on failure.
+ */
+static int am_handle_repost(request_rec *r)
+{
+    am_mod_cfg_rec *mod_cfg;
+    const char *query;
+    char *cp;
+    char *psf_id;
+    char *psf_filename;
+    char *post_data;
+    char *post_form;
+    char *output;
+    char *last;
+    char *return_url;
+
+    mod_cfg = am_get_mod_cfg(r->server);
+    query = r->parsed_uri.query;
+    
+    psf_id = am_extract_query_parameter(r->pool, query, "id");
+    if (psf_id == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                      "Bad repost query: missing id");
+        return HTTP_BAD_REQUEST;
+    }
+
+    /* Check that Id is sane */
+    for (cp = psf_id; *cp; cp++) {
+        if (!apr_isalnum(*cp)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                          "Bad repost query: invalid id \"%s\"", psf_id);
+            return HTTP_BAD_REQUEST;
+        }
+    }
+    
+    
+    return_url = am_extract_query_parameter(r->pool, query, "ReturnTo");
+    if (return_url == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Invalid or missing query ReturnTo parameter.");
+        return HTTP_BAD_REQUEST;
+    }
+
+    if (am_urldecode(return_url) != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "Bad repost query: return");
+        return HTTP_BAD_REQUEST;
+    }
+
+    psf_filename = apr_psprintf(r->pool, "%s/%s", mod_cfg->post_dir, psf_id); 
+    if ((post_data = am_getfile(r->pool, r->server, psf_filename)) == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                      "Bad repost query: cannot find \"%s\"", psf_filename);
+        return HTTP_BAD_REQUEST;
+    }
+
+    post_form = "";
+    for (cp = apr_strtok(post_data, "&", &last); cp; 
+         cp = apr_strtok(NULL, "&", &last)) {
+        char *item;
+        char *last2;
+        char *name;
+        char *value;
+        char *input_item;
+
+        item = apr_pstrdup(r->pool, cp);
+
+        name = apr_strtok(item, "=", &last2);  
+        value = apr_strtok(NULL, "=", &last2);
+
+        if (name == NULL)
+            continue;
+
+        if (value == NULL)
+            value = (char *)"";
+
+        if (am_urldecode(name) != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                         "urldecode(\"%s\") failed", name);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        if (am_urldecode(value) != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                         "urldecode(\"%s\") failed", value);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        input_item = apr_psprintf(r->pool, 
+                    "    <input type=\"hidden\" name=\"%s\" value=\"%s\">\n",
+                    am_htmlencode(r, name), am_htmlencode(r, value));
+        post_form = apr_pstrcat(r->pool, post_form, input_item, NULL);
+    }
+    
+    r->content_type = "text/html";
+    output = apr_psprintf(r->pool,
+      "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n"
+      "<html>\n"
+      " <head>\n" 
+      "  <title>SAML rePOST request</title>\n" 
+      " </head>\n" 
+      " <body onload=\"document.getElementById('form').submit();\">\n" 
+      "  <noscript>\n"
+      "   Your browser does not support Javascript, \n"
+      "   you must click the button below to proceed.\n"
+      "  </noscript>\n"
+      "   <form id=\"form\" method=\"POST\" action=\"%s\">\n%s"
+      "    <noscript>\n"
+      "     <input type=\"submit\">\n"
+      "    </noscript>\n"
+      "   </form>\n"
+      " </body>\n" 
+      "</html>\n",
+      return_url, post_form);
+
+    ap_rputs(output, r);
+    return OK;
+}
+
 
 /* This function handles responses to metadata request
  *
@@ -1739,14 +1825,46 @@ static int am_handle_artifact_reply(request_rec *r)
  * Returns:
  *  OK on success, or an error on failure.
  */
-int am_handle_metadata(request_rec *r)
+static int am_handle_metadata(request_rec *r)
 {
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
-    const char *endpoint;
 #ifdef HAVE_lasso_server_new_from_buffers
     LassoServer *server;
     const char *data;
+
+    server = am_get_lasso_server(r);
+    if(server == NULL)
+        return HTTP_INTERNAL_SERVER_ERROR;
+
+    data = cfg->sp_metadata_file;
+    if (data == NULL)
+        return HTTP_INTERNAL_SERVER_ERROR;
+
+    r->content_type = "application/samlmetadata+xml";
+
+    ap_rputs(data, r);
+
+    return OK;
+#else  /* ! HAVE_lasso_server_new_from_buffers */
+
+    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                  "metadata publishing require lasso 2.2.2 or higher");
+    return HTTP_NOT_FOUND;
 #endif
+}
+
+/* This function handles responses to request on our endpoint
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  OK on success, or an error on failure.
+ */
+int am_handler(request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    const char *endpoint;
 
     /* Check if this is a request for one of our endpoints. We check if
      * the uri starts with the path set with the MellonEndpointPath
@@ -1755,11 +1873,6 @@ int am_handle_metadata(request_rec *r)
     if(strstr(r->uri, cfg->endpoint_path) != r->uri)
         return DECLINED;
 
-    endpoint = &r->uri[strlen(cfg->endpoint_path)];
-    if (strcmp(endpoint, "metadata") != 0)
-        return DECLINED;
-
-#ifdef HAVE_lasso_server_new_from_buffers
     /* Make sure that this is a GET request. */
     if(r->method_number != M_GET) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
@@ -1779,25 +1892,15 @@ int am_handle_metadata(request_rec *r)
         return DECLINED;
     }
 
-    server = am_get_lasso_server(r);
-    if(server == NULL)
-        return HTTP_INTERNAL_SERVER_ERROR;
-
-    data = cfg->sp_metadata_file;
-    if (data == NULL)
-        return HTTP_INTERNAL_SERVER_ERROR;
-
-    r->content_type = "application/samlmetadata+xml";
-
-    ap_rputs(data, r);
-
-    return OK;
-#else  /* ! HAVE_lasso_server_new_from_buffers */
-    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                  "metadata publishing require lasso 2.2.2 or higher");
-    return HTTP_NOT_FOUND;
-#endif
+    endpoint = &r->uri[strlen(cfg->endpoint_path)];
+    if (strcmp(endpoint, "metadata") == 0)
+        return am_handle_metadata(r);
+    else if (strcmp(endpoint, "repost") == 0)
+        return am_handle_repost(r);
+    else
+        return DECLINED;
 }
+
 
 
 static int am_auth_new_ticket(request_rec *r)
@@ -1811,6 +1914,12 @@ static int am_auth_new_ticket(request_rec *r)
     const char *relay_state;
 
     relay_state = am_reconstruct_url(r);
+
+    /* If this is a POST request, attempt to save it */
+    if (r->method_number == M_POST) {
+        if (am_save_post(r, &relay_state) != OK)
+            return HTTP_INTERNAL_SERVER_ERROR;
+    }
 
     /* Check if IdP discovery is in use and no IdP was selected yet */
     if ((cfg->discovery_url != NULL) && 
@@ -1964,6 +2073,8 @@ static int am_endpoint_handler(request_rec *r)
     } else if(!strcmp(endpoint, "auth")) {
         return am_auth_new_ticket(r);
     } else if(!strcmp(endpoint, "metadata")) {
+        return OK;
+    } else if(!strcmp(endpoint, "repost")) {
         return OK;
     } else if(!strcmp(endpoint, "logout")
               || !strcmp(endpoint, "logoutRequest")) {

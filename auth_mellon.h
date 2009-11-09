@@ -89,6 +89,10 @@
 typedef struct am_mod_cfg_rec {
     int cache_size;
     const char *lock_file;
+    const char *post_dir;
+    apr_time_t post_ttl;
+    int post_count;
+    apr_size_t post_size;
 
     /* These variables can't be allowed to change after the session store
      * has been initialized. Therefore we copy them before initializing
@@ -257,11 +261,15 @@ char *am_urlencode(apr_pool_t *pool, const char *str);
 int am_urldecode(char *data);
 char *am_generate_session_id(request_rec *r);
 char *am_getfile(apr_pool_t *conf, server_rec *s, const char *file);
+char *am_get_endpoint_url(request_rec *r);
+int am_postdir_cleanup(request_rec *s);
+char *am_htmlencode(request_rec *r, const char *str);
+int am_save_post(request_rec *r, const char **relay_state);
 
 
 int am_auth_mellon_user(request_rec *r);
 int am_check_uid(request_rec *r);
-int am_handle_metadata(request_rec *r);
+int am_handler(request_rec *r);
 
 
 int am_httpclient_get(request_rec *r, const char *uri, 

@@ -56,6 +56,25 @@ static const int default_dump_saml_response = 0;
  */
 static const char *default_login_path = "/";
 
+/* This is the directory for storing saved POST sessions
+ * the MellonPostDirectory configuration directive if you change this.
+ */
+static const char *post_dir = "/var/tmp/mellonpost";
+
+/* saved POST session time to live
+ * the MellonPostTTL configuration directive if you change this.
+ */
+static const apr_time_t post_ttl = 15 * 60;
+
+/* saved POST session maximum size
+ * the MellonPostSize configuration directive if you change this.
+ */
+static const apr_size_t post_size = 1024 * 1024 * 1024;
+
+/* maximum saved POST sessions
+ * the MellonPostCount configuration directive if you change this.
+ */
+static const int post_count = 100;
 
 /* This function handles configuration directives which set a file
  * slot in the module configuration. If lasso is recent enough, it
@@ -453,6 +472,38 @@ const command_rec auth_mellon_commands[] = {
         RSRC_CONF,
         "The lock file for session synchronization."
         " Default value is \"/tmp/mellonLock\"."
+        ), 
+    AP_INIT_TAKE1(
+        "MellonPostDirectory",
+        am_set_module_config_string_slot,
+        (void *)APR_OFFSETOF(am_mod_cfg_rec, post_dir),
+        RSRC_CONF,
+        "The directory for saving POST requests."
+        " Default value is \"/var/tmp/mellonpost\"."
+        ), 
+    AP_INIT_TAKE1(
+        "MellonPostTTL",
+        am_set_module_config_int_slot,
+        (void *)APR_OFFSETOF(am_mod_cfg_rec, post_ttl),
+        RSRC_CONF,
+        "The time to live for saved POST requests in seconds."
+        " Default value is 15 mn."
+        ), 
+    AP_INIT_TAKE1(
+        "MellonPostCount",
+        am_set_module_config_int_slot,
+        (void *)APR_OFFSETOF(am_mod_cfg_rec, post_count),
+        RSRC_CONF,
+        "The maximum saved POST sessions at once."
+        " Default value is 100."
+        ), 
+    AP_INIT_TAKE1(
+        "MellonPostSize",
+        am_set_module_config_int_slot,
+        (void *)APR_OFFSETOF(am_mod_cfg_rec, post_size),
+        RSRC_CONF,
+        "The maximum size of a saved POST, in bytes."
+        " Default value is 1 MB."
         ), 
 
 
@@ -870,6 +921,10 @@ void *auth_mellon_server_config(apr_pool_t *p, server_rec *s)
 
     mod->cache_size = 100;  /* ought to be enough for everybody */
     mod->lock_file  = "/tmp/mellonLock";
+    mod->post_dir   = post_dir;
+    mod->post_ttl   = post_ttl;
+    mod->post_count = post_count;
+    mod->post_size  = post_size;
 
     mod->init_cache_size = 0;
     mod->init_lock_file = NULL;

@@ -104,6 +104,25 @@ MellonCacheSize 100
 # Default: MellonLockFile "/tmp/mellonLock"
 MellonLockFile "/tmp/mellonLock"
 
+# MellonPostDir is the full path of a directory where POST requests are
+# saved during authentication. This directory must be owned by the Apache
+# user and be mode 700. We will attempt to create it if it does not exist.
+# Default: MellonPostDir "/var/tmp/mellonpost"
+MellonPostDir "/var/tmp/mellonpost"
+
+# MellonPostTTL is the delay in seconds before a saved POST request can
+# be flushed.
+# Default: MellonPostTTL 900 (15 mn)
+MellonPostTTL 900
+
+# MellonPostSize is the maximum size for saved POST requests
+# Default: MellonPostSize 1073741824 (1 MB)
+MellonPostSize 1073741824
+
+# MellonPostCount is the maxmimum amount of saved POST requests
+# Default: MellonPostCount 100
+MellonPostCount 100
+
 ###########################################################################
 # End of global configuration for mod_auth_mellon.
 ###########################################################################

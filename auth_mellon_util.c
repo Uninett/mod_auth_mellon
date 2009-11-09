@@ -587,3 +587,355 @@ char *am_getfile(apr_pool_t *conf, server_rec *s, const char *file)
 
     return data;
 }
+
+/* 
+ * Create a directory for saved POST sessions, check for proper permissions
+ *
+ * Parameters:
+ *   request_rec *r     The current request
+ *
+ * Returns:
+ *  OK on success, or HTTP_INTERNAL_SERVER on failure.
+ */
+static int am_postdir_mkdir(request_rec *r)
+{
+    apr_int32_t wanted;
+    apr_finfo_t afi;
+    apr_status_t rv;
+    char buffer[512];
+    am_mod_cfg_rec *mod_cfg;
+    apr_fileperms_t mode;
+    apr_uid_t user;
+    apr_uid_t group;
+    apr_fileperms_t prot;
+
+    mod_cfg = am_get_mod_cfg(r->server);
+
+    mode = APR_FPROT_UREAD|APR_FPROT_UWRITE|APR_FPROT_UEXECUTE;
+    if ((rv = apr_dir_make_recursive(mod_cfg->post_dir, mode, r->pool)) != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                      "cannot create POST directory \"%s\": %s",
+                      mod_cfg->post_dir,
+                      apr_strerror(rv, buffer, sizeof(buffer)));
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* 
+     * The directory may have already existed. Check we really own it
+     */
+    wanted = APR_FINFO_USER|APR_FINFO_UPROT|APR_FINFO_GPROT|APR_FINFO_WPROT;
+    if (apr_stat(&afi, mod_cfg->post_dir, wanted, r->pool) == OK) {
+        if (apr_uid_current(&user, &group, r->pool) != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                          "apr_uid_current failed");
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        if (afi.user != user) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                          "POST directory \"%s\" must be owned by the same "
+                          "user as the web server is running as.",
+                          mod_cfg->post_dir);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        prot = APR_FPROT_UREAD|APR_FPROT_UWRITE|APR_FPROT_UEXECUTE;
+        if (afi.protection != prot) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                          "Premissions on POST directory \"%s\" must be 0700.",
+                          mod_cfg->post_dir);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+    }
+
+    return OK;
+}
+
+/* 
+ * Purge outdated saved POST requests. If the MellonPostDir directory
+ * does not exist, create it first. 
+ *
+ * Parameters:
+ *   request_rec *r     The current request
+ *
+ * Returns:
+ *  OK on success, or HTTP_INTERNAL_SERVER on failure.
+ */
+int am_postdir_cleanup(request_rec *r)
+{
+    am_mod_cfg_rec *mod_cfg;
+    apr_dir_t *postdir;
+    apr_status_t rv;
+    apr_finfo_t afi;
+    char *fname;
+    int count;
+
+    mod_cfg = am_get_mod_cfg(r->server);
+
+    /*
+     * Open our POST directory or create it. 
+     */
+    if (apr_dir_open(&postdir, mod_cfg->post_dir, r->pool) != OK)
+        return am_postdir_mkdir(r);
+
+    /*
+     * Purge outdated items
+     */
+    count = 0;
+    do {
+        rv = apr_dir_read(&afi, APR_FINFO_NAME|APR_FINFO_CTIME, postdir);
+        if (rv != OK)
+            break;
+
+        /* Skip dot_files */
+        if (afi.name[0] == '.')
+             continue;
+
+        if (afi.ctime + mod_cfg->post_ttl > apr_time_sec(apr_time_now())) {
+            fname = apr_psprintf(r->pool, "%s/%s", mod_cfg->post_dir, afi.name);
+            (void)apr_file_remove(fname , r->pool); 
+        } else {
+            count++;
+        }
+    } while (1 /* CONSTCOND */);
+
+    (void)apr_dir_close(postdir);
+
+    if (count >= mod_cfg->post_count) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                      "Too many saved POST sessions. "
+                      "Increase MellonPostCount directive.");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    return OK;
+}
+
+/* 
+ * HTML-encode a string
+ *
+ * Parameters:
+ *   request_rec *r     The current request
+ *   const char *str    The string to encode
+ *
+ * Returns:
+ *  The encoded string
+ */
+char *am_htmlencode(request_rec *r, const char *str)
+{
+    const char *cp;
+    char *output;
+    apr_size_t outputlen;
+    int i;
+
+    outputlen = 0;
+    for (cp = str; *cp; cp++) {
+        switch (*cp) {
+        case '&':
+            outputlen += 5;
+            break;
+        case '"':
+            outputlen += 6;
+            break;
+        default:
+            outputlen += 1;
+            break;
+        }
+    }
+
+    i = 0;
+    output = apr_palloc(r->pool, outputlen + 1);
+    for (cp = str; *cp; cp++) {
+        switch (*cp) {
+        case '&':
+            (void)strcpy(&output[i], "&amp;");
+            i += 5;
+            break;
+        case '"':
+            (void)strcpy(&output[i], "&quot;");
+            i += 6;
+            break;
+        default:
+            output[i] = *cp;
+            i += 1;
+            break;
+        }
+    }
+    output[i] = '\0';
+
+    return output;
+}
+
+/* This function produces the endpoint URL
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  the endpoint URL
+ */
+char *am_get_endpoint_url(request_rec *r)
+{
+    static APR_OPTIONAL_FN_TYPE(ssl_is_https) *am_is_https = NULL;
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    apr_pool_t *p = r->pool;
+    server_rec *s = r->server;
+    apr_port_t default_port;
+    char *port;
+    char *scheme;
+
+    am_is_https = APR_RETRIEVE_OPTIONAL_FN(ssl_is_https);
+
+    if (am_is_https && am_is_https(r->connection)) {
+        scheme = "https://";
+        default_port = DEFAULT_HTTPS_PORT;
+    } else {
+        scheme = "http://";
+        default_port = DEFAULT_HTTP_PORT;
+    }
+
+    if (s->addrs->host_port != default_port)
+        port = apr_psprintf(p, ":%d", s->addrs->host_port);
+    else
+        port = "";
+
+    return apr_psprintf(p, "%s%s%s%s", scheme,
+                        s->server_hostname,
+                        port,  cfg->endpoint_path);
+}
+
+/*
+ * The two functions below extract an HTTP header from the request.
+ *
+ * Parameters:
+ *  request_rec *r           The current request.
+ *
+ * Returns:
+ *  1 if multipart/form-data, 0 otherwise.
+ */
+struct am_get_header_state {
+    request_rec *req;
+    const char *header;
+    const char *value;
+};
+
+static int am_get_header_callback(void *s, const char *key, const char *val)
+{
+    struct am_get_header_state *state;
+
+    state = (struct am_get_header_state *)s;
+
+    if (strcmp(key, state->header) != 0)
+       return 1;
+
+    state->value = val;
+    return 0;
+}
+
+static const char *am_get_header(request_rec *r, const char *header) 
+{
+    struct am_get_header_state state;
+
+    state.req = r;
+    state.header = header;
+    state.value = NULL;
+
+    (void)apr_table_do(am_get_header_callback, &state, r->headers_in, NULL);
+
+    return state.value;
+}
+
+/*
+ * This function saves a POST request for later replay and updates
+ * the return URL.
+ *
+ * Parameters:
+ *  request_rec *r           The current request.
+ *  const char **relay_state The returl URL
+ *
+ * Returns:
+ *  OK on success, HTTP_INTERNAL_SERVER_ERROR otherwise
+ */
+int am_save_post(request_rec *r, const char **relay_state)
+{
+    am_mod_cfg_rec *mod_cfg;
+    const char *content_type;
+    const char *psf_id;
+    char *psf_name;
+    char *post_data;
+    apr_size_t post_data_len;
+    apr_size_t written;
+    apr_file_t *psf;
+
+    if (am_postdir_cleanup(r) != OK)
+        return HTTP_INTERNAL_SERVER_ERROR;
+
+    /* Check Content-Type */
+    content_type = am_get_header(r, "Content-Type");
+    if ((content_type != NULL) &&
+        (strcmp(content_type, "application/x-www-form-urlencoded") !=  0)) {
+        /* 
+         * This is probably "multipart/form-data; boundary=XXXXXXXXXX"
+         * The POST request then contains MIME data. We are not yet
+         * able to manage that, so issue an error 500.
+         */
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                      "Unsupported POST Content-Type \"%s\"", content_type);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    mod_cfg = am_get_mod_cfg(r->server);
+
+    if ((psf_id = am_generate_session_id(r)) == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "cannot generate id");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    psf_name = apr_psprintf(r->pool, "%s/%s", mod_cfg->post_dir, psf_id);
+
+    if (apr_file_open(&psf, psf_name,
+                      APR_WRITE|APR_CREATE|APR_BINARY, 
+                      APR_FPROT_UREAD|APR_FPROT_UWRITE,
+                      r->pool) != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "cannot create POST session file");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    } 
+
+    if (am_read_post_data(r, &post_data, &post_data_len) != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "cannot read POST data");
+        (void)apr_file_close(psf);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    } 
+
+    if (post_data_len > mod_cfg->post_size) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                      "POST data size %" APR_SIZE_T_FMT 
+                      " exceeds maximum %" APR_SIZE_T_FMT ". "
+                      "Increase MellonPostSize directive.",
+                      post_data_len, mod_cfg->post_size);
+        (void)apr_file_close(psf);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    written = post_data_len;
+    if ((apr_file_write(psf, post_data, &written) != OK) ||
+        (written != post_data_len)) { 
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "cannot write to POST session file");
+            (void)apr_file_close(psf);
+            return HTTP_INTERNAL_SERVER_ERROR;
+    } 
+    
+    if (apr_file_close(psf) != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "cannot close POST session file");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    *relay_state = apr_psprintf(r->pool, "%srepost?id=%s&ReturnTo=%s", 
+                                am_get_endpoint_url(r), psf_id,
+                                am_urlencode(r->pool, *relay_state));
+
+    return OK;
+}
