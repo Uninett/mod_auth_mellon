@@ -213,8 +213,8 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
 
         if(age < 3600) {
             ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, s,
-                         "Dropping LRU entry entry with age = %llis,"
-                         " which is less than one hour. It may be a good"
+                         "Dropping LRU entry entry with age = %" APR_TIME_T_FMT
+                         "s, which is less than one hour. It may be a good"
                          " idea to increase MellonCacheSize.",
                          age);
         }
@@ -499,8 +499,10 @@ int am_cache_set_lasso_state(am_cache_entry_t *session,
         } else {
             ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
                          "Lasso identity is to big for storage. Size of lasso"
-                         " identity is %u, max size is %u.", strlen(lasso_identity),
-                         AM_CACHE_MAX_LASSO_IDENTITY_SIZE - 1);
+                         " identity is %" APR_SIZE_T_FMT ", max size is %"
+                         APR_SIZE_T_FMT ".",
+                         (apr_size_t)strlen(lasso_identity),
+                         (apr_size_t)AM_CACHE_MAX_LASSO_IDENTITY_SIZE - 1);
             return HTTP_INTERNAL_SERVER_ERROR;
         }
     } else {
@@ -515,8 +517,10 @@ int am_cache_set_lasso_state(am_cache_entry_t *session,
         } else {
             ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
                          "Lasso session is to big for storage. Size of lasso"
-                         " session is %u, max size is %u.", strlen(lasso_session),
-                         AM_CACHE_MAX_LASSO_SESSION_SIZE - 1);
+                         " session is %" APR_SIZE_T_FMT ", max size is %"
+                         APR_SIZE_T_FMT ".",
+                         (apr_size_t)strlen(lasso_session),
+                         (apr_size_t)AM_CACHE_MAX_LASSO_SESSION_SIZE - 1);
             return HTTP_INTERNAL_SERVER_ERROR;
         }
     } else {
@@ -530,9 +534,10 @@ int am_cache_set_lasso_state(am_cache_entry_t *session,
         } else {
             ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
                          "Lasso SAML response is to big for storage. "
-                         "Size of lasso session is %u, max size is %u.", 
-                         strlen(lasso_saml_response),
-                         AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE - 1);
+                         "Size of lasso session is %" APR_SIZE_T_FMT
+                         ", max size is %" APR_SIZE_T_FMT ".",
+                         (apr_size_t)strlen(lasso_saml_response),
+                         (apr_size_t)AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE - 1);
             return HTTP_INTERNAL_SERVER_ERROR;
         }
     } else {
