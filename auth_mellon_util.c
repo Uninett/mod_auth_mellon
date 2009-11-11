@@ -433,6 +433,32 @@ char *am_urlencode(apr_pool_t *pool, const char *str)
     return ret;
 }
 
+/*
+ * Check that a URL is safe for redirect.
+ *
+ * Parameters:
+ *  request_rec *r       The request we are processing.
+ *  const char *url      The URL we should check.
+ *
+ * Returns:
+ *  OK on success, HTTP_BAD_REQUEST otherwise.
+ */
+int am_check_url(request_rec *r, const char *url)
+{
+    const char *i;
+
+    for (i = url; *i; i++) {
+        if (*i >= 0 && *i < ' ') {
+            /* Deny all control-characters. */
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, HTTP_BAD_REQUEST, r,
+                          "Control character detected in URL.");
+            return HTTP_BAD_REQUEST;
+        }
+    }
+
+    return OK;
+}
+
 /* This function generates a given number of (pseudo)random bytes.
  * The current implementation uses OpenSSL's RAND_*-functions.
  *

@@ -740,6 +740,12 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
         return HTTP_BAD_REQUEST;
     }
 
+    /* Check for bad characters in RelayState. */
+    rc = am_check_url(r, return_to);
+    if (rc != OK) {
+        return rc;
+    }
+
     apr_table_setn(r->headers_out, "Location", return_to);
     return HTTP_SEE_OTHER;
 }
@@ -792,6 +798,12 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
                       " loggged in.");
 
         lasso_logout_destroy(logout);
+
+        /* Check for bad characters in ReturnTo. */
+        rc = am_check_url(r, return_to);
+        if (rc != OK) {
+            return rc;
+        }
 
         /* Redirect to the page the user should be sent to after logout. */
         apr_table_setn(r->headers_out, "Location", return_to);
@@ -1485,6 +1497,12 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
         ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
                       "Could not urldecode RelayState value.");
         return HTTP_BAD_REQUEST;
+    }
+
+    /* Check for bad characters in RelayState. */
+    rc = am_check_url(r, relay_state);
+    if (rc != OK) {
+        return rc;
     }
 
     apr_table_setn(r->headers_out, "Location",
