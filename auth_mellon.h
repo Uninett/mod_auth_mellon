@@ -265,6 +265,16 @@ char *am_get_endpoint_url(request_rec *r);
 int am_postdir_cleanup(request_rec *s);
 char *am_htmlencode(request_rec *r, const char *str);
 int am_save_post(request_rec *r, const char **relay_state);
+const char *am_strip_cr(request_rec *r, const char *str);
+const char *am_add_cr(request_rec *r, const char *str);
+const char *am_xstrtok(request_rec *r, const char *str, 
+                       const char *sep, char **last);
+void am_strip_blank(const char **s);
+const char *am_get_header_attr(request_rec *r, const char *h,
+                               const char *v, const char *a);
+int am_has_header(request_rec *r, const char *h, const char *v);
+const char *am_get_mime_header(request_rec *r, const char *m, const char *h);
+const char *am_get_mime_body(request_rec *r, const char *mime);
 
 
 int am_auth_mellon_user(request_rec *r);

@@ -805,47 +805,6 @@ char *am_get_endpoint_url(request_rec *r)
 }
 
 /*
- * The two functions below extract an HTTP header from the request.
- *
- * Parameters:
- *  request_rec *r           The current request.
- *
- * Returns:
- *  1 if multipart/form-data, 0 otherwise.
- */
-struct am_get_header_state {
-    request_rec *req;
-    const char *header;
-    const char *value;
-};
-
-static int am_get_header_callback(void *s, const char *key, const char *val)
-{
-    struct am_get_header_state *state;
-
-    state = (struct am_get_header_state *)s;
-
-    if (strcmp(key, state->header) != 0)
-       return 1;
-
-    state->value = val;
-    return 0;
-}
-
-static const char *am_get_header(request_rec *r, const char *header) 
-{
-    struct am_get_header_state state;
-
-    state.req = r;
-    state.header = header;
-    state.value = NULL;
-
-    (void)apr_table_do(am_get_header_callback, &state, r->headers_in, NULL);
-
-    return state.value;
-}
-
-/*
  * This function saves a POST request for later replay and updates
  * the return URL.
  *
@@ -860,6 +819,7 @@ int am_save_post(request_rec *r, const char **relay_state)
 {
     am_mod_cfg_rec *mod_cfg;
     const char *content_type;
+    const char *charset;
     const char *psf_id;
     char *psf_name;
     char *post_data;
@@ -871,18 +831,27 @@ int am_save_post(request_rec *r, const char **relay_state)
         return HTTP_INTERNAL_SERVER_ERROR;
 
     /* Check Content-Type */
-    content_type = am_get_header(r, "Content-Type");
-    if ((content_type != NULL) &&
-        (strcmp(content_type, "application/x-www-form-urlencoded") !=  0)) {
-        /* 
-         * This is probably "multipart/form-data; boundary=XXXXXXXXXX"
-         * The POST request then contains MIME data. We are not yet
-         * able to manage that, so issue an error 500.
-         */
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
-                      "Unsupported POST Content-Type \"%s\"", content_type);
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
+    content_type = apr_table_get(r->headers_in, "Content-Type");
+    if (content_type == NULL) {
+        content_type = "urlencoded";
+        charset = NULL; 
+    } else {
+        if (am_has_header(r, content_type, 
+            "application/x-www-form-urlencoded")) {
+            content_type = "urlencoded";
+
+        } else if (am_has_header(r, content_type,
+                   "multipart/form-data")) {
+            content_type = "multipart";
+
+        } else {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                          "Unknown POST Content-Type \"%s\"", content_type);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        charset = am_get_header_attr(r, content_type, NULL, "charset");
+    }     
 
     mod_cfg = am_get_mod_cfg(r->server);
 
@@ -933,9 +902,279 @@ int am_save_post(request_rec *r, const char **relay_state)
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    *relay_state = apr_psprintf(r->pool, "%srepost?id=%s&ReturnTo=%s", 
+    if (charset != NULL)
+        charset = apr_psprintf(r->pool, "&charset=%s", 
+                               am_urlencode(r->pool, charset));
+    else 
+        charset = "";
+
+    *relay_state = apr_psprintf(r->pool, 
+                                "%srepost?id=%s&ReturnTo=%s&enctype=%s%s",
                                 am_get_endpoint_url(r), psf_id,
-                                am_urlencode(r->pool, *relay_state));
+                                am_urlencode(r->pool, *relay_state), 
+                                content_type, charset);
 
     return OK;
+}
+
+/*
+ * This function replaces CRLF by LF in a string
+ *
+ * Parameters:
+ *  request_rec *r  The current request
+ *  const char *str The string
+ *
+ * Returns:
+ *  Output string
+ */
+const char *am_strip_cr(request_rec *r, const char *str)
+{
+    char *output;
+    const char *cp;
+    apr_size_t i;
+
+    output = apr_palloc(r->pool, strlen(str) + 1);
+    i = 0;
+
+    for (cp = str; *cp; cp++) {
+        if ((*cp == '\r') && (*(cp + 1) == '\n'))
+            continue;
+        output[i++] = *cp;
+    }
+
+    output[i++] = '\0';
+    
+    return (const char *)output;
+}
+
+/*
+ * This function replaces LF by CRLF in a string
+ *
+ * Parameters:
+ *  request_rec *r  The current request
+ *  const char *str The string
+ *
+ * Returns:
+ *  Output string
+ */
+const char *am_add_cr(request_rec *r, const char *str)
+{
+    char *output;
+    const char *cp;
+    apr_size_t xlen;
+    apr_size_t i;
+
+    xlen = 0;
+
+    for (cp = str; *cp; cp++)
+        if (*cp == '\n')
+            xlen++;
+
+    output = apr_palloc(r->pool, strlen(str) + xlen + 1);
+    i = 0;
+
+    for (cp = str; *cp; cp++) {
+        if (*cp == '\n')
+            output[i++] = '\r';
+        output[i++] = *cp;
+    }
+
+    output[i++] = '\0';
+    
+    return (const char *)output;
+}
+
+/*
+ * This function tokenize a string, just like strtok_r, except that
+ * the separator is a string instead of a character set.
+ *
+ * Parameters:
+ *  const char *str The string to tokenize
+ *  const char *sep The separator string
+ *  char **last     Pointer to state (char *)
+ *
+ * Returns:
+ *  OK on success, HTTP_INTERNAL_SERVER_ERROR otherwise
+ */
+const char *am_xstrtok(request_rec *r, const char *str,
+                       const char *sep, char **last)
+{
+    char *s;
+    char *np;
+
+    /* Resume */
+    if (str != NULL)
+        s = apr_pstrdup(r->pool, str);
+    else
+        s = *last;
+
+    /* End of string */
+    if (*s == '\0')
+        return NULL;
+
+    /* Next sep exists? */
+    if ((np = strstr(s, sep)) == NULL) {
+        *last = s + strlen(s);
+    } else {
+        *last = np + strlen(sep);
+        memset(np, 0, strlen(sep));
+    }
+
+    return s;
+}
+
+/* This function strips leading spaces and tabs from a string
+ *
+ * Parameters:
+ *  const char **s       Pointer to the string
+ *
+ */
+void am_strip_blank(const char **s)
+{
+    while ((**s == ' ') || (**s == '\t'))
+        (*s)++;
+    return;
+}
+
+/* This function extracts a MIME header from a MIME section
+ *
+ * Parameters:
+ *  request_rec *r        The request
+ *  const char *m         The MIME section
+ *  const char *h         The header to extract (case insensitive)
+ *
+ * Returns:
+ *  The header value, or NULL on failure.
+ */
+const char *am_get_mime_header(request_rec *r, const char *m, const char *h) 
+{
+    const char *line;
+    char *l1;
+    const char *value;
+    char *l2;
+
+    for (line = am_xstrtok(r, m, "\n", &l1); line && *line; 
+         line = am_xstrtok(r, NULL, "\n", &l1)) {
+
+        am_strip_blank(&line);
+
+        if (((value = am_xstrtok(r, line, ":", &l2)) != NULL) &&
+            (strcasecmp(value, h) == 0)) {
+            value =  am_xstrtok(r, NULL, ":", &l2);
+            am_strip_blank(&value);
+            return value;
+        }
+   }
+   return NULL;
+}
+
+/* This function extracts an attribute from a header 
+ *
+ * Parameters:
+ *  request_rec *r        The request
+ *  const char *h         The header
+ *  const char *v         Optional header value to check (case insensitive)
+ *  const char *a         Optional attribute to extract (case insensitive)
+ *
+ * Returns:
+ *   if i was provided, item value, or NULL on failure.
+ *   if i is NULL, the whole header, or NULL on failure. This is
+ *   useful for testing v.
+ */
+const char *am_get_header_attr(request_rec *r, const char *h,
+                               const char *v, const char *a) 
+{
+    const char *value;
+    const char *attr;
+    char *l1;
+    const char *attr_value = NULL;
+
+    /* Looking for 
+     * header-value; item_name="item_value"\n 
+     */
+    if ((value = am_xstrtok(r, h, ";", &l1)) == NULL)
+        return NULL;
+    am_strip_blank(&value);
+
+    /* If a header value was provided, check it */ 
+    if ((v != NULL) && (strcasecmp(value, v) != 0))
+        return NULL;
+
+    /* If no attribute name is provided, return everything */
+    if (a == NULL)
+        return h;
+
+    while ((attr = am_xstrtok(r, NULL, ";", &l1)) != NULL) {
+        const char *attr_name = NULL;
+        char *l2;
+
+        am_strip_blank(&attr);
+
+        attr_name = am_xstrtok(r, attr, "=", &l2); 
+        if ((attr_name != NULL) && (strcasecmp(attr_name, a) == 0)) {
+        	attr_value = am_xstrtok(r, NULL, "=", &l2);
+                am_strip_blank(&attr_value);
+        	break;
+        }
+    }
+  
+    /* Remove leading and trailing quotes */
+    if (attr_value != NULL) {
+        apr_size_t len; 
+
+        len = strlen(attr_value);
+        if ((len > 1) && (attr_value[len - 1] == '\"'))
+            attr_value = apr_pstrndup(r->pool, attr_value, len - 1);
+        if (attr_value[0] == '\"')
+            attr_value++;
+    }
+    
+    return attr_value;
+}
+
+/* This function checks for a header name/value existence
+ *
+ * Parameters:
+ *  request_rec *r        The request
+ *  const char *h         The header (case insensitive)
+ *  const char *v         Optional header value to check (case insensitive)
+ *
+ * Returns:
+ *   0 if header does not exists or does not has the value, 1 otherwise
+ */
+int am_has_header(request_rec *r, const char *h, const char *v)
+{
+    return (am_get_header_attr(r, h, v, NULL) != NULL);
+}
+
+/* This function extracts the body from a MIME section
+ *
+ * Parameters:
+ *  request_rec *r        The request
+ *  const char *mime      The MIME section
+ *
+ * Returns:
+ *  The MIME section body, or NULL on failure.
+ */
+const char *am_get_mime_body(request_rec *r, const char *mime) 
+{
+    const char lflf[] = "\n\n";
+    const char *body;
+    apr_size_t body_len;
+
+    if ((body = strstr(mime, lflf)) == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "No MIME body");
+        return NULL;
+    }
+
+    body += strlen(lflf);
+
+    /* Strip tralling \n */
+    if ((body_len = strlen(body)) > 1) {
+        if (body[body_len - 1] == '\n') 
+            body = apr_pstrmemdup(r->pool, body, body_len - 1);
+    }
+
+    /* Turn back LF into CRLF */
+    return am_add_cr(r, body);
 }

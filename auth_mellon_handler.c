@@ -1693,6 +1693,136 @@ static int am_handle_artifact_reply(request_rec *r)
     return am_handle_reply_common(r, login, relay_state, "");
 }
 
+
+
+/* This function builds web form inputs for a saved POST request, 
+ * in multipart/form-data format.
+ *
+ * Parameters:
+ *  request_rec *r        The request
+ *  const char *post_data The savec POST request
+ *
+ * Returns:
+ *  The web form fragment, or NULL on failure.
+ */
+const char *am_post_mkform_multipart(request_rec *r, const char *post_data)
+{
+    const char *mime_part;
+    const char *boundary;
+    char *l1;
+    char *post_form = "";
+
+    /* Replace CRLF by LF */
+    post_data = am_strip_cr(r, post_data);
+
+    if ((boundary = am_xstrtok(r, post_data, "\n", &l1)) == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                     "Cannot figure initial boundary");
+        return NULL;
+    }
+
+    for (mime_part = am_xstrtok(r, post_data, boundary, &l1); mime_part;
+         mime_part = am_xstrtok(r, NULL, boundary, &l1)) {
+        const char *hdr;
+        const char *name = NULL;
+        const char *value = NULL;
+        const char *input_item;
+
+        /* End of MIME data */
+        if (strcmp(mime_part, "--\n") == 0)
+            break;
+
+        /* Remove leading CRLF */
+        if (strstr(mime_part, "\n") == mime_part)
+            mime_part += 1;
+
+        /* Empty part */
+        if (*mime_part == '\0')
+            continue;
+
+        /* Find Content-Disposition header 
+         * Looking for 
+         * Content-Disposition: form-data; name="the_name"\n 
+         */
+        hdr = am_get_mime_header(r, mime_part, "Content-Disposition");
+        if (hdr == NULL) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                         "No Content-Disposition header in MIME section,");
+            continue;
+        }
+
+        name = am_get_header_attr(r, hdr, "form-data", "name");
+        if (name == NULL) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                         "Unexpected Content-Disposition header: \"%s\"", hdr);
+            continue;
+        }
+
+        if ((value = am_get_mime_body(r, mime_part)) == NULL)
+            value = "";
+
+        input_item = apr_psprintf(r->pool, 
+                    "    <input type=\"hidden\" name=\"%s\" value=\"%s\">\n",
+                    am_htmlencode(r, name), am_htmlencode(r, value));
+        post_form = apr_pstrcat(r->pool, post_form, input_item, NULL);
+    }
+
+    return post_form;
+}
+
+/* This function builds web form inputs for a saved POST request, 
+ * in application/x-www-form-urlencoded format
+ *
+ * Parameters:
+ *  request_rec *r        The request
+ *  const char *post_data The savec POST request
+ *
+ * Returns:
+ *  The web form fragment, or NULL on failure.
+ */
+const char *am_post_mkform_urlencoded(request_rec *r, const char *post_data)
+{
+    const char *item;
+    char *last;
+    char *post_form = "";
+
+    for (item = am_xstrtok(r, post_data, "&", &last); item; 
+         item = am_xstrtok(r, NULL, "&", &last)) {
+        char *l1;
+        char *name;
+        char *value;
+        const char *input_item;
+
+        name = (char *)am_xstrtok(r, item, "=", &l1);  
+        value = (char *)am_xstrtok(r, NULL, "=", &l1);
+
+        if (name == NULL)
+            continue;
+
+        if (value == NULL)
+            value = (char *)"";
+
+        if (am_urldecode(name) != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                         "urldecode(\"%s\") failed", name);
+            return NULL;
+        }
+
+        if (am_urldecode(value) != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                         "urldecode(\"%s\") failed", value);
+            return NULL;
+        }
+
+        input_item = apr_psprintf(r->pool, 
+                    "    <input type=\"hidden\" name=\"%s\" value=\"%s\">\n",
+                    am_htmlencode(r, name), am_htmlencode(r, value));
+        post_form = apr_pstrcat(r->pool, post_form, input_item, NULL);
+    }
+    return post_form;
+}
+
+
 /* This function handles responses to repost request
  *
  * Parameters:
@@ -1705,18 +1835,56 @@ static int am_handle_repost(request_rec *r)
 {
     am_mod_cfg_rec *mod_cfg;
     const char *query;
-    char *cp;
+    const char *enctype;
+    char *charset;
     char *psf_id;
+    char *cp;
     char *psf_filename;
     char *post_data;
-    char *post_form;
+    const char *post_form;
     char *output;
-    char *last;
     char *return_url;
+    const char *(*post_mkform)(request_rec *, const char *);
 
     mod_cfg = am_get_mod_cfg(r->server);
     query = r->parsed_uri.query;
     
+    enctype = am_extract_query_parameter(r->pool, query, "enctype");
+    if (enctype == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                      "Bad repost query: missing enctype");
+        return HTTP_BAD_REQUEST;
+    }
+    if (strcmp(enctype, "urlencoded") == 0) {
+        enctype = "application/x-www-form-urlencoded";
+        post_mkform = am_post_mkform_urlencoded;
+    } else if (strcmp(enctype, "multipart") == 0) {
+        enctype = "multipart/form-data";
+        post_mkform = am_post_mkform_multipart;
+    } else {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                      "Bad repost query: invalid enctype \"%s\".", enctype);
+        return HTTP_BAD_REQUEST;
+    }
+
+    charset = am_extract_query_parameter(r->pool, query, "charset");
+    if (charset != NULL) {
+        if (am_urldecode(charset) != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                          "Bad repost query: invalid charset \"%s\"", charset);
+            return HTTP_BAD_REQUEST;
+        }
+    
+        /* Check that charset is sane */
+        for (cp = psf_id; *cp; cp++) {
+            if (!apr_isalnum(*cp) && (*cp != '-') && (*cp != '_')) {
+                ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                              "Bad repost query: invalid charset \"%s\"", charset);
+                return HTTP_BAD_REQUEST;
+            }
+        }
+    }
+
     psf_id = am_extract_query_parameter(r->pool, query, "id");
     if (psf_id == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
@@ -1753,45 +1921,21 @@ static int am_handle_repost(request_rec *r)
         return HTTP_BAD_REQUEST;
     }
 
-    post_form = "";
-    for (cp = apr_strtok(post_data, "&", &last); cp; 
-         cp = apr_strtok(NULL, "&", &last)) {
-        char *item;
-        char *last2;
-        char *name;
-        char *value;
-        char *input_item;
+    if ((post_form = (*post_mkform)(r, post_data)) == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "am_post_mkform() failed");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
 
-        item = apr_pstrdup(r->pool, cp);
-
-        name = apr_strtok(item, "=", &last2);  
-        value = apr_strtok(NULL, "=", &last2);
-
-        if (name == NULL)
-            continue;
-
-        if (value == NULL)
-            value = (char *)"";
-
-        if (am_urldecode(name) != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                         "urldecode(\"%s\") failed", name);
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
-
-        if (am_urldecode(value) != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                         "urldecode(\"%s\") failed", value);
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
-
-        input_item = apr_psprintf(r->pool, 
-                    "    <input type=\"hidden\" name=\"%s\" value=\"%s\">\n",
-                    am_htmlencode(r, name), am_htmlencode(r, value));
-        post_form = apr_pstrcat(r->pool, post_form, input_item, NULL);
+    if (charset != NULL) {
+         r->content_type = apr_psprintf(r->pool, 
+                                        "text/html; charset=\"%s\"",
+                                        charset);
+         charset = apr_psprintf(r->pool, " accept-charset=\"%s\"", charset);
+    } else {
+         r->content_type = "text/html";
+         charset = (char *)"";
     }
     
-    r->content_type = "text/html";
     output = apr_psprintf(r->pool,
       "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n"
       "<html>\n"
@@ -1803,14 +1947,14 @@ static int am_handle_repost(request_rec *r)
       "   Your browser does not support Javascript, \n"
       "   you must click the button below to proceed.\n"
       "  </noscript>\n"
-      "   <form id=\"form\" method=\"POST\" action=\"%s\">\n%s"
+      "   <form id=\"form\" method=\"POST\" action=\"%s\" enctype=\"%s\"%s>\n%s"
       "    <noscript>\n"
       "     <input type=\"submit\">\n"
       "    </noscript>\n"
       "   </form>\n"
       " </body>\n" 
       "</html>\n",
-      return_url, post_form);
+      am_htmlencode(r, return_url), enctype, charset, post_form);
 
     ap_rputs(output, r);
     return OK;
