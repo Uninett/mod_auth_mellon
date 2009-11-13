@@ -1864,6 +1864,12 @@ static int am_handle_repost(request_rec *r)
     char *return_url;
     const char *(*post_mkform)(request_rec *, const char *);
 
+    if (am_cookie_get(r) == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                      "Repost query without a session");
+        return HTTP_FORBIDDEN;
+    }
+
     mod_cfg = am_get_mod_cfg(r->server);
     query = r->parsed_uri.query;
     
