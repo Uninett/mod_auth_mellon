@@ -1196,7 +1196,7 @@ const char *am_get_mime_body(request_rec *r, const char *mime)
     body += strlen(lflf);
 
     /* Strip tralling \n */
-    if ((body_len = strlen(body)) > 1) {
+    if ((body_len = strlen(body)) >= 1) {
         if (body[body_len - 1] == '\n') 
             body = apr_pstrmemdup(r->pool, body, body_len - 1);
     }
