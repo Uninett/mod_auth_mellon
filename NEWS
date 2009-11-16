@@ -3,6 +3,8 @@ Version 0.2.5
 
 * Replay POST requests after been sent to the IdP
 
+* Fix HTTP response splitting vulnerability.
+
 Version 0.2.4
 ---------------------------------------------------------------------------
 
