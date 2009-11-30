@@ -272,10 +272,9 @@ MellonPostCount 100
 
         # MellonSPPrivateKeyFile is a .pem file which contains the private
         # key of the service provider. The .pem-file cannot be encrypted
-        # with a password. This directive is optional. If built with 
-        # lasso-2.2.2 or higher, the private key can be only readable
-        # by root, otherwise it has to be reasbable by the Apache pseudo  
-        # user.
+        # with a password. If built with lasso-2.2.2 or higher, the
+        # private key can be only readable by root, otherwise it has to
+        # be reasbable by the Apache pseudo user.
         # Default: None set.
 	MellonSPPrivateKeyFile /etc/apache2/mellon/sp-private-key.pem
 
