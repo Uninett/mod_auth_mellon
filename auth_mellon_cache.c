@@ -145,67 +145,58 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
     }
 
 
-    /* First we try to find another session with the given key. */
-    t = am_cache_lock(s, AM_CACHE_SESSION, key);
+    mod_cfg = am_get_mod_cfg(s);
 
 
-    if(t == NULL) {
-        /* We didn't find a previous session with the key. We will search
-         * for the least recently used entry or a free entry in stead.
-         */
+    /* Lock the table. */
+    if((rv = apr_global_mutex_lock(mod_cfg->lock)) != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                     "apr_global_mutex_lock() failed [%d]: %s",
+                     rv, apr_strerror(rv, buffer, sizeof(buffer)));
+        return NULL;
+    }
 
-        mod_cfg = am_get_mod_cfg(s);
+    table = apr_shm_baseaddr_get(mod_cfg->cache);
 
+    /* Get current time. If we find a entry with expires <= the current
+     * time, then we can use it.
+     */
+    current_time = apr_time_now();
 
-        /* Lock the table. */
-        if((rv = apr_global_mutex_lock(mod_cfg->lock)) != APR_SUCCESS) {
-            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-                         "apr_global_mutex_lock() failed [%d]: %s",
-                         rv, apr_strerror(rv, buffer, sizeof(buffer)));
-            return NULL;
+    /* We will use 't' to remember the best/oldest entry. We
+     * initalize it to the first entry in the table to simplify the
+     * following code (saves test for t == NULL).
+     */
+    t = &table[0];
+
+    /* Iterate over the session table. Update 't' to match the "best"
+     * entry (the least recently used). 't' will point a free entry
+     * if we find one. Otherwise, 't' will point to the least recently
+     * used entry.
+     */
+    for(i = 0; i < mod_cfg->init_cache_size; i++) {
+        if(table[i].key[0] == '\0') {
+            /* This entry is free. Update 't' to this entry
+             * and exit loop.
+             */
+            t = &table[i];
+            break;
         }
 
-        table = apr_shm_baseaddr_get(mod_cfg->cache);
+        if(table[i].expires <= current_time) {
+            /* This entry is expired, and is therefore free.
+             * Update 't' and exit loop.
+             */
+            t = &table[i];
+            break;
+        }
 
-        /* Get current time. If we find a entry with expires <= the current
-         * time, then we can use it.
-         */
-        current_time = apr_time_now();
-
-        /* We will use 't' to remember the best/oldest entry. We
-         * initalize it to the first entry in the table to simplify the
-         * following code (saves test for t == NULL).
-         */
-        t = &table[0];
-
-        /* Iterate over the session table. Update 't' to match the "best"
-         * entry (the least recently used). 't' will point a free entry
-         * if we find one. Otherwise, 't' will point to the least recently
-         * used entry.
-         */
-        for(i = 0; i < mod_cfg->init_cache_size; i++) {
-            if(table[i].key[0] == '\0') {
-                /* This entry is free. Update 't' to this entry
-                 * and exit loop.
-                 */
-                t = &table[i];
-                break;
-            }
-
-            if(table[i].expires <= current_time) {
-                /* This entry is expired, and is therefore free.
-                 * Update 't' and exit loop.
-                 */
-                t = &table[i];
-                break;
-            }
-
-            if(table[i].access < t->access) {
-                /* This entry is older than 't' - update 't'. */
-                t = &table[i];
-            }
+        if(table[i].access < t->access) {
+            /* This entry is older than 't' - update 't'. */
+            t = &table[i];
         }
     }
+
 
     if(t->key[0] != '\0' && t->expires > current_time) {
         /* We dropped a LRU entry. Calculate the age in seconds. */
