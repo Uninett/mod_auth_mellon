@@ -1995,8 +1995,8 @@ static int am_handle_repost(request_rec *r)
  */
 static int am_handle_metadata(request_rec *r)
 {
-    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
 #ifdef HAVE_lasso_server_new_from_buffers
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     LassoServer *server;
     const char *data;
 
