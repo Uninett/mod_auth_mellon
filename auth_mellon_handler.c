@@ -1900,7 +1900,7 @@ static int am_handle_repost(request_rec *r)
         }
     
         /* Check that charset is sane */
-        for (cp = psf_id; *cp; cp++) {
+        for (cp = charset; *cp; cp++) {
             if (!apr_isalnum(*cp) && (*cp != '-') && (*cp != '_')) {
                 ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
                               "Bad repost query: invalid charset \"%s\"", charset);
