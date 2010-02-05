@@ -273,8 +273,8 @@ MellonPostCount 100
         # MellonSPPrivateKeyFile is a .pem file which contains the private
         # key of the service provider. The .pem-file cannot be encrypted
         # with a password. If built with lasso-2.2.2 or higher, the
-        # private key can be only readable by root, otherwise it has to
-        # be reasbable by the Apache pseudo user.
+        # private key only needs to be readable by root, otherwise it has
+        # to be reasbable by the Apache pseudo user.
         # Default: None set.
 	MellonSPPrivateKeyFile /etc/apache2/mellon/sp-private-key.pem
 
@@ -297,7 +297,7 @@ MellonPostCount 100
         # Default: None set.
 	MellonIdPPublicKeyFile /etc/apache2/mellon/idp-public-key.pem
 
-        # MellonIdPCAFile is te full path to the certificate of the
+        # MellonIdPCAFile is the full path to the certificate of the
         # certificate authority. This can be used instead of an
         # certificate for the IdP.
         # Default: None set.
