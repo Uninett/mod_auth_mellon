@@ -1204,3 +1204,39 @@ const char *am_get_mime_body(request_rec *r, const char *mime)
     /* Turn back LF into CRLF */
     return am_add_cr(r, body);
 }
+
+/* This function returns the URL for a given provider service (type + method)
+ *
+ * Parameters:
+ *  request_rec *r        The request
+ *  LassoProfile *profile Login profile
+ *  char *endpoint_name   Service and method as specified in metadata
+ *                        e.g.: "SingleSignOnService HTTP-Redirect"
+ * Returns:
+ *  The endpoint URL that must be freed by caller, or NULL on failure.
+ */
+char *
+am_get_service_url(request_rec *r, LassoProfile *profile, char *service_name)
+{
+    LassoProvider *provider;
+    gchar *url;
+
+    provider = lasso_server_get_provider(profile->server, 
+                                         profile->remote_providerID);
+    if (LASSO_IS_PROVIDER(provider) == FALSE) {
+        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                      "Cannot find provider service %s, no provider.",
+                      service_name);
+	return NULL;
+    }
+
+    url = lasso_provider_get_metadata_one(provider, service_name);
+    if (url == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                      "Cannot find provider service %s from metadata.",
+                      service_name);
+	return NULL;
+    }
+
+    return url;
+}

@@ -2186,6 +2186,19 @@ static int am_auth_new_ticket(request_rec *r)
     LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Consent
       = g_strdup(LASSO_SAML2_CONSENT_IMPLICIT);
 
+
+    /* 
+     * Make sure the Destination attribute is set to the IdP 
+     * SingleSignOnService endpoint. This is required for 
+     * Shibboleth 2 interoperability, and older versions of
+     * lasso (at least up to 2.2.91) did not do it.
+     * XXX Here we assume HTTP-Redirect method
+     */
+    if (LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination == NULL)
+        LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination = 
+            am_get_service_url(r, LASSO_PROFILE(login), 
+                               "SingleSignOnService HTTP-Redirect");
+
     LASSO_PROFILE(login)->msg_relayState = g_strdup(relay_state);
 
     ret = lasso_login_build_authn_request_msg(login);

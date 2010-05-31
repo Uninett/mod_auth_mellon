@@ -70,8 +70,8 @@
 #define AM_CACHE_ENVSIZE 128
 #define AM_CACHE_USERSIZE 512
 #define AM_CACHE_MAX_LASSO_IDENTITY_SIZE 1024
-#define AM_CACHE_MAX_LASSO_SESSION_SIZE 8192
-#define AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE 16384
+#define AM_CACHE_MAX_LASSO_SESSION_SIZE 32768
+#define AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE 65536
 
 
 /* This is the length of the session id we use.
@@ -277,6 +277,8 @@ const char *am_get_header_attr(request_rec *r, const char *h,
 int am_has_header(request_rec *r, const char *h, const char *v);
 const char *am_get_mime_header(request_rec *r, const char *m, const char *h);
 const char *am_get_mime_body(request_rec *r, const char *mime);
+char *am_get_service_url(request_rec *r, 
+                         LassoProfile *profile, char *service_name);
 
 
 int am_auth_mellon_user(request_rec *r);
