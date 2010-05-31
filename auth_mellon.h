@@ -138,6 +138,7 @@ typedef struct am_dir_cfg_rec {
     apr_hash_t *require;
     apr_hash_t *envattr;
     const char *userattr;
+    const char *idpattr;
     int dump_session;
     int dump_saml_response;
 

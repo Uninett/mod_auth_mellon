@@ -185,14 +185,18 @@ MellonPostCount 100
         # Default: Off
         MellonSecureCookie On
 
-        # MellonSecureCookie enforces the HttpOnly and secure flags
-        # for the mod_mellon cookie
         # MellonUser selects which attribute we should use for the username.
         # The username is passed on to other apache modules and to the web
         # page the user visits. NAME_ID is an attribute which we set to
         # the id we get from the IdP.
         # Default: MellonUser "NAME_ID"
 	MellonUser "NAME_ID"
+
+        # MellonIdP selects in which attribute we should dump the remote 
+        # IdP providerId. This is passed to other apache modules and to 
+        # the web pages the user visits.
+        # Default: none
+	# MellonIdP "IDP"
 
         # MellonSetEnv configuration directives allows you to map
         # attribute names received from the IdP to names you choose

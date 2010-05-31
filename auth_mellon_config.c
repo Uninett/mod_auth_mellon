@@ -557,6 +557,13 @@ const command_rec auth_mellon_commands[] = {
         "Attribute to set as r->user. Defaults to NAME_ID, which is the"
         " attribute we set to the identifier we receive from the IdP."
         ),
+    AP_INIT_TAKE1(
+        "MellonIdP",
+        ap_set_string_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, idpattr),
+        OR_AUTHCFG,
+        "Attribute we set to the IdP ProviderId."
+        ),
     AP_INIT_TAKE2(
         "MellonSetEnv",
         am_set_setenv_slot,
@@ -724,6 +731,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->require   = apr_hash_make(p);
     dir->envattr   = apr_hash_make(p);
     dir->userattr  = default_user_attribute;
+    dir->idpattr  = NULL;
     dir->dump_session = default_dump_session;
     dir->dump_saml_response = default_dump_saml_response;
 
@@ -807,6 +815,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->userattr = (add_cfg->userattr != default_user_attribute ?
                          add_cfg->userattr :
                          base_cfg->userattr);
+
+    new_cfg->idpattr = (add_cfg->idpattr != NULL ?
+                        add_cfg->idpattr :
+                        base_cfg->idpattr);
 
     new_cfg->dump_session = (add_cfg->dump_session != default_dump_session ?
                              add_cfg->dump_session :

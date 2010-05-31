@@ -1304,6 +1304,16 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
         return ret;
     }
 
+    /* If requested, save the IdP ProviderId */
+    if (dir_cfg->idpattr != NULL) {
+        ret = am_cache_env_append(session, dir_cfg->idpattr, am_get_idp(r));
+        if(ret != OK) {
+            return ret;
+        }
+    }
+    
+     
+
     /* assertions is a list of LassoSaml2Assertion objects. */
     for(asrt_itr = g_list_first(assertions); asrt_itr != NULL;
         asrt_itr = g_list_next(asrt_itr)) {
