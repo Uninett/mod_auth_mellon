@@ -97,12 +97,24 @@ static const char *am_set_filestring_slot(cmd_parms *cmd,
                                           const char *arg)
 {
     const char *data;
+    apr_finfo_t finfo;
+    apr_status_t rv;
+    char error[64];
 
 #ifdef HAVE_lasso_server_new_from_buffers
     if ((data = am_getfile(cmd->pool, cmd->server, arg)) == NULL)
         return apr_psprintf(cmd->pool, "%s - Cannot read file %s",
                             cmd->cmd->name, arg);
 #else
+
+    rv = apr_stat(&finfo, arg, APR_FINFO_SIZE, cmd->pool);
+    if(rv != 0) {
+        apr_strerror(rv, error, sizeof(error));
+        return apr_psprintf(cmd->pool,
+                            "%s - Cannot read file \"%s\" [%d] \"%s\"",
+                            cmd->cmd->name, arg, rv, error);
+    }
+
     data = arg;
 #endif
 
