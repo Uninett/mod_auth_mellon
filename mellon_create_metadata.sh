@@ -33,6 +33,7 @@ if ! echo "$BASEURL" | grep -q '^https\?://'; then
     exit 1
 fi
 
+HOST="$(echo "$BASEURL" | sed 's#^[a-z]*://\([^/]*\).*#\1#')"
 BASEURL="$(echo "$BASEURL" | sed 's#/$##')"
 
 OUTFILE="$(echo "$ENTITYID" | sed 's/[^A-Za-z.]/_/g' | sed 's/__*/_/g')"
@@ -40,6 +41,7 @@ echo "Output files:"
 echo "Private key:               $OUTFILE.key"
 echo "Certificate:               $OUTFILE.cert"
 echo "Metadata:                  $OUTFILE.xml"
+echo "Host:                      $HOST"
 echo
 echo "Endpoints:"
 echo "SingleLogoutService:       $BASEURL/logout"
@@ -60,7 +62,7 @@ distinguished_name = req_distinguished_name
 prompt             = no
 policy             = policy_anything
 [req_distinguished_name]
-commonName         = $ENTITYID
+commonName         = $HOST
 EOF
 
 openssl req -utf8 -batch -config "$TEMPLATEFILE" -new -x509 -days 3652 -nodes -out "$OUTFILE.cert" -keyout "$OUTFILE.key" 2>/dev/null
