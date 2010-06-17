@@ -2408,6 +2408,7 @@ int am_check_uid(request_rec *r)
 
     /* If the user isn't logged in, then we can't authorize the user. */
     if(!session->logged_in) {
+        am_release_request_session(r, session);
         return HTTP_UNAUTHORIZED;
     }
 
