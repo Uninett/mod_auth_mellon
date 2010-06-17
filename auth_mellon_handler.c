@@ -1309,16 +1309,6 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
         return ret;
     }
 
-    /* If requested, save the IdP ProviderId */
-    if (dir_cfg->idpattr != NULL) {
-        ret = am_cache_env_append(session, dir_cfg->idpattr, am_get_idp(r));
-        if(ret != OK) {
-            return ret;
-        }
-    }
-    
-     
-
     /* assertions is a list of LassoSaml2Assertion objects. */
     for(asrt_itr = g_list_first(assertions); asrt_itr != NULL;
         asrt_itr = g_list_next(asrt_itr)) {
@@ -1423,6 +1413,9 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     am_dir_cfg_rec *dir_cfg;
     am_cache_entry_t *session;
     int rc;
+    const char *idp;
+
+    dir_cfg = am_get_dir_cfg(r);
 
     if(LASSO_PROFILE(login)->nameIdentifier == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
@@ -1450,7 +1443,6 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
                           "User has disabled cookies, or has lost"
                           " the cookie before returning from the SAML2"
                           " login server.");
-            dir_cfg = am_get_dir_cfg(r);
             if(dir_cfg->no_cookie_error_page != NULL) {
                 apr_table_setn(r->headers_out, "Location",
                                dir_cfg->no_cookie_error_page);
@@ -1478,6 +1470,19 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
         lasso_login_destroy(login);
         return rc;
     }
+
+    /* If requested, save the IdP ProviderId */
+    if(dir_cfg->idpattr != NULL) {
+        idp = LASSO_PROFILE(login)->remote_providerID;
+        if(idp != NULL) {
+            rc = am_cache_env_append(session, dir_cfg->idpattr, idp);
+            if(rc != OK) {
+                lasso_login_destroy(login);
+                return rc;
+            }
+        }
+    }
+
     am_release_request_session(r, session);
 
     rc = lasso_login_accept_sso(login);
