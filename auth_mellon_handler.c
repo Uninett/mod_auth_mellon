@@ -412,16 +412,21 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 
     apr_thread_mutex_lock(cfg->server_mutex);
     if(cfg->server == NULL) {
-#ifdef HAVE_lasso_server_new_from_buffers
-        /*
-         * If we have no metadata, try to generate them now
-         */
         if(cfg->sp_metadata_file == NULL) {
-            apr_pool_t *pool = r->server->process->pconf;
 
+#ifdef HAVE_lasso_server_new_from_buffers
+            /*
+             * Try to generate missing metadata
+             */
+            apr_pool_t *pool = r->server->process->pconf;
             cfg->sp_metadata_file = am_generate_metadata(pool, r);
-        }
+#else
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Missing MellonSPMetadataFile option.");
+            apr_thread_mutex_unlock(cfg->server_mutex);
+            return NULL;
 #endif /* HAVE_lasso_server_new_from_buffers */
+        }
 
         cfg->server = SERVER_NEW(cfg->sp_metadata_file,
                                  cfg->sp_private_key_file,
