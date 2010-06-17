@@ -1446,11 +1446,13 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
             if(dir_cfg->no_cookie_error_page != NULL) {
                 apr_table_setn(r->headers_out, "Location",
                                dir_cfg->no_cookie_error_page);
+                lasso_login_destroy(login);
                 return HTTP_SEE_OTHER;
             } else {
                 /* Return 400 Bad Request when the user hasn't set a
                  * no-cookie error page.
                  */
+                lasso_login_destroy(login);
                 return HTTP_BAD_REQUEST;
             }
         }
