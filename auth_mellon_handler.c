@@ -2265,6 +2265,74 @@ static int am_auth_new_ticket(request_rec *r)
     return am_send_authn_request(r, am_get_idp(r), relay_state, FALSE);
 }
 
+/* This function handles requests to the login handler.
+ *
+ * Parameters:
+ *  request_rec *r       The request.
+ *
+ * Returns:
+ *  OK on success, or an error if any of the steps fail.
+ */
+static int am_handle_login(request_rec *r)
+{
+    const char *idp;
+    char *return_to;
+    char *is_passive_str;
+    int is_passive;
+    int ret;
+
+    return_to = am_extract_query_parameter(r->pool, r->args, "ReturnTo");
+    if(return_to == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Missing required ReturnTo parameter.");
+        return HTTP_BAD_REQUEST;
+    }
+
+    ret = am_urldecode(return_to);
+    if(ret != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Error urldecoding ReturnTo parameter.");
+        return ret;
+    }
+
+    idp = am_extract_query_parameter(r->pool, r->args, "IdP");
+    if(idp != NULL) {
+        ret = am_urldecode((char*)idp);
+        if(ret != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Error urldecoding IdP parameter.");
+            return ret;
+        }
+    } else {
+        /* Use the default IdP. */
+        idp = am_get_idp(r);
+    }
+
+    is_passive_str = am_extract_query_parameter(r->pool, r->args, "IsPassive");
+    if(is_passive_str != NULL) {
+        ret = am_urldecode((char*)is_passive_str);
+        if(ret != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Error urldecoding IsPassive parameter.");
+            return ret;
+        }
+        if(!strcmp(is_passive_str, "true")) {
+            is_passive = TRUE;
+        } else if(!strcmp(is_passive_str, "false")) {
+            is_passive = FALSE;
+        } else {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Invalid value for IsPassive parameter - must be \"true\" or \"false\".");
+            return HTTP_BAD_REQUEST;
+        }
+    } else {
+        is_passive = FALSE;
+    }
+
+    return am_send_authn_request(r, idp, return_to, is_passive);
+}
+
+
 /* This function takes a request for an endpoint and passes it on to the
  * correct handler function.
  *
@@ -2303,6 +2371,8 @@ static int am_endpoint_handler(request_rec *r)
          * with version 0.0.6 and older.
          */
         return am_handle_logout(r);
+    } else if(!strcmp(endpoint, "login")) {
+        return am_handle_login(r);
     } else {
 	ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
 		      "Endpoint \"%s\" not handled by mod_auth_mellon.",

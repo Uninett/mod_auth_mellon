@@ -437,6 +437,19 @@ foreach($_SERVER as $key=>$value) {
 }
 ?>
 
+===========================================================================
+ Manual login
+===========================================================================
+
+It is possible to manually trigger login operations. This can be done by
+accessing "<endpoint path>/login". That endpoint accepts three parameters:
+
+- ReturnTo: A mandatory parameter which contains the URL we should return
+  to after login.
+- IdP: The entity ID of the IdP we should send a login request to. This
+  parameter is optional.
+- IsPassive: This parameter can be set to "true" to send a passive
+  authentication request to the IdP.
 
 ===========================================================================
  Logging out
