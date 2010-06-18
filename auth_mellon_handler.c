@@ -2092,65 +2092,25 @@ int am_handler(request_rec *r)
 }
 
 
-
-static int am_auth_new_ticket(request_rec *r)
+/* Create and send an authentication request.
+ *
+ * Parameters:
+ *  request_rec *r         The request we are processing.
+ *  const char *idp        The entityID of the IdP.
+ *  const char *return_to  The URL we should redirect to when receiving the request.
+ *  int is_passive         Whether to send a passive request.
+ *
+ * Returns:
+ *  HTTP_SEE_OTHER on success, or an error on failure.
+ */
+static int am_send_authn_request(request_rec *r, const char *idp,
+                           const char *return_to, int is_passive)
 {
-    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     LassoServer *server;
     LassoLogin *login;
     LassoSamlp2AuthnRequest *request;
     gint ret;
     char *redirect_to;
-    const char *relay_state;
-
-    relay_state = am_reconstruct_url(r);
-
-    /* If this is a POST request, attempt to save it */
-    if (r->method_number == M_POST) {
-        if (am_save_post(r, &relay_state) != OK)
-            return HTTP_INTERNAL_SERVER_ERROR;
-    }
-
-    /* Check if IdP discovery is in use and no IdP was selected yet */
-    if ((cfg->discovery_url != NULL) && 
-        (am_builtin_discovery_timeout(r) == -1) && /* no built-in discovery */
-        (am_extract_query_parameter(r->pool, r->args, "IdP") == NULL)) {
-        char *discovery_url;
-	char *return_url;
-	char *endpoint = am_get_endpoint_url(r);
-        char *sep;
-
-        /* If discovery URL already has a ? we append a & */
-        sep = (strchr(cfg->discovery_url, '?')) ? "&" : "?";
-
-	return_url = apr_psprintf(r->pool, "%sauth?ReturnTo=%s",
-                                  endpoint, 
-                                  am_urlencode(r->pool, relay_state));
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-		      "return_url = %s", return_url);
-        discovery_url = apr_psprintf(r->pool, "%s%sentityID=%smetadata&"
-                                     "return=%s&returnIDParam=IdP",
-                                     cfg->discovery_url, sep, 
-                                     am_urlencode(r->pool, endpoint),
-                                     am_urlencode(r->pool, return_url));
-	
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-		      "discovery_url = %s", discovery_url);
-        apr_table_setn(r->headers_out, "Location", discovery_url);
-        return HTTP_SEE_OTHER;
-    }
-
-    /* If IdP discovery is in use and we have an IdP selected, 
-     * set the relay_state
-     */
-    if ((cfg->discovery_url != NULL) &&
-        (am_builtin_discovery_timeout(r) == -1)) { /* no built-in discovery */
-        char *return_url;
-
-        return_url = am_extract_query_parameter(r->pool, r->args, "ReturnTo");
-        if ((return_url != NULL) && am_urldecode((char *)return_url) == 0)
-            relay_state = return_url;
-    }
 
     /* Add cookie for cookie test. We know that we should have
      * a valid cookie when we return from the IdP after SP-initiated
@@ -2171,7 +2131,7 @@ static int am_auth_new_ticket(request_rec *r)
 	return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    ret = lasso_login_init_authn_request(login, am_get_idp(r),
+    ret = lasso_login_init_authn_request(login, idp,
 					 LASSO_HTTP_METHOD_REDIRECT);
     if(ret != 0) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
@@ -2191,7 +2151,7 @@ static int am_auth_new_ticket(request_rec *r)
     }
 
     request->ForceAuthn = FALSE;
-    request->IsPassive = FALSE;
+    request->IsPassive = is_passive;
 
     request->NameIDPolicy->AllowCreate = TRUE;
 
@@ -2199,19 +2159,19 @@ static int am_auth_new_ticket(request_rec *r)
       = g_strdup(LASSO_SAML2_CONSENT_IMPLICIT);
 
 
-    /* 
-     * Make sure the Destination attribute is set to the IdP 
-     * SingleSignOnService endpoint. This is required for 
+    /*
+     * Make sure the Destination attribute is set to the IdP
+     * SingleSignOnService endpoint. This is required for
      * Shibboleth 2 interoperability, and older versions of
      * lasso (at least up to 2.2.91) did not do it.
      * XXX Here we assume HTTP-Redirect method
      */
     if (LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination == NULL)
-        LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination = 
-            am_get_service_url(r, LASSO_PROFILE(login), 
-                               "SingleSignOnService HTTP-Redirect");
+        LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination =
+            g_strdup(am_get_service_url(r, LASSO_PROFILE(login),
+                                        "SingleSignOnService HTTP-Redirect"));
 
-    LASSO_PROFILE(login)->msg_relayState = g_strdup(relay_state);
+    LASSO_PROFILE(login)->msg_relayState = g_strdup(return_to);
 
     ret = lasso_login_build_authn_request_msg(login);
     if(ret != 0) {
@@ -2245,6 +2205,64 @@ static int am_auth_new_ticket(request_rec *r)
 
     /* We don't want to include POST data (in case this was a POST request). */
     return HTTP_SEE_OTHER;
+}
+
+
+static int am_auth_new_ticket(request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    const char *relay_state;
+
+    relay_state = am_reconstruct_url(r);
+
+    /* If this is a POST request, attempt to save it */
+    if (r->method_number == M_POST) {
+        if (am_save_post(r, &relay_state) != OK)
+            return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* Check if IdP discovery is in use and no IdP was selected yet */
+    if ((cfg->discovery_url != NULL) &&
+        (am_builtin_discovery_timeout(r) == -1) && /* no built-in discovery */
+        (am_extract_query_parameter(r->pool, r->args, "IdP") == NULL)) {
+        char *discovery_url;
+        char *return_url;
+        char *endpoint = am_get_endpoint_url(r);
+        char *sep;
+
+        /* If discovery URL already has a ? we append a & */
+        sep = (strchr(cfg->discovery_url, '?')) ? "&" : "?";
+
+        return_url = apr_psprintf(r->pool, "%sauth?ReturnTo=%s",
+                                  endpoint,
+                                  am_urlencode(r->pool, relay_state));
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                      "return_url = %s", return_url);
+        discovery_url = apr_psprintf(r->pool, "%s%sentityID=%smetadata&"
+                                     "return=%s&returnIDParam=IdP",
+                                     cfg->discovery_url, sep,
+                                     am_urlencode(r->pool, endpoint),
+                                     am_urlencode(r->pool, return_url));
+
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                      "discovery_url = %s", discovery_url);
+        apr_table_setn(r->headers_out, "Location", discovery_url);
+        return HTTP_SEE_OTHER;
+    }
+
+    /* If IdP discovery is in use and we have an IdP selected,
+     * set the relay_state
+     */
+    if ((cfg->discovery_url != NULL) &&
+        (am_builtin_discovery_timeout(r) == -1)) { /* no built-in discovery */
+        char *return_url;
+
+        return_url = am_extract_query_parameter(r->pool, r->args, "ReturnTo");
+        if ((return_url != NULL) && am_urldecode((char *)return_url) == 0)
+            relay_state = return_url;
+    }
+
+    return am_send_authn_request(r, am_get_idp(r), relay_state, FALSE);
 }
 
 /* This function takes a request for an endpoint and passes it on to the
