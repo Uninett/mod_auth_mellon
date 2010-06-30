@@ -31,6 +31,7 @@
 #include <lasso/xml/saml-2.0/saml2_attribute.h>
 #include <lasso/xml/saml-2.0/saml2_attribute_value.h>
 #include <lasso/xml/saml-2.0/saml2_authn_statement.h>
+#include <lasso/xml/saml-2.0/saml2_audience_restriction.h>
 #include <lasso/xml/misc_text_node.h>
 
 /* The following are redefined in ap_config_auto.h */

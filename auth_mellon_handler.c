@@ -1094,6 +1094,170 @@ static apr_time_t am_parse_timestamp(request_rec *r, const char *timestamp)
 }
 
 
+/* Validate the subject on an Assertion.
+ *
+ *  request_rec *r                   The current request. Used to log
+ *                                   errors.
+ *  LassoSaml2Assertion *assertion   The assertion we will validate.
+ *  const char *url                  The current URL.
+ *
+ * Returns:
+ *  OK on success, HTTP_BAD_REQUEST on failure.
+ */
+static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
+                               const char *url)
+{
+    apr_time_t now;
+    apr_time_t t;
+    LassoSaml2SubjectConfirmation *sc;
+    LassoSaml2SubjectConfirmationData *scd;
+
+    if (assertion->Subject == NULL) {
+        /* No Subject to validate. */
+        return OK;
+    }
+
+    if (assertion->Subject->SubjectConfirmation == NULL) {
+        /* No SubjectConfirmation. */
+        return OK;
+    }
+
+    sc = assertion->Subject->SubjectConfirmation;
+    if (sc->Method == NULL ||
+        strcmp(sc->Method, "urn:oasis:names:tc:SAML:2.0:cm:bearer")) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Invalid Method in SubjectConfirmation.");
+        return HTTP_BAD_REQUEST;
+    }
+
+    scd = sc->SubjectConfirmationData;
+    if (scd == NULL) {
+        /* Nothing to verify. */
+        return OK;
+    }
+
+    now = apr_time_now();
+
+    if (scd->NotBefore) {
+        t = am_parse_timestamp(r, scd->NotBefore);
+        if (t == 0) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Invalid timestamp in NotBefore in SubjectConfirmationData.");
+            return HTTP_BAD_REQUEST;
+        }
+        if (t - 60000000 > now) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "NotBefore in SubjectConfirmationData was in the future.");
+            return HTTP_BAD_REQUEST;
+        }
+    }
+
+    if (scd->NotOnOrAfter) {
+        t = am_parse_timestamp(r, scd->NotOnOrAfter);
+        if (t == 0) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Invalid timestamp in NotOnOrAfter in SubjectConfirmationData.");
+            return HTTP_BAD_REQUEST;
+        }
+        if (now >= t + 60000000) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "NotOnOrAfter in SubjectConfirmationData was in the past.");
+            return HTTP_BAD_REQUEST;
+        }
+    }
+
+    if (scd->Recipient) {
+        if (strcmp(scd->Recipient, url)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Wrong Recipient in SubjectConfirmationData. Current URL is: %s",
+                          url);
+            return HTTP_BAD_REQUEST;
+        }
+    }
+
+    return OK;
+}
+
+
+/* Validate the conditions on an Assertion.
+ *
+ * Parameters:
+ *  request_rec *r                   The current request. Used to log
+ *                                   errors.
+ *  LassoSaml2Assertion *assertion   The assertion we will validate.
+ *  const char *providerID           The providerID of the SP.
+ *
+ * Returns:
+ *  OK on success, HTTP_BAD_REQUEST on failure.
+ */
+static int am_validate_conditions(request_rec *r,
+                                  LassoSaml2Assertion *assertion,
+                                  const char *providerID)
+{
+    LassoSaml2Conditions *conditions;
+    apr_time_t now;
+    apr_time_t t;
+    GList *i;
+    LassoSaml2AudienceRestriction *ar;
+
+    conditions = assertion->Conditions;
+
+    if (conditions->Condition != NULL) {
+        /* This is a list of LassoSaml2ConditionAbstract - if it
+         * isn't empty, we have an unsupported condition.
+         */
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Unsupported condition in Assertion.");
+        return HTTP_BAD_REQUEST;
+    }
+
+
+    now = apr_time_now();
+
+    if (conditions->NotBefore) {
+        t = am_parse_timestamp(r, conditions->NotBefore);
+        if (t == 0) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Invalid timestamp in NotBefore in Condition.");
+            return HTTP_BAD_REQUEST;
+        }
+        if (t - 60000000 > now) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "NotBefore in Condition was in the future.");
+            return HTTP_BAD_REQUEST;
+        }
+    }
+
+    if (conditions->NotOnOrAfter) {
+        t = am_parse_timestamp(r, conditions->NotOnOrAfter);
+        if (t == 0) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Invalid timestamp in NotOnOrAfter in Condition.");
+            return HTTP_BAD_REQUEST;
+        }
+        if (now >= t + 60000000) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "NotOnOrAfter in Condition was in the past.");
+            return HTTP_BAD_REQUEST;
+        }
+    }
+
+    for (i = g_list_first(conditions->AudienceRestriction); i != NULL;
+         i = g_list_next(i)) {
+        ar = i->data;
+        if (ar->Audience == NULL || strcmp(ar->Audience, providerID)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Invalid Audience in Conditions. Should be: %s",
+                          providerID);
+            return HTTP_BAD_REQUEST;
+        }
+    }
+
+    return OK;
+}
+
+
+
 /* This function sets the session expire timestamp based on NotOnOrAfter
  * attribute of a condition element.
  *
@@ -1392,6 +1556,8 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
 static int am_handle_reply_common(request_rec *r, LassoLogin *login,
                                   char *relay_state, char *saml_response)
 {
+    char *url;
+    char *chr;
     const char *name_id;
     LassoSamlp2Response *response;
     LassoSaml2Assertion *assertion;
@@ -1400,6 +1566,12 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     am_cache_entry_t *session;
     int rc;
     const char *idp;
+
+    url = am_reconstruct_url(r);
+    chr = strchr(url, '&');
+    if (chr) {
+        *chr = '\0';
+    }
 
     dir_cfg = am_get_dir_cfg(r);
 
@@ -1416,6 +1588,16 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
 
     response = LASSO_SAMLP2_RESPONSE(LASSO_PROFILE(login)->response);
 
+    if (response->parent.Destination) {
+        if (strcmp(response->parent.Destination, url)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Invalid Destination on Response. Should be: %s",
+                          url);
+            lasso_login_destroy(login);
+            return HTTP_BAD_REQUEST;
+        }
+    }
+
     if (g_list_length(response->Assertion) == 0) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "No Assertion in response.");
@@ -1429,6 +1611,20 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
         return HTTP_BAD_REQUEST;
     }
     assertion = g_list_first(response->Assertion)->data;
+
+    rc = am_validate_subject(r, assertion, url);
+    if (rc != OK) {
+        lasso_login_destroy(login);
+        return rc;
+    }
+
+    rc = am_validate_conditions(r, assertion,
+        LASSO_PROVIDER(LASSO_PROFILE(login)->server)->ProviderID);
+
+    if (rc != OK) {
+        lasso_login_destroy(login);
+        return rc;
+    }
 
     in_response_to = response->parent.InResponseTo;
 
