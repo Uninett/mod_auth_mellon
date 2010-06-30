@@ -33,9 +33,9 @@
  *  A string containing the full url of the current request.
  *  The string is allocated from r->pool.
  */
-const char *am_reconstruct_url(request_rec *r)
+char *am_reconstruct_url(request_rec *r)
 {
-    const char *url;
+    char *url;
 
     /* This function will construct an full url for a given path relative to
      * the root of the web site. To configure what hostname and port this
