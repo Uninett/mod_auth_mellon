@@ -1260,25 +1260,24 @@ static int am_store_attribute(request_rec *r, am_cache_entry_t *session,
 }
 
 
-/* This function iterates over a list of assertion elements, and adds all the
- * attributes it finds to the session data for the current user.
+/* Add all the attributes from an assertion to the session data for the
+ * current user.
  *
  * Parameters:
- *  am_cache_entry_t *s  The current session.
- *  request_rec *r       The current request.
- *  const char *name_id  The name identifier we received from the IdP.
- *  GList *assertions    A list of LassoSaml2Assertion objects.
+ *  am_cache_entry_t *s             The current session.
+ *  request_rec *r                  The current request.
+ *  const char *name_id             The name identifier we received from
+ *                                  the IdP.
+ *  LassoSaml2Assertion *assertion  The assertion.
  *
  * Returns:
  *  HTTP_BAD_REQUEST if we couldn't find the session id of the user, or
  *  OK if no error occured.
  */
 static int add_attributes(am_cache_entry_t *session, request_rec *r,
-                          const char *name_id, GList *assertions)
+                          const char *name_id, LassoSaml2Assertion *assertion)
 {
     am_dir_cfg_rec *dir_cfg;
-    GList *asrt_itr;
-    LassoSaml2Assertion *assertion;
     GList *atr_stmt_itr;
     LassoSaml2AttributeStatement *atr_stmt;
     GList *atr_itr;
@@ -1309,80 +1308,66 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
         return ret;
     }
 
-    /* assertions is a list of LassoSaml2Assertion objects. */
-    for(asrt_itr = g_list_first(assertions); asrt_itr != NULL;
-        asrt_itr = g_list_next(asrt_itr)) {
+    /* Update expires timestamp of session. */
+    am_handle_session_expire(r, session, assertion);
 
-        assertion = LASSO_SAML2_ASSERTION(asrt_itr->data);
+    /* assertion->AttributeStatement is a list of
+     * LassoSaml2AttributeStatement objects.
+     */
+    for(atr_stmt_itr = g_list_first(assertion->AttributeStatement);
+        atr_stmt_itr != NULL;
+        atr_stmt_itr = g_list_next(atr_stmt_itr)) {
 
-        /* Update expires timestamp of session. */
-        am_handle_session_expire(r, session, assertion);
+        atr_stmt = LASSO_SAML2_ATTRIBUTE_STATEMENT(atr_stmt_itr->data);
 
-        /* assertion->AttributeStatement is a list of
-         * LassoSaml2AttributeStatement objects.
-         */
-        for(atr_stmt_itr = g_list_first(assertion->AttributeStatement);
-            atr_stmt_itr != NULL;
-            atr_stmt_itr = g_list_next(atr_stmt_itr)) {
+        /* atr_stmt->Attribute is list of LassoSaml2Attribute objects. */
+        for(atr_itr = g_list_first(atr_stmt->Attribute);
+            atr_itr != NULL;
+            atr_itr = g_list_next(atr_itr)) {
 
-            atr_stmt = LASSO_SAML2_ATTRIBUTE_STATEMENT(atr_stmt_itr->data);
+            attribute = LASSO_SAML2_ATTRIBUTE(atr_itr->data);
 
-            /* atr_stmt->Attribute is list of LassoSaml2Attribute objects. */
-            for(atr_itr = g_list_first(atr_stmt->Attribute);
-                atr_itr != NULL;
-                atr_itr = g_list_next(atr_itr)) {
+            /* attribute->AttributeValue is a list of
+             * LassoSaml2AttributeValue objects.
+             */
+            for(value_itr = g_list_first(attribute->AttributeValue);
+                value_itr != NULL;
+                value_itr = g_list_next(value_itr)) {
 
-                attribute = LASSO_SAML2_ATTRIBUTE(atr_itr->data);
+                value = LASSO_SAML2_ATTRIBUTE_VALUE(
+                    value_itr->data
+                );
 
-                /* attribute->AttributeValue is a list of
-                 * LassoSaml2AttributeValue objects.
+                /* value->any is a list with the child nodes of the
+                 * AttributeValue element.
+                 *
+                 * We assume that the list contains a single text node.
                  */
-                for(value_itr = g_list_first(attribute->AttributeValue);
-                    value_itr != NULL;
-                    value_itr = g_list_next(value_itr)) {
+                if(value->any == NULL) {
+                    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                                  "AttributeValue element was empty.");
+                    continue;
+                }
 
-                    value = LASSO_SAML2_ATTRIBUTE_VALUE(
-                        value_itr->data
-                        );
+                /* Verify that this is a LassoMiscTextNode object. */
+                if(!LASSO_IS_MISC_TEXT_NODE(value->any->data)) {
+                    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                                  "AttributeValue element contained an "
+                                  " element which wasn't a text node.");
+                    continue;
+                }
 
-                    /* value->any is a list with the child nodes of the
-                     * AttributeValue element.
-                     *
-                     * We assume that the list contains a single text node.
-                     */
-                    if(value->any == NULL) {
-                        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                                      "AttributeValue element was empty.");
-                        continue;
-                    }
-
-                    /* Verify that this is a LassoMiscTextNode object. */
-                    if(!LASSO_IS_MISC_TEXT_NODE(value->any->data)) {
-                        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                                      "AttributeValue element contained an "
-                                      " element which wasn't a text node.");
-                        continue;
-                    }
-
-                    value_text = LASSO_MISC_TEXT_NODE(value->any->data);
+                value_text = LASSO_MISC_TEXT_NODE(value->any->data);
 
 
-                    /* Decode and save the attribute. */
-                    ret = am_store_attribute(r, session, attribute->Name,
-                                             value_text->content);
-                    if(ret != OK) {
-                        return ret;
-                    }
+                /* Decode and save the attribute. */
+                ret = am_store_attribute(r, session, attribute->Name,
+                                         value_text->content);
+                if(ret != OK) {
+                    return ret;
                 }
             }
         }
-
-        /* TODO: lasso only verifies the signature on the _first_ asserion
-         * element. Therefore we can't trust any of following assertions.
-         * If the Response-element is signed then we can trust all the
-         * assertions, but we have no way to find what element is signed.
-         */
-        break;
     }
 
     return OK;
@@ -1408,7 +1393,8 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
                                   char *relay_state, char *saml_response)
 {
     const char *name_id;
-    GList *assertions;
+    LassoSamlp2Response *response;
+    LassoSaml2Assertion *assertion;
     const char *in_response_to;
     am_dir_cfg_rec *dir_cfg;
     am_cache_entry_t *session;
@@ -1428,11 +1414,23 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     name_id = LASSO_SAML2_NAME_ID(LASSO_PROFILE(login)->nameIdentifier)
         ->content;
 
-    assertions = LASSO_SAMLP2_RESPONSE(LASSO_PROFILE(login)->response)
-        ->Assertion;
+    response = LASSO_SAMLP2_RESPONSE(LASSO_PROFILE(login)->response);
 
-    in_response_to = LASSO_SAMLP2_RESPONSE(LASSO_PROFILE(login)->response)
-        ->parent.InResponseTo;
+    if (g_list_length(response->Assertion) == 0) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "No Assertion in response.");
+        lasso_login_destroy(login);
+        return HTTP_BAD_REQUEST;
+    }
+    if (g_list_length(response->Assertion) > 1) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "More than one Assertion in response.");
+        lasso_login_destroy(login);
+        return HTTP_BAD_REQUEST;
+    }
+    assertion = g_list_first(response->Assertion)->data;
+
+    in_response_to = response->parent.InResponseTo;
 
 
     if(in_response_to != NULL) {
@@ -1466,7 +1464,7 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    rc = add_attributes(session, r, name_id, assertions);
+    rc = add_attributes(session, r, name_id, assertion);
     if(rc != OK) {
         am_release_request_session(r, session);
         lasso_login_destroy(login);
