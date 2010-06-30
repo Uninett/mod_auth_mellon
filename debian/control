@@ -11,5 +11,6 @@ Depends: openssl, apache2.2-common, libcurl3, liblasso3 (>= 2.1.0)
 Description: A SAML 2.0 authentication module for Apache
  mod-auth-mellon is an Apache module which enables you to authenticate
  users of a web site against a SAML 2.0 enabled IdP.
- After installing this package, you should run "a2enmon auth_mellon". For
- configuration information, see /usr/share/doc/mod-auth-mellon/README.gz
+ After installing this package, you should run "a2enmon auth_mellon". See
+ /usr/share/doc/libapache2-mod-auth-mellon/README.gz for configuration
+ information.
