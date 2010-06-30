@@ -14,3 +14,8 @@ Description: A SAML 2.0 authentication module for Apache
  After installing this package, you should run "a2enmon auth_mellon". See
  /usr/share/doc/libapache2-mod-auth-mellon/README.gz for configuration
  information.
+
+Package: libapache2-mod-auth-mellon-dbg
+Architecture: any
+Depends: libapache2-mod-auth-mellon (=${Source-Version})
+Description: Debug symbols for libapache2-mod-auth-mellon.
