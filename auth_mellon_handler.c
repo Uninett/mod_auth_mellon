@@ -998,6 +998,7 @@ static int am_handle_logout(request_rec *r)
  */
 static apr_time_t am_parse_timestamp(request_rec *r, const char *timestamp)
 {
+    size_t len;
     int i;
     char c;
     const char *expected;
@@ -1005,14 +1006,16 @@ static apr_time_t am_parse_timestamp(request_rec *r, const char *timestamp)
     apr_time_t res;
     apr_status_t rc;
 
+    len = strlen(timestamp);
+
     /* Verify length of timestamp. */
-    if(strlen(timestamp) != 20){
+    if(len < 20){
         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
                       "Invalid length of timestamp: \"%s\".", timestamp);
     }
 
     /* Verify components of timestamp. */
-    for(i = 0; i < 20; i++) {
+    for(i = 0; i < len - 1; i++) {
         c = timestamp[i];
 
         expected = NULL;
@@ -1043,14 +1046,14 @@ static apr_time_t am_parse_timestamp(request_rec *r, const char *timestamp)
             break;
 
         case 19:
-            /* Matches "                   Z" */
-            if(c != 'Z') {
-                expected = "'Z'";
+            /* Matches "                   ." */
+            if (c != '.') {
+                expected = "'.'";
             }
             break;
 
         default:
-            /* Matches "YYYY MM DD hh mm ss " */
+            /* Matches "YYYY MM DD hh mm ss uuuuuu" */
             if(c < '0' || c > '9') {
                 expected = "a digit";
             }
@@ -1066,7 +1069,33 @@ static apr_time_t am_parse_timestamp(request_rec *r, const char *timestamp)
         }
     }
 
+    if (timestamp[len - 1] != 'Z') {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Timestamp wasn't in UTC (did not end with 'Z')."
+                      " Full timestamp: \"%s\"",
+                      timestamp);
+        return 0;
+    }
+
+
     time_exp.tm_usec = 0;
+    if (len > 20) {
+        /* Subsecond precision. */
+        if (len > 27) {
+            /* Timestamp has more than microsecond precision. Just clip it to
+             * microseconds.
+             */
+            len = 27;
+        }
+        len -= 1; /* Drop the 'Z' off the end. */
+        for (i = 20; i < len; i++) {
+            time_exp.tm_usec = time_exp.tm_usec * 10 + timestamp[i] - '0';
+        }
+        for (i = len; i < 26; i++) {
+            time_exp.tm_usec *= 10;
+        }
+    }
+
     time_exp.tm_sec = (timestamp[17] - '0') * 10 + (timestamp[18] - '0');
     time_exp.tm_min = (timestamp[14] - '0') * 10 + (timestamp[15] - '0');
     time_exp.tm_hour = (timestamp[11] - '0') * 10 + (timestamp[12] - '0');
