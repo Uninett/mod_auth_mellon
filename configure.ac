@@ -9,24 +9,20 @@ AC_ARG_WITH(
 	[  --with-apxs2=PATH       Full path to the apxs2 executable.],
 	[
 		APXS2=${withval}
-	],
-	[
-		APXS2='unknown'
-	]
-)
+	],)
 
 
-if test "$APXS2" = 'unknown'; then
+if test "x$APXS2" = "x"; then
    # The user didn't specify the --with-apxs2-option.
 
    # Search for apxs2 in the specified directories
-   AC_PATH_PROG(APXS2, apxs2, 'unknown',
+   AC_PATH_PROG(APXS2, apxs2,,
 		/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin)
 
-   if test "$APXS2" = 'unknown'; then
+   if test "x$APXS2" = "x"; then
       # Didn't find apxs2 in any of the specified directories.
       # Search for apxs instead.
-      AC_PATH_PROG(APXS2, apxs, 'unknown',
+      AC_PATH_PROG(APXS2, apxs,,
 		   /usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin)
    fi
 
