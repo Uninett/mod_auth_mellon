@@ -844,16 +844,15 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
 
     assertion = LASSO_SAML2_ASSERTION(assertion_n);
 
-    if(!assertion->AuthnStatement) {
+    /* We assume that the first authnStatement contains the data we want. */
+    authnStatement = LASSO_SAML2_AUTHN_STATEMENT(assertion->AuthnStatement->data);
+
+    if(!authnStatement) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "No AuthnStatement found in the current assertion.");
         lasso_logout_destroy(logout);
         return HTTP_INTERNAL_SERVER_ERROR;
     }
-
-    /* We assume that the first authnStatement contains the data we want. */
-    authnStatement = LASSO_SAML2_AUTHN_STATEMENT(
-        assertion->AuthnStatement->data);
 
     if(authnStatement->SessionIndex) {
         request = LASSO_SAMLP2_LOGOUT_REQUEST(profile->request);
@@ -1144,11 +1143,19 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
     if (assertion->Subject == NULL) {
         /* No Subject to validate. */
         return OK;
+    } else if (!LASSO_IS_SAML2_SUBJECT(assertion->Subject)) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Wrong type of Subject node.");
+        return HTTP_BAD_REQUEST;
     }
 
     if (assertion->Subject->SubjectConfirmation == NULL) {
         /* No SubjectConfirmation. */
         return OK;
+    } else if (!LASSO_IS_SAML2_SUBJECT_CONFIRMATION(assertion->Subject->SubjectConfirmation)) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Wrong type of SubjectConfirmation node.");
+        return HTTP_BAD_REQUEST;
     }
 
     sc = assertion->Subject->SubjectConfirmation;
@@ -1163,6 +1170,10 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
     if (scd == NULL) {
         /* Nothing to verify. */
         return OK;
+    } else if (!LASSO_IS_SAML2_SUBJECT_CONFIRMATION_DATA(scd)) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Wrong type of SubjectConfirmationData node.");
+        return HTTP_BAD_REQUEST;
     }
 
     now = apr_time_now();
@@ -1230,6 +1241,11 @@ static int am_validate_conditions(request_rec *r,
     LassoSaml2AudienceRestriction *ar;
 
     conditions = assertion->Conditions;
+    if (!LASSO_IS_SAML2_CONDITIONS(conditions)) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Wrong type of Conditions node.");
+        return HTTP_BAD_REQUEST;
+    }
 
     if (conditions->Condition != NULL) {
         /* This is a list of LassoSaml2ConditionAbstract - if it
@@ -1274,6 +1290,12 @@ static int am_validate_conditions(request_rec *r,
     for (i = g_list_first(conditions->AudienceRestriction); i != NULL;
          i = g_list_next(i)) {
         ar = i->data;
+        if (!LASSO_IS_SAML2_AUDIENCE_RESTRICTION(ar)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Wrong type of AudienceRestriction node.");
+            return HTTP_BAD_REQUEST;
+        }
+
         if (ar->Audience == NULL || strcmp(ar->Audience, providerID)) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "Invalid Audience in Conditions. Should be: %s",
@@ -1311,8 +1333,12 @@ static void am_handle_session_expire(request_rec *r, am_cache_entry_t *session,
     for(authn_itr = g_list_first(assertion->AuthnStatement); authn_itr != NULL;
         authn_itr = g_list_next(authn_itr)) {
 
-        authn = LASSO_SAML2_AUTHN_STATEMENT(authn_itr->data);
-
+        authn = authn_itr->data;
+        if (!LASSO_IS_SAML2_AUTHN_STATEMENT(authn)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Wrong type of AuthnStatement node.");
+            continue;
+        }
 
         /* Find timestamp. */
         not_on_or_after = authn->SessionNotOnOrAfter;
@@ -1511,14 +1537,24 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
         atr_stmt_itr != NULL;
         atr_stmt_itr = g_list_next(atr_stmt_itr)) {
 
-        atr_stmt = LASSO_SAML2_ATTRIBUTE_STATEMENT(atr_stmt_itr->data);
+        atr_stmt = atr_stmt_itr->data;
+        if (!LASSO_IS_SAML2_ATTRIBUTE_STATEMENT(atr_stmt)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Wrong type of AttributeStatement node.");
+            continue;
+        }
 
         /* atr_stmt->Attribute is list of LassoSaml2Attribute objects. */
         for(atr_itr = g_list_first(atr_stmt->Attribute);
             atr_itr != NULL;
             atr_itr = g_list_next(atr_itr)) {
 
-            attribute = LASSO_SAML2_ATTRIBUTE(atr_itr->data);
+            attribute = atr_itr->data;
+            if (!LASSO_IS_SAML2_ATTRIBUTE(attribute)) {
+                ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                              "Wrong type of Attribute node.");
+                continue;
+            }
 
             /* attribute->AttributeValue is a list of
              * LassoSaml2AttributeValue objects.
@@ -1527,9 +1563,12 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
                 value_itr != NULL;
                 value_itr = g_list_next(value_itr)) {
 
-                value = LASSO_SAML2_ATTRIBUTE_VALUE(
-                    value_itr->data
-                );
+                value = value_itr->data;
+                if (!LASSO_IS_SAML2_ATTRIBUTE_VALUE(value)) {
+                    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                                  "Wrong type of AttributeValue node.");
+                    continue;
+                }
 
                 /* value->any is a list with the child nodes of the
                  * AttributeValue element.
@@ -1640,6 +1679,12 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
         return HTTP_BAD_REQUEST;
     }
     assertion = g_list_first(response->Assertion)->data;
+    if (!LASSO_IS_SAML2_ASSERTION(assertion)) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Wrong type of Assertion node.");
+        lasso_login_destroy(login);
+        return HTTP_BAD_REQUEST;
+    }
 
     rc = am_validate_subject(r, assertion, url);
     if (rc != OK) {
