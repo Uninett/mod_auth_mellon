@@ -1215,6 +1215,16 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
         }
     }
 
+    if (scd->Address) {
+        if (strcasecmp(scd->Address, r->connection->remote_ip)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Wrong Address in SubjectConfirmationData."
+                          "Current address is \"%s\", but should have been \"%s\".",
+                          r->connection->remote_ip, scd->Address);
+            return HTTP_BAD_REQUEST;
+        }
+    }
+
     return OK;
 }
 
