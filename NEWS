@@ -1,7 +1,18 @@
+Version 0.3.0
+---------------------------------------------------------------------------
+
+* New login-endpoint, which allows easier manual initiation of login
+  requests, and specifying parameters such as IsPassive.
+
+* Validation of Conditions and SubjectConfirmation data in the assertion
+  we receive from the IdP.
+
+* Various bugfixes.
+
 Version 0.2.7
 ---------------------------------------------------------------------------
 
-* Optionaly ave the remote IdP entityId in the environment
+* Optionaly save the remote IdP entityId in the environment
 
 * Shibboleth 2 interoperability
 
