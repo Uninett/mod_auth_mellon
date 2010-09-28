@@ -169,35 +169,34 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
     }
 
     return apr_psprintf(p,
-      "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
-      "<EntityDescriptor "
-        "entityID=\"%smetadata\" "
-        "xmlns=\"urn:oasis:names:tc:SAML:2.0:metadata\">"
-        "<SPSSODescriptor "
-          "AuthnRequestsSigned=\"true\" "
-          "WantAssertionsSigned=\"true\" "
-          "protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"
-          "%s"
-          "<SingleLogoutService "
-            "Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:SOAP\" "
-            "Location=\"%slogout\" />"
-          "<SingleLogoutService "
-            "Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect\" "
-            "Location=\"%slogout\" />"
-          "<ManageNameIDService "
-            "Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:SOAP\" "
-            "Location=\"%slogoutRequest\"/>"
-          "<NameIDFormat>"
-            "urn:oasis:names:tc:SAML:2.0:nameid-format:transient"
-          "</NameIDFormat>"
-          "<AssertionConsumerService "
-            "index=\"0\" "
-            "isDefault=\"true\" "
-            "Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\" "
-            "Location=\"%spostResponse\" />"
-        "</SPSSODescriptor>"
-        "%s"
-      "</EntityDescriptor>",
+      "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\
+<EntityDescriptor\n\
+ entityID=\"%smetadata\"\n\
+ xmlns=\"urn:oasis:names:tc:SAML:2.0:metadata\">\n\
+ <SPSSODescriptor\n\
+   AuthnRequestsSigned=\"true\"\n\
+   WantAssertionsSigned=\"true\"\n\
+   protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">\n\
+   %s\
+   <SingleLogoutService\n\
+     Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:SOAP\"\n\
+     Location=\"%slogout\" />\n\
+   <SingleLogoutService\n\
+     Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect\"\n\
+     Location=\"%slogout\" />\n\
+   <NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</NameIDFormat>\n\
+   <AssertionConsumerService\n\
+     index=\"0\"\n\
+     isDefault=\"true\"\n\
+     Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\"\n\
+     Location=\"%spostResponse\" />\n\
+   <AssertionConsumerService\n\
+     index=\"1\"\n\
+     Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact\"\n\
+     Location=\"%sartifactResponse\" />\n\
+ </SPSSODescriptor>\n\
+ %s\n\
+</EntityDescriptor>",
       url, cert, url, url, url, url, am_optional_metadata(p, r));
 }
 #endif /* HAVE_lasso_server_new_from_buffers */
