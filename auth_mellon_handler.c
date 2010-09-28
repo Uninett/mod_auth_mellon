@@ -1210,8 +1210,8 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
     if (scd->Recipient) {
         if (strcmp(scd->Recipient, url)) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                          "Wrong Recipient in SubjectConfirmationData. Current URL is: %s",
-                          url);
+                          "Wrong Recipient in SubjectConfirmationData. Current URL is: %s, Recipient is %s",
+                          url, scd->Recipient);
             return HTTP_BAD_REQUEST;
         }
     }
