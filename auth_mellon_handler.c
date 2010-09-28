@@ -1647,10 +1647,14 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     const char *idp;
 
     url = am_reconstruct_url(r);
-    chr = strchr(url, '&');
+    chr = strchr(url, '?');
+    if (! chr) {
+        chr = strchr(url, ';');
+    }
     if (chr) {
         *chr = '\0';
     }
+
 
     dir_cfg = am_get_dir_cfg(r);
 
