@@ -774,6 +774,7 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
     char *redirect_to;
     LassoProfile *profile;
     LassoSession *session;
+    GList *assertion_list;
     LassoNode *assertion_n;
     LassoSaml2Assertion *assertion;
     LassoSaml2AuthnStatement *authnStatement;
@@ -832,14 +833,15 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
     /* We currently only look at the first assertion in the list
      * lasso_session_get_assertions returns.
      */
-    assertion_n = lasso_session_get_assertions(
-        session, profile->remote_providerID)->data;
-    if(LASSO_IS_SAML2_ASSERTION(assertion_n) == FALSE) {
+    assertion_list = lasso_session_get_assertions(
+        session, profile->remote_providerID);
+    if(! assertion_list || LASSO_IS_SAML2_ASSERTION(assertion_list->data) == FALSE) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "No assertions found for the current session.");
         lasso_logout_destroy(logout);
         return HTTP_INTERNAL_SERVER_ERROR;
     }
+    assertion_n = assertion_list->data;
 
     assertion = LASSO_SAML2_ASSERTION(assertion_n);
 
