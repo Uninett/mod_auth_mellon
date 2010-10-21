@@ -802,32 +802,9 @@ char *am_htmlencode(request_rec *r, const char *str)
  */
 char *am_get_endpoint_url(request_rec *r)
 {
-    static APR_OPTIONAL_FN_TYPE(ssl_is_https) *am_is_https = NULL;
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
-    apr_pool_t *p = r->pool;
-    server_rec *s = r->server;
-    apr_port_t default_port;
-    char *port;
-    char *scheme;
 
-    am_is_https = APR_RETRIEVE_OPTIONAL_FN(ssl_is_https);
-
-    if (am_is_https && am_is_https(r->connection)) {
-        scheme = "https://";
-        default_port = DEFAULT_HTTPS_PORT;
-    } else {
-        scheme = "http://";
-        default_port = DEFAULT_HTTP_PORT;
-    }
-
-    if (s->addrs->host_port != default_port)
-        port = apr_psprintf(p, ":%d", s->addrs->host_port);
-    else
-        port = "";
-
-    return apr_psprintf(p, "%s%s%s%s", scheme,
-                        s->server_hostname,
-                        port,  cfg->endpoint_path);
+    return ap_construct_url(r->pool, cfg->endpoint_path, r);
 }
 
 /*
