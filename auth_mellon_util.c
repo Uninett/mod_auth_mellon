@@ -678,8 +678,8 @@ static int am_postdir_mkdir(request_rec *r)
 }
 
 /* 
- * Purge outdated saved POST requests. If the MellonPostDir directory
- * does not exist, create it first. 
+ * Purge outdated saved POST requests. If the MellonPostDirectory
+ * directory does not exist, create it first.
  *
  * Parameters:
  *   request_rec *r     The current request
