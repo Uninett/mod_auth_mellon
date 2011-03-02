@@ -368,19 +368,6 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
         }
     }
 
-    if(t->user[0] != '\0') {
-        /* We have a user-"name". Set r->user and r->ap_auth_type. */
-        r->user = apr_pstrdup(r->pool, t->user);
-        r->ap_auth_type = apr_pstrdup(r->pool, "Mellon");
-    } else {
-        /* We don't have a user-"name". Log error. */
-        ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
-                      "Didn't find the attribute \"%s\" in the attributes"
-                      " which were received from the IdP. Cannot set a user"
-                      " for this request without a valid user attribute.",
-                      d->userattr);
-    }
-
     /* Allocate a set of counters for duplicate variables in the list. */
     counters = apr_hash_make(r->pool);
 
@@ -399,6 +386,11 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
 
         value = t->env[i].value;
 
+        /*  
+         * If we find a variable remapping to MellonUser, use it.
+         */
+        if ((t->user[0] == '\0') && (strcmp(varname, d->userattr) == 0))
+            strcpy(t->user, value);
 
         /* Find the number of times this variable has been set. */
         count = apr_hash_get(counters, varname, APR_HASH_KEY_STRING);
@@ -425,6 +417,20 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
         /* Increase the count. */
         ++(*count);
     }
+
+    if(t->user[0] != '\0') {
+        /* We have a user-"name". Set r->user and r->ap_auth_type. */
+        r->user = apr_pstrdup(r->pool, t->user);
+        r->ap_auth_type = apr_pstrdup(r->pool, "Mellon");
+    } else {
+        /* We don't have a user-"name". Log error. */
+        ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
+                      "Didn't find the attribute \"%s\" in the attributes"
+                      " which were received from the IdP. Cannot set a user"
+                      " for this request without a valid user attribute.",
+                      d->userattr);
+    }
+
 
     /* Populate with the session? */
     if (d->dump_session) {
