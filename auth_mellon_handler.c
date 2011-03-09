@@ -226,33 +226,6 @@ static const char *am_first_idp(request_rec *r)
     return provider_id;
 }
 
-/* This returns built-in IdP discovery timeout
- *
- * Parameters:
- *  request_rec *r       The request we received.
- *
- * Returns:
- *  the timeout, -1 if not enabled.
- */
-static long am_builtin_discovery_timeout(request_rec *r)
-{
-    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
-    const char *builtin = "builtin:get-metadata";
-    const char *timeout = "?timeout=";
-    const char *cp;
-    const long default_timeout = 1L;
-
-    if ((cfg->discovery_url == NULL) ||
-        (strncmp(cfg->discovery_url, builtin, strlen(builtin)) != 0))
-        return -1;
-    
-    cp = cfg->discovery_url + strlen(builtin);
-    if (strncmp(cp, timeout, strlen(timeout)) != 0)
-        return default_timeout;
-
-    cp += strlen(timeout);
-    return atoi(cp);
-}
 
 /* This function selects an IdP and returns its provider_id
  *
@@ -267,8 +240,6 @@ static const char *am_get_idp(request_rec *r)
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     const char *idp_provider_id;
     const char *idp_metadata_file;
-    apr_hash_index_t *index;
-    long timeout;
     
     /*
      * If we have a single IdP, return that one.
@@ -305,47 +276,6 @@ static const char *am_get_idp(request_rec *r)
             idp_provider_id = am_first_idp(r);
         }
 
-        return idp_provider_id;
-    }
-
-    /*
-     * If built-in IdP discovery is not configured, return default.
-     */
-    timeout = am_builtin_discovery_timeout(r);
-    if (timeout == -1)
-        return am_first_idp(r);
-
-    /*
-     * Otherwise, proceed with built-in IdP discovery:
-     * send probes for all configures IdP to check availability.
-     * The first to answer is chosen. On error, use default.
-     */
-    for (index = apr_hash_first(r->pool, cfg->idp_metadata_files);
-         index;
-         index = apr_hash_next(index)) {
-        void *buffer;
-        apr_size_t len;
-        apr_ssize_t slen;
-        long status;
- 
-        apr_hash_this(index, 
-                      (const void **)&idp_provider_id, 
-                      &slen,
-                      (void *)&idp_metadata_file);
-
-        status = 0;
-        if (am_httpclient_get(r, idp_provider_id, &buffer, &len, 
-                              timeout, &status) != OK)
-            continue;
-
-        if (status != HTTP_OK) {
-	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-			  "Cannot probe %s: IdP returned HTTP %ld",
-			  idp_provider_id, status);
-            continue;
-        }
-
-        /* We got some succes */
         return idp_provider_id;
     }
 
@@ -2506,7 +2436,6 @@ static int am_auth_new_ticket(request_rec *r)
 
     /* Check if IdP discovery is in use and no IdP was selected yet */
     if ((cfg->discovery_url != NULL) &&
-        (am_builtin_discovery_timeout(r) == -1) && /* no built-in discovery */
         (am_extract_query_parameter(r->pool, r->args, "IdP") == NULL)) {
         char *discovery_url;
         char *return_url;
@@ -2536,8 +2465,7 @@ static int am_auth_new_ticket(request_rec *r)
     /* If IdP discovery is in use and we have an IdP selected,
      * set the relay_state
      */
-    if ((cfg->discovery_url != NULL) &&
-        (am_builtin_discovery_timeout(r) == -1)) { /* no built-in discovery */
+    if (cfg->discovery_url != NULL) {
         char *return_url;
 
         return_url = am_extract_query_parameter(r->pool, r->args, "ReturnTo");
@@ -2615,6 +2543,150 @@ static int am_handle_login(request_rec *r)
     return am_send_authn_request(r, idp, return_to, is_passive);
 }
 
+/* This function handles requests to the probe discovery handler
+ *
+ * Parameters:
+ *  request_rec *r       The request.
+ *
+ * Returns:
+ *  OK on success, or an error if any of the steps fail.
+ */
+static int am_handle_probe_discovery(request_rec *r) {
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    const char *idp = NULL;
+    int timeout;
+    apr_hash_index_t *index;
+    char *return_to;
+    char *idp_param;
+    char *redirect_url;
+    int ret;
+
+    /*
+     * If built-in IdP discovery is not configured, return error.
+     * For now we only have the get-metadata metadata method, so this
+     * information is not saved in configuration nor it is checked here.
+     */
+    timeout = cfg->probe_discovery_timeout;
+    if (timeout == -1) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "probe discovery handler invoked but not "
+                      "configured. Plase set MellonProbeDiscoveryTimeout.");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /*
+     * Check for mandatory arguments early to avoid sending 
+     * probles for nothing.
+     */
+    return_to = am_extract_query_parameter(r->pool, r->args, "return");
+    if(return_to == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Missing required return parameter.");
+        return HTTP_BAD_REQUEST;
+    }
+
+    ret = am_urldecode(return_to);
+    if (ret != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, ret, r,
+                      "Could not urldecode return value.");
+        return HTTP_BAD_REQUEST;
+    }
+
+    idp_param = am_extract_query_parameter(r->pool, r->args, "returnIDParam");
+    if(idp_param == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Missing required returnIDParam parameter.");
+        return HTTP_BAD_REQUEST;
+    }
+
+    ret = am_urldecode(idp_param);
+    if (ret != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, ret, r,
+                      "Could not urldecode returnIDParam value.");
+        return HTTP_BAD_REQUEST;
+    }
+
+    /*
+     * Proceed with built-in IdP discovery. 
+     *
+     * Send probes for all configured IdP to check availability.
+     * The first to answer is chosen, but the list of usable
+     * IdP can be restricted in configuration.
+     */
+    for (index = apr_hash_first(r->pool, cfg->idp_metadata_files);
+         index;
+         index = apr_hash_next(index)) {
+        void *dontcare;
+        const char *ping_url;
+        apr_size_t len;
+        apr_ssize_t slen;
+        long status;
+ 
+        apr_hash_this(index, (const void **)&idp, 
+                      &slen, (void *)&dontcare);
+        ping_url = idp;
+
+        /*
+         * If a list of IdP was given for probe discovery, 
+         * skip any IdP that does not match.
+         */
+        if (apr_hash_count(cfg->probe_discovery_idp) != 0) {
+            char *value = apr_hash_get(cfg->probe_discovery_idp,
+                                       idp, APR_HASH_KEY_STRING);
+
+            if (value == NULL) {
+                /* idp not in list, try the next one */
+                idp = NULL;
+                continue;
+            } else {
+                /* idp in list, use the value as the ping url */
+                ping_url = value;
+            }
+        }
+
+        status = 0;
+        if (am_httpclient_get(r, ping_url, &dontcare, &len, 
+                              timeout, &status) != OK)
+            continue;
+
+        if (status != HTTP_OK) {
+	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+			  "Cannot probe %s: \"%s\" returned HTTP %ld",
+			  idp, ping_url, status);
+            continue;
+        }
+
+        /* We got some succes */
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                      "probeDiscovery using %s", idp);
+        break;
+    }
+
+    /* 
+     * On failure, try default
+     */
+    if (idp == NULL) {
+        idp = am_first_idp(r);
+        if (idp == NULL) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                          "probeDiscovery found no usable IdP.");
+            return HTTP_INTERNAL_SERVER_ERROR;
+        } else {
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, "probeDiscovery "
+                          "failed, trying default IdP %s", idp); 
+        }
+    }
+
+    redirect_url = apr_psprintf(r->pool, "%s%s%s=%s", return_to, 
+                                strchr(return_to, '?') ? "&" : "?",
+                                am_urlencode(r->pool, idp_param), 
+                                am_urlencode(r->pool, idp));
+
+    apr_table_setn(r->headers_out, "Location", redirect_url);
+
+    return HTTP_SEE_OTHER;
+}
+
 
 /* This function takes a request for an endpoint and passes it on to the
  * correct handler function.
@@ -2656,6 +2728,8 @@ static int am_endpoint_handler(request_rec *r)
         return am_handle_logout(r);
     } else if(!strcmp(endpoint, "login")) {
         return am_handle_login(r);
+    } else if(!strcmp(endpoint, "probeDisco")) {
+        return am_handle_probe_discovery(r);
     } else {
 	ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
 		      "Endpoint \"%s\" not handled by mod_auth_mellon.",

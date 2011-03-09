@@ -76,6 +76,47 @@ static const apr_size_t post_size = 1024 * 1024 * 1024;
  */
 static const int post_count = 100;
 
+/* This function handles configuration directives which set a 
+ * multivalued string slot in the module configuration (the destination
+ * strucure is a hash).
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *                       This value isn't used by this function.
+ *  const char *key      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *  const char *value    Optional value to be stored in the hash.
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_hash_string_slot(cmd_parms *cmd,
+                                          void *struct_ptr,
+                                          const char *key,
+                                          const char *value)
+{
+    server_rec *s = cmd->server;
+    apr_pool_t *pconf = s->process->pconf;
+    am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
+    int offset;
+    apr_hash_t **hash;
+
+    /*
+     * If no value is given, we just store the key in the hash.
+     */
+    if (value == NULL || *value == '\0')
+        value = key;
+
+    offset = (int)(long)cmd->info;
+    hash = (apr_hash_t **)((char *)cfg + offset);
+    apr_hash_set(*hash, apr_pstrdup(pconf, key), APR_HASH_KEY_STRING, value);
+
+    return NULL;
+}
+
 /* This function handles configuration directives which set a file
  * slot in the module configuration. If lasso is recent enough, it
  * attempts to read the file immediatly.
@@ -133,10 +174,10 @@ static const char *am_set_filestring_slot(cmd_parms *cmd,
  *  NULL on success or an error string on failure.
  *  
  */
-static const char *am_get_proovider_id(apr_pool_t *p,
-                                       server_rec *s,
-                                       const char *file,
-                                       const char **provider)
+static const char *am_get_provider_id(apr_pool_t *p,
+                                      server_rec *s,
+                                      const char *file,
+                                      const char **provider)
 {
     char *data;
     apr_xml_parser *xp;
@@ -195,7 +236,7 @@ static const char *am_get_proovider_id(apr_pool_t *p,
  * Returns:
  *  NULL on success or an error string on failure.
  */
-static const char *ap_set_idp_string_slot(cmd_parms *cmd,
+static const char *am_set_idp_string_slot(cmd_parms *cmd,
                                           void *struct_ptr,
                                           const char *arg)
 {
@@ -205,8 +246,8 @@ static const char *ap_set_idp_string_slot(cmd_parms *cmd,
     const char *error;
     const char *provider_id;
 
-    if ((error = am_get_proovider_id(cmd->pool, s, 
-                                     arg, &provider_id)) != NULL)
+    if ((error = am_get_provider_id(cmd->pool, s, 
+                                    arg, &provider_id)) != NULL)
         return apr_psprintf(cmd->pool, "%s - %s", cmd->cmd->name, error);
 
     apr_hash_set(cfg->idp_metadata_files,
@@ -649,8 +690,8 @@ const command_rec auth_mellon_commands[] = {
         ),
     AP_INIT_TAKE1(
         "MellonIdPMetadataFile",
-        ap_set_idp_string_slot,
-	NULL,
+        am_set_idp_string_slot,
+        NULL,
         OR_AUTHCFG,
         "Full path to xml metadata file for the IdP."
         ),
@@ -703,6 +744,21 @@ const command_rec auth_mellon_commands[] = {
         (void *)APR_OFFSETOF(am_dir_cfg_rec, discovery_url),
         OR_AUTHCFG,
         "The URL of IdP discovery service. Default is unset."
+        ),
+    AP_INIT_TAKE1(
+        "MellonProbeDiscoveryTimeout",
+        ap_set_int_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, probe_discovery_timeout),
+        OR_AUTHCFG,
+        "The timeout of IdP probe discovery service. "
+        "Default is 1s"
+        ),
+    AP_INIT_TAKE12(
+        "MellonProbeDiscoveryIdP",
+        am_set_hash_string_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, probe_discovery_idp),
+        OR_AUTHCFG,
+        "An IdP that can be used for IdP probe discovery."
         ),
     AP_INIT_TAKE1(
         "MellonEndpointPath",
@@ -760,6 +816,8 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->idp_ca_file = NULL;
     dir->login_path = default_login_path;
     dir->discovery_url = NULL;
+    dir->probe_discovery_timeout = -1; /* -1 means no probe discovery */
+    dir->probe_discovery_idp = apr_hash_make(p);
 
     dir->sp_org_name = apr_hash_make(p);
     dir->sp_org_display_name = apr_hash_make(p);
@@ -902,6 +960,16 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->discovery_url = (add_cfg->discovery_url ?
                               add_cfg->discovery_url :
                               base_cfg->discovery_url);
+
+    new_cfg->probe_discovery_timeout = 
+                           (add_cfg->probe_discovery_timeout != -1 ?
+                            add_cfg->probe_discovery_timeout :
+                            base_cfg->probe_discovery_timeout);
+
+    new_cfg->probe_discovery_idp = apr_hash_copy(p,
+                      (apr_hash_count(add_cfg->probe_discovery_idp) > 0) ?
+                       add_cfg->probe_discovery_idp : 
+                       base_cfg->probe_discovery_idp);
 
     apr_thread_mutex_create(&new_cfg->server_mutex,
                             APR_THREAD_MUTEX_DEFAULT, p);

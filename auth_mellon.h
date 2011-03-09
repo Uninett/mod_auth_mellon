@@ -174,6 +174,8 @@ typedef struct am_dir_cfg_rec {
 
     /* IdP discovery service */
     const char *discovery_url;
+    int probe_discovery_timeout;
+    apr_hash_t *probe_discovery_idp;
 
     /* Mutex to prevent us from creating several lasso server objects. */
     apr_thread_mutex_t *server_mutex;

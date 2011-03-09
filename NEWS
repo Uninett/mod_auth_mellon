@@ -3,6 +3,9 @@ Version 0.3.1
 
 * Allow MellonUser variable to be translated through MellonSetEnv
 
+* A /mellon/probeDisco endpoint replaces the builtin:get-metadata 
+  IdP dicovery URL scheme
+
 Version 0.3.0
 ---------------------------------------------------------------------------
 

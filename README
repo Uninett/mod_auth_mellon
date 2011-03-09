@@ -321,8 +321,17 @@ MellonPostCount 100
         # The IdP discovery must redirect the user to the return URL, 
         # with retueniDParam set to the selected IdP providerID.
         # 
-        # Alternatively, a simple built-in IdP discovery can be used,
-        # by specifying "builtin:get-metadata?timeout=1"
+        # The builtin:get-metadata discovery URL is not supported anymore
+        # starting with 0.3.1. See MellonProbeDiscoveryTimeout for
+        # a replacement.
+        #
+        # Default: None set.
+        MellonDiscoveryURL "http://www.example.net/idp-discovery"
+
+        # MellonProbeDiscoveryTimeout sets the timeout of the
+        # IdP probe discovery service, which is available on the
+        # probeDisco endoint.
+        #
         # This will cause the SP to send HTTP GET requests on the 
         # configured IdP PorviderID URL. Theses URL should be used to
         # publish metadata, though this is not mandatory. If the IdP
@@ -330,8 +339,16 @@ MellonPostCount 100
         # If the PorviderID URL requires SSL, MellonIdPCAFile is used
         # as a trusted CA bundle.
         #
-        # Default: None set.
-        MellonDiscoveryURL "http://www.example.net/idp-discovery"
+        # Default: unset, which means the feature is disabled
+        # MellonProbeDiscoveryTimeout 1
+
+        # MellonProbeDiscoveryIdP can be used to restrict the 
+        # list of IdP queried by the IdP probe discovery service.
+        #
+        # Default unset, which means that all configured IdP are 
+        # queried.
+        # MellonProbeDiscoveryIdP http://idp1.example.com/saml/metadata
+        # MellonProbeDiscoveryIdP http://idp2.example.net/saml/metadata
 
         # This option will make the SAML authentication assertion 
         # available in the MELLON_SAML_RESPONSE environement 
@@ -476,6 +493,38 @@ could contain a link element like the following:
 This will return the user to "https://www.example.org/logged_out.html"
 after the logout operation has completed.
 
+===========================================================================
+ Probe IdP discovery 
+===========================================================================
+
+mod_auth_mellon has an IdP probe discovery service that sends HTTP GET
+to IdP and picks the first that answers. This can be used as a poor
+man's failover setup that redirects to your organisation internal IdP. 
+Here is a sample configuration:
+
+  MellonEndpointPath "/saml"
+  (...)
+  MellonDiscoveryUrl "/saml/probeDisco"
+  MellonProbeDiscoveryTimeout 1
+
+The SP will sends HTTP GET to each configured IdP providerId URL until
+it gets an HTTP 200 response within the 1 second timeout. It will then 
+proceed with that IdP.
+
+If you are in a federation, then your IdP login page will need to provide 
+an IdP selection feature aimed at users from other institutions (after
+such a choice, the user would be redirected to the SP's /saml/login 
+endpoint, with ReturnTo and IdP set appropriately). In such a setup, 
+you will want to configure external IdP in mod_auth_mellon, but not 
+use them for IdP probe discovery. The MellonProbeDiscoveryIdP 
+directive can be used to limit the usable IdP for probe discovery:
+
+  MellonEndpointPath "/saml"
+  (...)
+  MellonDiscoveryUrl "/saml/probeDisco"
+  MellonProbeDiscoveryTimeout 1
+  MellonProbeDiscoveryIdP "https://idp1.example.net/saml/metadata"
+  MellonProbeDiscoveryIdP "https://idp2.example.net/saml/metadata"
 
 ===========================================================================
  Contributors
