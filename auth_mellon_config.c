@@ -422,6 +422,135 @@ static const char *am_set_setenv_slot(cmd_parms *cmd,
     return NULL;
 }
 
+/* This function decodes MellonCond flags, such as [NOT,REG]
+ *
+ * Parameters:
+ *  const char *arg      Pointer to the flags string
+ *
+ * Returns:
+ *  flags, or -1 on error
+ */
+const char *am_cond_options[] = { 
+    "OR",  /* AM_EXPIRE_FLAG_OR */
+    "NOT", /* AM_EXPIRE_FLAG_NOT */
+    "REG", /* AM_EXPIRE_FLAG_REG */
+    "NC",  /* AM_EXPIRE_FLAG_NC */
+    "MAP", /* AM_EXPIRE_FLAG_MAP */
+    "IGN", /* AM_EXPIRE_FLAG_IGN */
+    "REQ", /* AM_EXPIRE_FLAG_REQ */
+};
+
+static int am_cond_flags(const char *arg)
+{
+    int flags = AM_COND_FLAG_NULL; 
+    
+    /* Skip inital [ */
+    if (arg[0] == '[')
+        arg++;
+    else
+        return -1;
+ 
+    do {
+        apr_size_t i;
+
+        for (i = 0; i < AM_COND_FLAG_COUNT; i++) {
+            apr_size_t optlen = strlen(am_cond_options[i]);
+
+            if (strncmp(arg, am_cond_options[i], optlen) == 0) {
+                /* Make sure we have a separator next */
+                if (arg[optlen] && !strchr("]\t ,", (int)arg[optlen]))
+                       return -1;
+
+                flags |= (1 << i); 
+                arg += optlen;
+                break;
+            }
+      
+         /* no match */
+         if (i == AM_COND_FLAG_COUNT)
+             return -1;
+
+         /* skip spaces, tabs and commas */
+         arg += strspn(arg, " \t,");
+
+         /* Garbage after ] is ignored */
+         if (*arg == ']') 
+             return flags;
+         }
+    } while (*arg);
+
+    /* Missing trailing ] */
+    return -1;
+}
+
+/* This function handles the MellonCond configuration directive, which
+ * allows the user to restrict access based on attributes received from
+ * the IdP.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for the MellonCond
+ *                       configuration directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *  const char *attribute   Pointer to the attribute name
+ *  const char *value       Pointer to the attribute value or regex
+ *  const char *options     Pointer to options
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_cond_slot(cmd_parms *cmd,
+                                    void *struct_ptr,
+                                    const char *attribute,
+                                    const char *value,
+                                    const char *options)
+{
+    am_dir_cfg_rec *d = struct_ptr;
+    am_cond_t *element;
+
+    if (*attribute == '\0' || *value == '\0')
+        return apr_pstrcat(cmd->pool, cmd->cmd->name,
+                           " takes two or three arguments", NULL);
+ 
+    element = (am_cond_t *)apr_array_push(d->cond);
+    element->varname = attribute;
+    element->flags = AM_COND_FLAG_NULL;
+    element->str = NULL;
+    element->regex = NULL;
+    element->directive = apr_pstrcat(cmd->pool, cmd->directive->directive, 
+                                     " ", cmd->directive->args, NULL);
+
+    /* Handle optional flags */
+    if (*options != '\0') {
+        int flags;
+
+        flags = am_cond_flags(options);
+        if (flags == -1)
+             return apr_psprintf(cmd->pool, "%s - invalid flags %s",
+                                 cmd->cmd->name, options);
+
+        element->flags = flags;
+    }
+
+    if (element->flags & AM_COND_FLAG_REG) {
+        int regex_flags = AP_REG_EXTENDED|AP_REG_NOSUB;
+
+        if (element->flags & AM_COND_FLAG_NC)
+            regex_flags |= AP_REG_ICASE;
+
+        element->regex = ap_pregcomp(cmd->pool, value, regex_flags);
+        if (element->regex == NULL) 
+             return apr_psprintf(cmd->pool, "%s - invalid regex %s",
+                                 cmd->cmd->name, value);
+    }
+
+    /*
+     * We keep the string also for regex, so that we can 
+     * print it for debug purpose.
+     */
+    element->str = value;
+    
+    return NULL;
+}
 
 /* This function handles the MellonRequire configuration directive, which
  * allows the user to restrict access based on attributes received from
@@ -440,10 +569,11 @@ static const char *am_set_require_slot(cmd_parms *cmd,
                                        void *struct_ptr,
                                        const char *arg)
 {
-    apr_array_header_t *r;
     am_dir_cfg_rec *d = struct_ptr;
     char *attribute, *value;
-    const char **element;
+    int i;
+    am_cond_t *element;
+    am_cond_t *first_element;
 
     attribute = ap_getword_conf(cmd->pool, &arg);
     value     = ap_getword_conf(cmd->pool, &arg);
@@ -453,19 +583,46 @@ static const char *am_set_require_slot(cmd_parms *cmd,
                            " takes at least two arguments", NULL);
     }
 
+    /*
+     * MellonRequire overwrites previous conditions on this attribute
+     * We just tag the am_cond_t with the ignore flag, as it is 
+     * easier (and probably faster) than to really remove it.
+     */
+    for (i = 0; i < d->cond->nelts; i++) {
+        am_cond_t *ce = &((am_cond_t *)(d->cond->elts))[i];
+ 
+        if ((strcmp(ce->varname, attribute) == 0) && 
+            (ce->flags & AM_COND_FLAG_REQ))
+            ce->flags |= AM_COND_FLAG_IGN;
+    }
+    
+    first_element = NULL;
     do {
-        r = (apr_array_header_t *)apr_hash_get(d->require, attribute,
-                                               APR_HASH_KEY_STRING);
+        element = (am_cond_t *)apr_array_push(d->cond);
+        element->varname = attribute;
+        element->flags = AM_COND_FLAG_OR|AM_COND_FLAG_REQ;
+        element->str = value;
+        element->regex = NULL;
 
-        if (r == NULL) {
-            r = apr_array_make(cmd->pool, 2, sizeof(const char *));
-            apr_hash_set(d->require, attribute, APR_HASH_KEY_STRING, r);
+        /*
+         * When multiple values are given, we track the first one
+         * in order to retreive the directive
+         */ 
+        if (first_element == NULL) {
+            element->directive = apr_pstrcat(cmd->pool, 
+                                             cmd->directive->directive, " ",
+                                             cmd->directive->args, NULL);
+            first_element = element;
+        } else {
+            element->directive = first_element->directive;
         }
 
-        element = (const char **)apr_array_push(r);
-        *element = value;
-
     } while (*(value = ap_getword_conf(cmd->pool, &arg)) != '\0');
+
+    /* 
+     * Remove OR flag on last element 
+     */
+    element->flags &= ~AM_COND_FLAG_OR;
 
     return NULL;
 }
@@ -650,6 +807,15 @@ const command_rec auth_mellon_commands[] = {
         " for the attribute. The syntax is:"
         " MellonRequire <attribute> <value1> [value2....]."
         ),
+    AP_INIT_TAKE23(
+        "MellonCond",
+        am_set_cond_slot,
+        NULL,
+        OR_AUTHCFG,
+        "Attribute requirements for authorization. Allows you to restrict"
+        " access based on attributes received from the IdP. The syntax is:"
+        " MellonRequire <attribute> <value> [<options>]."
+        ),
     AP_INIT_TAKE1(
         "MellonSessionLength",
         ap_set_int_slot,
@@ -795,7 +961,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
 
     dir->varname = default_cookie_name;
     dir->secure = default_secure_cookie;
-    dir->require   = apr_hash_make(p);
+    dir->cond = apr_array_make(p, 0, sizeof(am_cond_t));
     dir->envattr   = apr_hash_make(p);
     dir->userattr  = default_user_attribute;
     dir->idpattr  = NULL;
@@ -871,10 +1037,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                         base_cfg->secure);
 
 
-    new_cfg->require = apr_hash_copy(p,
-                                     (apr_hash_count(add_cfg->require) > 0) ?
-                                     add_cfg->require :
-                                     base_cfg->require);
+    new_cfg->cond = apr_array_copy(p,
+                                   (!apr_is_empty_array(add_cfg->cond)) ?
+                                   add_cfg->cond :
+                                   base_cfg->cond);
 
     new_cfg->envattr = apr_hash_copy(p,
                                      (apr_hash_count(add_cfg->envattr) > 0) ?

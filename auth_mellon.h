@@ -124,6 +124,30 @@ typedef enum {
     am_decoder_feide,
 } am_decoder_t;
 
+typedef enum {
+    AM_COND_FLAG_NULL = 0x00, /* No flags */
+    AM_COND_FLAG_OR   = 0x01, /* Or with  next condition */
+    AM_COND_FLAG_NOT  = 0x02, /* Negate this condition */
+    AM_COND_FLAG_REG  = 0x04, /* Condition is regex */
+    AM_COND_FLAG_NC   = 0x08, /* Case insensitive match */
+    AM_COND_FLAG_MAP  = 0x10, /* Try to use attribute name from MellonSetEnv */
+    AM_COND_FLAG_IGN  = 0x20, /* Condition is to be ignored */
+    AM_COND_FLAG_REQ  = 0x40, /* Condition was configure using MellonRequire */
+} am_cond_flag_t;
+
+/* Not counting AM_COND_FLAG_NULL */
+#define AM_COND_FLAG_COUNT 7
+
+extern const char *am_cond_options[];
+
+typedef struct {
+    const char *varname;
+    int flags;
+    const char *str; 
+    ap_regex_t *regex; 
+    const char *directive;
+} am_cond_t;
+
 typedef struct am_dir_cfg_rec {
     /* enable_mellon is used to enable auth_mellon for a location.
      */
@@ -136,7 +160,7 @@ typedef struct am_dir_cfg_rec {
 
     const char *varname;
     int secure;
-    apr_hash_t *require;
+    apr_array_header_t *cond;
     apr_hash_t *envattr;
     const char *userattr;
     const char *idpattr;

@@ -152,9 +152,9 @@ MellonPostCount 100
         #   "auth": We will populate the environment with information about
         #           the user if he is authorized. If he is authenticated
         #           (logged in), but not authorized (according to the
-        #           MellonRequire directives, then we will return a 403
-        #           Forbidden error. If he isn't authenticated then we will
-        #           redirect him to the login page of the IdP.
+        #           MellonRequire and MellonCond directives, then we will 
+        #           return a 403 Forbidden error. If he isn't authenticated
+        #           then we will redirect him to the login page of the IdP.
         #
         # Default: MellonEnable "off"
         MellonEnable "auth"
@@ -221,13 +221,44 @@ MellonPostCount 100
         # Note that the attribute name is the name we received from the
         # IdP.
         #
-        # If you don't list any MellonRequire directives, then any user
-        # authenticated by the IdP will have access to this service. If
-        # you list several MellonRequire directives, then all of them
-        # will have to match.
+        # If you don't list any MellonRequire directives (and any 
+        # MellonCond directives, see below), then any user authenticated 
+        # by the IdP will have access to this service. If you list several 
+        # MellonRequire directives, then all of them will have to match.
+        # If you use multiple MellonRequire directive on the same 
+        # attribute, the last overrides the previous ones.
         #
         # Default: None set.
 	MellonRequire "eduPersonAffiliation" "student" "employee"
+
+        # MellonCond provides the same function as MellonRequire, with
+        # extra functionnality (MellonRequire is retained for backward
+        # compatibility). The syntax is
+        # 'MellonCond <attribute name> <value> [<options>]'
+        #
+        # <options> is an optional, comma-separated list of option
+        # encloseed with brackets. Here is an example: [NOT,NC]
+        # The valid options are:
+        #    OR  If this MellonCond evaluted to false, then the
+        #        next one will be checked. If it evalutes to true,
+        #        then the overall check succeeds.
+        #    NOT This MellonCond evaluates to true if the attribute 
+        #        does not match the value.
+        #    REG Value to check is a regular expression.
+        #    NC  Perform case insensitive match.
+        #    MAP Attempt to search an attribute with name remapped by
+        #        MellonSetEnv. Fallback to non remapped name if not
+        #        found.
+        #        
+        # It is allowed to have multiple MellonCond on the same 
+        # attribute, and to mix MellonCond and MellonRequire. 
+        # Note that this can create tricky situations, since the OR
+        # option has effect on a following MellonRequire directive.
+        # 
+        # Default: none set
+	# MellonCond "mail" "@example\.net$" [OR,REG]
+	# MellonCond "mail" "@example\.com$" [OR,REG]
+	# MellonCond "uid" "superuser"
 
         # MellonEndpointPath selects which directory mod_auth_mellon
         # should assume contains the SAML 2.0 endpoints. Any request to
