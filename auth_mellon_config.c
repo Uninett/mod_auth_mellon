@@ -390,7 +390,7 @@ static const char *am_set_endpoint_path(cmd_parms *cmd,
 
     /* Make sure that the path ends with '/'. */
     if(strlen(arg) == 0 || arg[strlen(arg) - 1] != '/') {
-        d->endpoint_path = apr_pstrcat(cmd->pool, arg, "/", 0);
+        d->endpoint_path = apr_pstrcat(cmd->pool, arg, "/", NULL);
     } else {
         d->endpoint_path = arg;
     }
