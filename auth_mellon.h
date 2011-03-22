@@ -125,18 +125,20 @@ typedef enum {
 } am_decoder_t;
 
 typedef enum {
-    AM_COND_FLAG_NULL = 0x00, /* No flags */
-    AM_COND_FLAG_OR   = 0x01, /* Or with  next condition */
-    AM_COND_FLAG_NOT  = 0x02, /* Negate this condition */
-    AM_COND_FLAG_REG  = 0x04, /* Condition is regex */
-    AM_COND_FLAG_NC   = 0x08, /* Case insensitive match */
-    AM_COND_FLAG_MAP  = 0x10, /* Try to use attribute name from MellonSetEnv */
-    AM_COND_FLAG_IGN  = 0x20, /* Condition is to be ignored */
-    AM_COND_FLAG_REQ  = 0x40, /* Condition was configure using MellonRequire */
-} am_cond_flag_t;
+    AM_COND_FLAG_NULL = 0x000, /* No flags */
+    AM_COND_FLAG_OR   = 0x001, /* Or with  next condition */
+    AM_COND_FLAG_NOT  = 0x002, /* Negate this condition */
+    AM_COND_FLAG_REG  = 0x004, /* Condition is regex */
+    AM_COND_FLAG_NC   = 0x008, /* Case insensitive match */
+    AM_COND_FLAG_MAP  = 0x010, /* Try to use attribute name from MellonSetEnv */
+    AM_COND_FLAG_REF  = 0x020, /* Set regex backreferences */
+    AM_COND_FLAG_SUB  = 0x040, /* Substring match */
 
-/* Not counting AM_COND_FLAG_NULL */
-#define AM_COND_FLAG_COUNT 7
+    /* The other options are internally used */
+    AM_COND_FLAG_IGN  = 0x1000, /* Condition is to be ignored */
+    AM_COND_FLAG_REQ  = 0x2000, /* Condition was set using MellonRequire */
+    AM_COND_FLAG_FSTR = 0x4000, /* Value contains a format string */
+} am_cond_flag_t;
 
 extern const char *am_cond_options[];
 

@@ -422,6 +422,7 @@ static const char *am_set_setenv_slot(cmd_parms *cmd,
     return NULL;
 }
 
+
 /* This function decodes MellonCond flags, such as [NOT,REG]
  *
  * Parameters:
@@ -430,19 +431,20 @@ static const char *am_set_setenv_slot(cmd_parms *cmd,
  * Returns:
  *  flags, or -1 on error
  */
-const char *am_cond_options[] = { 
-    "OR",  /* AM_EXPIRE_FLAG_OR */
-    "NOT", /* AM_EXPIRE_FLAG_NOT */
-    "REG", /* AM_EXPIRE_FLAG_REG */
-    "NC",  /* AM_EXPIRE_FLAG_NC */
-    "MAP", /* AM_EXPIRE_FLAG_MAP */
-    "IGN", /* AM_EXPIRE_FLAG_IGN */
-    "REQ", /* AM_EXPIRE_FLAG_REQ */
-};
-
 static int am_cond_flags(const char *arg)
 {
     int flags = AM_COND_FLAG_NULL; 
+    static const char const *options[] = { 
+        "OR",  /* AM_EXPIRE_FLAG_OR */
+        "NOT", /* AM_EXPIRE_FLAG_NOT */
+        "REG", /* AM_EXPIRE_FLAG_REG */
+        "NC",  /* AM_EXPIRE_FLAG_NC */
+        "MAP", /* AM_EXPIRE_FLAG_MAP */
+        "REF", /* AM_EXPIRE_FLAG_REF */
+        "SUB", /* AM_EXPIRE_FLAG_SUB */
+        /* The other options (IGN, REQ, FSTR, ...) are only internally used  */
+    };
+    apr_size_t options_count = sizeof(options) / sizeof(*options);
     
     /* Skip inital [ */
     if (arg[0] == '[')
@@ -453,10 +455,10 @@ static int am_cond_flags(const char *arg)
     do {
         apr_size_t i;
 
-        for (i = 0; i < AM_COND_FLAG_COUNT; i++) {
-            apr_size_t optlen = strlen(am_cond_options[i]);
+        for (i = 0; i < options_count; i++) {
+            apr_size_t optlen = strlen(options[i]);
 
-            if (strncmp(arg, am_cond_options[i], optlen) == 0) {
+            if (strncmp(arg, options[i], optlen) == 0) {
                 /* Make sure we have a separator next */
                 if (arg[optlen] && !strchr("]\t ,", (int)arg[optlen]))
                        return -1;
@@ -466,16 +468,21 @@ static int am_cond_flags(const char *arg)
                 break;
             }
       
-         /* no match */
-         if (i == AM_COND_FLAG_COUNT)
-             return -1;
-
-         /* skip spaces, tabs and commas */
-         arg += strspn(arg, " \t,");
-
-         /* Garbage after ] is ignored */
-         if (*arg == ']') 
-             return flags;
+            /* no match */
+            if (i == options_count)
+                return -1;
+    
+            /* skip spaces, tabs and commas */
+            arg += strspn(arg, " \t,");
+    
+            /*
+             * End of option, but we fire an error if 
+             * there is trailing garbage
+             */
+            if (*arg == ']') {
+                arg++;
+                return (*arg == '\0') ? flags : -1;
+            }
          }
     } while (*arg);
 
@@ -505,32 +512,28 @@ static const char *am_set_cond_slot(cmd_parms *cmd,
                                     const char *options)
 {
     am_dir_cfg_rec *d = struct_ptr;
+    int flags = AM_COND_FLAG_NULL;
     am_cond_t *element;
 
-    if (*attribute == '\0' || *value == '\0')
+    if (attribute == NULL || *attribute == '\0' || 
+        value == NULL || *value == '\0')
         return apr_pstrcat(cmd->pool, cmd->cmd->name,
-                           " takes two or three arguments", NULL);
- 
+                           " takes at least two arguments", NULL);
+
+    if (options != NULL && *options != '\0')
+        flags = am_cond_flags(options);
+
+    if (flags == -1)
+         return apr_psprintf(cmd->pool, "%s - invalid flags %s",
+                             cmd->cmd->name, options);
+     
     element = (am_cond_t *)apr_array_push(d->cond);
     element->varname = attribute;
-    element->flags = AM_COND_FLAG_NULL;
+    element->flags = flags;
     element->str = NULL;
     element->regex = NULL;
     element->directive = apr_pstrcat(cmd->pool, cmd->directive->directive, 
                                      " ", cmd->directive->args, NULL);
-
-    /* Handle optional flags */
-    if (*options != '\0') {
-        int flags;
-
-        flags = am_cond_flags(options);
-        if (flags == -1)
-             return apr_psprintf(cmd->pool, "%s - invalid flags %s",
-                                 cmd->cmd->name, options);
-
-        element->flags = flags;
-    }
-
     if (element->flags & AM_COND_FLAG_REG) {
         int regex_flags = AP_REG_EXTENDED|AP_REG_NOSUB;
 
@@ -544,8 +547,15 @@ static const char *am_set_cond_slot(cmd_parms *cmd,
     }
 
     /*
+     * Flag values containing format strings to that we do 
+     * not have to process the others at runtime.
+     */ 
+    if (strchr(value, '%') != NULL) 
+        element->flags |= AM_COND_FLAG_FSTR;
+
+    /*
      * We keep the string also for regex, so that we can 
-     * print it for debug purpose.
+     * print it for debug purpose and perform substitutions on it. 
      */
     element->str = value;
     

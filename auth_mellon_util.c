@@ -19,6 +19,8 @@
  *
  */
 
+#include <assert.h>
+
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
@@ -49,6 +51,201 @@ char *am_reconstruct_url(request_rec *r)
     return url;
 }
 
+/* This function builds an array of regexp backreferences
+ *
+ * Parameters:
+ *  request_rec *r                 The current request.
+ *  const am_cond_t *ce            The condition
+ *  const char *value              Attribute value
+ *  const ap_regmatch_t *regmatch  regmatch_t from ap_regexec()
+ *
+ * Returns:
+ *  An array of collected backreference strings
+ */
+const apr_array_header_t *am_cond_backrefs(request_rec *r, 
+                                           const am_cond_t *ce, 
+                                           const char *value, 
+                                           const ap_regmatch_t *regmatch)
+{
+    apr_array_header_t *backrefs;
+    const char **ref;
+    int nsub;
+    int i;
+
+    nsub = ce->regex->re_nsub + 1;     /* +1 for %0 */
+    backrefs = apr_array_make(r->pool, nsub, sizeof(const char *));
+    backrefs->nelts = nsub;
+
+    ref = (const char **)(backrefs->elts);
+
+    for (i = 0; i < nsub; i++) {
+        if ((regmatch[i].rm_so == -1) || (regmatch[i].rm_eo == -1)) {
+            ref[i] = "";
+        } else {
+            int len = regmatch[i].rm_eo - regmatch[i].rm_so;
+            int off = regmatch[i].rm_so;
+
+            ref[i] = apr_pstrndup(r->pool, value + off, len);
+        }
+    }
+
+    return (const apr_array_header_t *)backrefs;
+}
+
+/* This function clones an am_cond_t and substitute value to 
+ * match (both regexp and string) with backreferences from
+ * a previous regex match.
+ *
+ * Parameters:
+ *  request_rec *r                      The current request.
+ *  const am_cond_t *cond               The am_cond_t to clone and substiture
+ *  const apr_array_header_t *backrefs  Collected backreferences
+ *
+ * Returns:
+ *  The cloned am_cond_t
+ */
+const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce, 
+                                   const apr_array_header_t *backrefs)
+{
+    am_cond_t *c;
+    const char *instr = ce->str;
+    apr_size_t inlen = strlen(instr);
+    const char *outstr = "";
+    size_t last;
+    size_t i;
+
+    c = (am_cond_t *)apr_pmemdup(r->pool, ce, sizeof(*ce));
+    c->str = outstr;
+    last = 0;
+    
+    for (i = strcspn(instr, "%"); i < inlen; i += strcspn(instr + i, "%")) {
+        const char *fstr;
+        const char *ns;
+        const char *name;
+        const char *value;
+        apr_size_t flen;
+        apr_size_t pad;
+        apr_size_t nslen;
+
+        /* 
+         * Make sure we got a %
+         */
+	assert(instr[i] == '%');
+
+        /*
+         * Copy the format string in fstr. It can be a single 
+         * digit (e.g.: %1) , or a curly-brace enclosed text
+         * (e.g.: %{12})
+         */
+        fstr = instr + i + 1;
+        if (*fstr == '{') {          /* Curly-brace enclosed text */
+            pad = 3; /* 3 for %{} */
+            fstr++;
+            flen = strcspn(fstr, "}");
+
+            /* If there is no closing }, we do not substitute  */
+            if (fstr[flen] == '\0') {
+                pad = 2; /* 2 for %{ */
+                i += flen + pad;
+                break;
+            }
+
+        } else if (*fstr == '\0') {  /* String ending by a % */
+            break;
+
+        } else {                     /* Single digit */
+            pad = 1; /* 1 for % */
+            flen = 1;
+        }
+
+        /*
+         * Try to extract a namespace (ns) and a name, e.g: %{ENV:foo}
+         */ 
+        fstr = apr_pstrndup(r->pool, fstr, flen);
+        if ((nslen = strcspn(fstr, ":")) != flen) {
+            ns = apr_pstrndup(r->pool, fstr, nslen);
+            name = fstr + nslen + 1; /* +1 for : */
+        } else {
+            nslen = 0;
+            ns = "";
+            name = fstr;
+        }
+
+        value = NULL;
+        if ((*ns == '\0') && (strspn(fstr, "0123456789") == flen)) {
+            /*
+             * If fstr has only digits, this is a regexp backreference
+             */
+            int d = (int)apr_atoi64(fstr);
+
+            if ((d >= 0) && (d < backrefs->nelts)) 
+                value = ((const char **)(backrefs->elts))[d];
+
+        } else if ((*ns == '\0') && (strcmp(fstr, "%") == 0)) {
+            /*
+             * %-escape
+             */
+            value = fstr;
+
+        } else if (strcmp(ns, "ENV") == 0) {
+            /*
+             * ENV namespace. Get value from apache environement
+             */
+            value = getenv(name);
+        }
+
+        /*
+         * If we did not find a value, substitue the
+         * format string with an empty string.
+         */
+         if (value == NULL)
+            value = "";
+
+        /*
+         * Concatenate the value with leading text, and * keep track 
+         * of the last location we copied in source string
+         */
+        outstr = apr_pstrcat(r->pool, outstr,
+                             apr_pstrndup(r->pool, instr + last, i - last), 
+                             value, NULL);
+        last = i + flen + pad;
+
+        /*
+         * Move index to the end of the format string
+         */
+        i += flen + pad;
+    }
+
+    /*
+     * Copy text remaining after the last format string.
+     */
+    outstr = apr_pstrcat(r->pool, outstr,
+                         apr_pstrndup(r->pool, instr + last, i - last), 
+                         NULL);
+
+    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                  "Directive %s, \"%s\" substituted into \"%s\"",
+                  ce->directive, instr, outstr);
+
+    /*
+     * If this was a regexp, recompile it.
+     */
+    if (ce->flags & AM_COND_FLAG_REG) {
+        int regex_flags = AP_REG_EXTENDED|AP_REG_NOSUB;
+ 
+        if (ce->flags & AM_COND_FLAG_NC)
+            regex_flags |= AP_REG_ICASE;
+ 
+        c->regex = ap_pregcomp(r->pool, outstr, regex_flags);
+        if (c->regex == NULL) {
+             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                           "Invalid regular expression \"%s\"", outstr);
+             return ce;
+        }
+    }
+
+    return (const am_cond_t *)c;
+}
 
 /* This function checks if the user has access according
  * to the MellonRequire and MellonCond directives.
@@ -65,12 +262,13 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
     am_dir_cfg_rec *dir_cfg;
     int i, j;
     int skip_or = 0;
+    const apr_array_header_t *backrefs = NULL;
 
     dir_cfg = am_get_dir_cfg(r);
 
     /* Iterate over all cond-directives */
     for (i = 0; i < dir_cfg->cond->nelts; i++) {
-        am_cond_t *ce;
+        const am_cond_t *ce;
         const char *value = NULL;
         int match = 0;
 
@@ -124,16 +322,42 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
 
             value = session->env[j].value;
 
+            /*
+             * Substiture backrefs if available
+             */
+            if ((ce->flags & AM_COND_FLAG_FSTR) && (backrefs != NULL))
+                ce = am_cond_substitue(r, ce, backrefs);
+
             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
                           "Evaluate %s vs \"%s\"", 
                           ce->directive, value);
     
             if (value == NULL) {
                  match = 0;          /* can not happen */
+
+            } else if (ce->flags & (AM_COND_FLAG_REG|AM_COND_FLAG_REF)) {
+                 int nsub = ce->regex->re_nsub + 1;
+                 ap_regmatch_t *regmatch;
+
+                 regmatch = (ap_regmatch_t *)apr_palloc(r->pool, 
+                            nsub * sizeof(*regmatch));
+
+                 match = !ap_regexec(ce->regex, value, nsub, regmatch, 0);
+                 if (match)
+                     backrefs = am_cond_backrefs(r, ce, value, regmatch);
+
             } else if (ce->flags & AM_COND_FLAG_REG) {
                  match = !ap_regexec(ce->regex, value, 0, NULL, 0);
+
+            } else if (ce->flags & (AM_COND_FLAG_SUB|AM_COND_FLAG_NC)) {
+                 match = (strcasestr(ce->str, value) != NULL);
+
+            } else if (ce->flags & AM_COND_FLAG_SUB) {
+                 match = (strstr(ce->str, value) != NULL);
+
             } else if (ce->flags & AM_COND_FLAG_NC) {
                  match = !strcasecmp(ce->str, value);
+
             } else {
                  match = !strcmp(ce->str, value);
             }

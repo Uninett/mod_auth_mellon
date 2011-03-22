@@ -236,6 +236,24 @@ MellonPostCount 100
         # compatibility). The syntax is
         # 'MellonCond <attribute name> <value> [<options>]'
         #
+        # <value> is an attribute value to match. Unlike with MellonRequire, 
+        # multiples values are not allowed.
+        #
+        # If the [REG] flag is specified (see below), <value> is a regular 
+        # expression. The syntax for backslash escape is the same as in
+        # Apache's <LocationMatch>'s directives. 
+        #
+        # Format strings are substituted into <value> prior evaluation. 
+        # Here are the supported syntaxes:
+        #    %n       With n being a digit between 0 and 9. If [REG,REF] 
+        #             flags (see below) were used in an earlier matching 
+        #             MellonCond, then regular expression back references
+        #             are substituted.
+        #    %{num}   Same as %n, with num being a number that may be 
+        #             greater than 9.
+        #    %{ENV:x} Substitute Apache environement variable x.
+        #    %%       Escape substitution to get a litteral %.
+        #
         # <options> is an optional, comma-separated list of option
         # encloseed with brackets. Here is an example: [NOT,NC]
         # The valid options are:
@@ -244,11 +262,16 @@ MellonPostCount 100
         #        then the overall check succeeds.
         #    NOT This MellonCond evaluates to true if the attribute 
         #        does not match the value.
+        #    SUB Substring match, evaluates to true if value is
+        #        included in attribute.
         #    REG Value to check is a regular expression.
-        #    NC  Perform case insensitive match.
+        #    NC  Perform case insensitive match. 
         #    MAP Attempt to search an attribute with name remapped by
         #        MellonSetEnv. Fallback to non remapped name if not
         #        found.
+        #    REF Used with REG, track regular expression back references,
+        #        So that they can be substituted in an upcoming 
+        #        MellonCond directive.
         #        
         # It is allowed to have multiple MellonCond on the same 
         # attribute, and to mix MellonCond and MellonRequire. 
