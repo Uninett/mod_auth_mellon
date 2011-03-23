@@ -9,6 +9,9 @@ Version 0.3.1
 * New MellonCond directive to enable attribute filtering beyond
   MellonRequire functionalities. 
 
+* New MellonIdPMetadataGlob directive to load mulitple IdP metadata
+  using a glob(3) pattern.
+
 Version 0.3.0
 ---------------------------------------------------------------------------
 

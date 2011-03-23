@@ -838,6 +838,31 @@ char *am_generate_session_id(request_rec *r)
     return ret;
 }
 
+/* This returns the directroy part of a path, a la dirname(3)
+ *
+ * Parameters:
+ *  apr_pool_t p         Pool to allocate memory from
+ *  const char *path     Path to extract directory from
+ *
+ * Returns:
+ *  The directory part of path
+ */
+const char *am_filepath_dirname(apr_pool_t *p, const char *path) 
+{
+    char *cp;
+
+    /*
+     * Try Unix and then Windows style. Borrowed from
+     * apr_match_glob(), it seems it cannot be made more
+     * portable.
+     */
+    if (((cp = strrchr(path, (int)'/')) == NULL) &&
+        ((cp = strrchr(path, (int)'\\')) == NULL))
+            return ".";
+   
+    return apr_pstrndup(p, path, cp - path);
+}
+
 /*
  * malloc a buffer and fill it with a given file
  *

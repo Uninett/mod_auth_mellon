@@ -349,6 +349,11 @@ MellonPostCount 100
         # Default: None set.
 	MellonIdPMetadataFile /etc/apache2/mellon/idp-metadata.xml
 
+        # MellonIdPMetadataGlob is a glob(3) pattern enabled  alternative 
+        # to MellonIdPMetadataFile.
+        # Default: None set.
+	#MellonIdPMetadataGlob /etc/apache2/mellon/*-metadata.xml
+
         # MellonIdpPublicKeyFile is the full path of the public key of the
         # IdP. This parameter is optional if the public key is embedded
         # in the IdP's metadata file, or if a certificate authority is

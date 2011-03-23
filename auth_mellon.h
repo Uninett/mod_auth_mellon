@@ -52,6 +52,7 @@
 #include "apr_file_io.h"
 #include "apr_xml.h"
 #include "apr_lib.h"
+#include "apr_fnmatch.h"
 
 #include "ap_config.h"
 #include "httpd.h"
@@ -296,6 +297,7 @@ char *am_get_endpoint_url(request_rec *r);
 int am_postdir_cleanup(request_rec *s);
 char *am_htmlencode(request_rec *r, const char *str);
 int am_save_post(request_rec *r, const char **relay_state);
+const char *am_filepath_dirname(apr_pool_t *p, const char *path);
 const char *am_strip_cr(request_rec *r, const char *str);
 const char *am_add_cr(request_rec *r, const char *str);
 const char *am_xstrtok(request_rec *r, const char *str, 

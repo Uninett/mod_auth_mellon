@@ -222,6 +222,54 @@ static const char *am_get_provider_id(apr_pool_t *p,
     return NULL;
 }
 
+/* This function handles configuration directives which use
+ * a glob pattern
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *  const char *arg      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_glob_fn(cmd_parms *cmd,
+                                  void *struct_ptr,
+                                  const char *arg)
+{
+    const char *(*take_argv)(cmd_parms *, void *, const char *);
+    apr_array_header_t *files;
+    const char *error;
+    const char *directory;
+    int i;
+
+    take_argv = cmd->info;
+    directory = am_filepath_dirname(cmd->pool, arg);
+
+    if (arg == NULL || *arg == '\0')
+        return apr_psprintf(cmd->pool, "%s takes one argument", cmd->cmd->name);
+
+    if (apr_match_glob(arg, &files, cmd->pool) != 0)
+        return take_argv(cmd, struct_ptr, arg);
+    
+    for (i = 0; i < files->nelts; i++) {
+        const char *path;
+
+        path = apr_pstrcat(cmd->pool, directory, "/", 
+                           ((const char **)(files->elts))[i], NULL); 
+                           
+        error = take_argv(cmd, struct_ptr, path);
+
+        if (error != NULL)
+            return error;
+    }
+   
+    return NULL;
+}
+
 /* This function handles configuration directives which set an 
  * idp related slot in the module configuration. 
  *
@@ -870,6 +918,13 @@ const command_rec auth_mellon_commands[] = {
         NULL,
         OR_AUTHCFG,
         "Full path to xml metadata file for the IdP."
+        ),
+    AP_INIT_TAKE1(
+        "MellonIdPMetadataGlob",
+        am_set_glob_fn,
+        am_set_idp_string_slot,
+        OR_AUTHCFG,
+        "Full path to xml metadata files for the IdP, with glob(3) patterns."
         ),
     AP_INIT_TAKE1(
         "MellonIdPPublicKeyFile",
