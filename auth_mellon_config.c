@@ -1006,6 +1006,27 @@ const command_rec auth_mellon_commands[] = {
 };
 
 
+/* Release a lasso_server object associated with this configuration.
+ *
+ * Parameters:
+ *  void *data           The pointer to the configuration data.
+ *
+ * Returns:
+ *  Always APR_SUCCESS.
+ */
+static apr_status_t auth_mellon_free_server(void *data)
+{
+    am_dir_cfg_rec *dir = data;
+
+    if (dir->server != NULL) {
+        lasso_server_destroy(dir->server);
+        dir->server = NULL;
+    }
+
+    return APR_SUCCESS;
+}
+
+
 /* This function creates and initializes a directory configuration
  * object for auth_mellon.
  *
@@ -1019,6 +1040,9 @@ const command_rec auth_mellon_commands[] = {
 void *auth_mellon_dir_config(apr_pool_t *p, char *d)
 {
     am_dir_cfg_rec *dir = apr_palloc(p, sizeof(*dir));
+
+    apr_pool_cleanup_register(p, dir, auth_mellon_free_server,
+                              auth_mellon_free_server);
 
     dir->enable_mellon = am_enable_default;
 
@@ -1080,6 +1104,9 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     am_dir_cfg_rec *new_cfg;
 
     new_cfg = (am_dir_cfg_rec *)apr_palloc(p, sizeof(*new_cfg));
+
+    apr_pool_cleanup_register(p, new_cfg, auth_mellon_free_server,
+                              auth_mellon_free_server);
 
 
     new_cfg->enable_mellon = (add_cfg->enable_mellon != am_enable_default ?
