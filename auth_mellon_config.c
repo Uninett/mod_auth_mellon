@@ -817,6 +817,22 @@ const command_rec auth_mellon_commands[] = {
         " secure flags set. Default is off."
         ),
     AP_INIT_TAKE1(
+        "MellonCookieDomain",
+        ap_set_string_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, cookie_domain),
+        OR_AUTHCFG,
+        "The domain of the cookie which auth_mellon will set. Defaults to"
+        " the domain of the current request."
+        ),
+    AP_INIT_TAKE1(
+        "MellonCookiePath",
+        ap_set_string_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, cookie_path),
+        OR_AUTHCFG,
+        "The path of the cookie which auth_mellon will set. Defaults to"
+        " '/'."
+        ),
+    AP_INIT_TAKE1(
         "MellonUser",
         ap_set_string_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, userattr),
@@ -1051,6 +1067,8 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->varname = default_cookie_name;
     dir->secure = default_secure_cookie;
     dir->cond = apr_array_make(p, 0, sizeof(am_cond_t));
+    dir->cookie_domain = NULL;
+    dir->cookie_path = NULL;
     dir->envattr   = apr_hash_make(p);
     dir->userattr  = default_user_attribute;
     dir->idpattr  = NULL;
@@ -1123,11 +1141,18 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                         add_cfg->varname :
                         base_cfg->varname);
 
-    
+
     new_cfg->secure = (add_cfg->secure != default_secure_cookie ?
                         add_cfg->secure :
                         base_cfg->secure);
 
+    new_cfg->cookie_domain = (add_cfg->cookie_domain != NULL ?
+                        add_cfg->cookie_domain :
+                        base_cfg->cookie_domain);
+
+    new_cfg->cookie_path = (add_cfg->cookie_path != NULL ?
+                        add_cfg->cookie_path :
+                        base_cfg->cookie_path);
 
     new_cfg->cond = apr_array_copy(p,
                                    (!apr_is_empty_array(add_cfg->cond)) ?

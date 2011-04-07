@@ -163,6 +163,8 @@ typedef struct am_dir_cfg_rec {
 
     const char *varname;
     int secure;
+    const char *cookie_domain;
+    const char *cookie_path;
     apr_array_header_t *cond;
     apr_hash_t *envattr;
     const char *userattr;

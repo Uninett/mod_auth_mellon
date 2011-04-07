@@ -186,6 +186,17 @@ MellonPostCount 100
         # Default: Off
         MellonSecureCookie On
 
+        # MellonCookieDomain allows to specify of the cookie which auth_mellon
+        # will set.
+        # Default: the domain for the received request (the Host: header if
+        # present, of the ServerName of the VirtualHost declaration, or if
+        # absent a reverse resolution on the local IP)
+        # MellonCookieDomain example.com
+
+        # MellonCookiePath is the path of the cookie which auth_mellon will set.
+        # Default: /
+        MellonCookiePath /
+
         # MellonUser selects which attribute we should use for the username.
         # The username is passed on to other apache modules and to the web
         # page the user visits. NAME_ID is an attribute which we set to
