@@ -753,41 +753,44 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
     }
 
 
-    /* We need to set the SessionIndex in the LogoutRequest to the
-     * SessionIndex we received during the login operation.
-     */
-
     profile = LASSO_PROFILE(logout);
-    session = lasso_profile_get_session(profile);
 
-    /* We currently only look at the first assertion in the list
-     * lasso_session_get_assertions returns.
+    /* We need to set the SessionIndex in the LogoutRequest to the SessionIndex
+     * we received during the login operation. This is not needed since release
+     * 2.3.0.
      */
-    assertion_list = lasso_session_get_assertions(
-        session, profile->remote_providerID);
-    if(! assertion_list || LASSO_IS_SAML2_ASSERTION(assertion_list->data) == FALSE) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "No assertions found for the current session.");
-        lasso_logout_destroy(logout);
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
-    assertion_n = assertion_list->data;
+    if (lasso_check_version(2, 3, 0, LASSO_CHECK_VERSION_NUMERIC) == 0) {
+        session = lasso_profile_get_session(profile);
+        assertion_list = lasso_session_get_assertions(
+            session, profile->remote_providerID);
+        if(! assertion_list ||
+                        LASSO_IS_SAML2_ASSERTION(assertion_list->data) == FALSE) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "No assertions found for the current session.");
+            lasso_logout_destroy(logout);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+        /* We currently only look at the first assertion in the list
+         * lasso_session_get_assertions returns.
+         */
+        assertion_n = assertion_list->data;
 
-    assertion = LASSO_SAML2_ASSERTION(assertion_n);
+        assertion = LASSO_SAML2_ASSERTION(assertion_n);
 
-    /* We assume that the first authnStatement contains the data we want. */
-    authnStatement = LASSO_SAML2_AUTHN_STATEMENT(assertion->AuthnStatement->data);
+        /* We assume that the first authnStatement contains the data we want. */
+        authnStatement = LASSO_SAML2_AUTHN_STATEMENT(assertion->AuthnStatement->data);
 
-    if(!authnStatement) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "No AuthnStatement found in the current assertion.");
-        lasso_logout_destroy(logout);
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
+        if(!authnStatement) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "No AuthnStatement found in the current assertion.");
+            lasso_logout_destroy(logout);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
 
-    if(authnStatement->SessionIndex) {
-        request = LASSO_SAMLP2_LOGOUT_REQUEST(profile->request);
-        request->SessionIndex = g_strdup(authnStatement->SessionIndex);
+        if(authnStatement->SessionIndex) {
+            request = LASSO_SAMLP2_LOGOUT_REQUEST(profile->request);
+            request->SessionIndex = g_strdup(authnStatement->SessionIndex);
+        }
     }
 
 
