@@ -344,14 +344,17 @@ static const char *am_first_idp(request_rec *r)
  */
 static const char *am_get_idp(request_rec *r)
 {
-    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    LassoServer *server;
     const char *idp_provider_id;
-    const char *idp_metadata_file;
+
+    server = am_get_lasso_server(r);
+    if (server == NULL)
+        return NULL;
 
     /*
      * If we have a single IdP, return that one.
      */
-    if (apr_hash_count(cfg->idp_metadata_files) == 1)
+    if (g_hash_table_size(server->providers) == 1)
         return am_first_idp(r);
 
     /*
@@ -367,10 +370,7 @@ static const char *am_get_idp(request_rec *r)
                           "Could not urldecode IdP discovery value.");
             idp_provider_id = NULL;
         } else {
-            idp_metadata_file = apr_hash_get(cfg->idp_metadata_files,
-                                             idp_provider_id,
-                                             APR_HASH_KEY_STRING);
-            if (idp_metadata_file == NULL)
+            if (g_hash_table_lookup(server->providers, idp_provider_id) == NULL)
                 idp_provider_id = NULL;
         }
 
@@ -2641,7 +2641,6 @@ static int am_handle_probe_discovery(request_rec *r) {
 
             if (value == NULL) {
                 /* idp not in list, try the next one */
-                idp = NULL;
                 continue;
             } else {
                 /* idp in list, use the value as the ping url */
