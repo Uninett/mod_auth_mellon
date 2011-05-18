@@ -206,14 +206,14 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
  * This function loads all IdP metadata in a lasso server
  *
  * Parameters:
+ *  am_dir_cfg_rec *cfg  The server configuration.
  *  request_rec *r       The request we received.
  *
  * Returns:
  *  number of loaded providers
  */
-static guint am_server_add_providers(request_rec *r)
+static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
 {
-    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     const char *idp_public_key_file;
     apr_size_t index;
 
@@ -276,6 +276,8 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 {
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
 
+    cfg = cfg->inherit_server_from;
+
     apr_thread_mutex_lock(cfg->server_mutex);
     if(cfg->server == NULL) {
         if(cfg->sp_metadata_file == NULL) {
@@ -308,7 +310,7 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 	    return NULL;
 	}
 
-        if (am_server_add_providers(r) == 0) {
+        if (am_server_add_providers(cfg, r) == 0) {
 	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
 			  "Error adding IdP to lasso server object. Please"
 			  " verify the following configuration directives:"
@@ -2264,6 +2266,8 @@ static int am_handle_metadata(request_rec *r)
     server = am_get_lasso_server(r);
     if(server == NULL)
         return HTTP_INTERNAL_SERVER_ERROR;
+
+    cfg = cfg->inherit_server_from;
 
     data = cfg->sp_metadata_file;
     if (data == NULL)

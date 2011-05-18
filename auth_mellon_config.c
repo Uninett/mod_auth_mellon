@@ -19,6 +19,7 @@
  *
  */
 
+#include <stdbool.h>
 
 #include "auth_mellon.h"
 
@@ -1104,10 +1105,43 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->sp_org_url = apr_hash_make(p);
 
     apr_thread_mutex_create(&dir->server_mutex, APR_THREAD_MUTEX_DEFAULT, p);
-
+    dir->inherit_server_from = dir;
     dir->server = NULL;
 
     return dir;
+}
+
+
+/* Determine whether this configuration changes anything relevant to the
+ * lasso_server configuration.
+ *
+ * Parameters:
+ *  am_dir_cfg_rec *add_cfg   The new configuration.
+ *
+ * Returns:
+ *  true if we can inherit the lasso_server object, false if not.
+ */
+static bool cfg_can_inherit_lasso_server(const am_dir_cfg_rec *add_cfg)
+{
+    if (add_cfg->endpoint_path != default_endpoint_path)
+        return false;
+
+    if (add_cfg->sp_metadata_file != NULL
+        || add_cfg->sp_private_key_file != NULL
+        || add_cfg->sp_cert_file != NULL)
+        return false;
+    if (add_cfg->idp_metadata->nelts > 0
+        || add_cfg->idp_public_key_file != NULL
+        || add_cfg->idp_ca_file != NULL
+        || add_cfg->idp_ignore != NULL)
+        return false;
+
+    if (apr_hash_count(add_cfg->sp_org_name) > 0
+        || apr_hash_count(add_cfg->sp_org_display_name) > 0
+        || apr_hash_count(add_cfg->sp_org_url) > 0)
+        return false;
+
+    return true;
 }
 
 
@@ -1264,8 +1298,14 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                        add_cfg->probe_discovery_idp : 
                        base_cfg->probe_discovery_idp);
 
-    apr_thread_mutex_create(&new_cfg->server_mutex,
-                            APR_THREAD_MUTEX_DEFAULT, p);
+
+    if (cfg_can_inherit_lasso_server(add_cfg)) {
+        new_cfg->inherit_server_from = base_cfg->inherit_server_from;
+    } else {
+        apr_thread_mutex_create(&new_cfg->server_mutex,
+                                APR_THREAD_MUTEX_DEFAULT, p);
+        new_cfg->inherit_server_from = new_cfg;
+    }
     new_cfg->server = NULL;
 
     return new_cfg;
