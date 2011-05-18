@@ -162,66 +162,6 @@ static const char *am_set_filestring_slot(cmd_parms *cmd,
 }
 
 
-/* This function extracts an IdP ProviderID from metadata
- *
- * Parameters:
- *  apr_pool_t *p        Pool to allocate temporary items from.
- *  server_rec *s        The server.
- *  const char *file     File containing metadata.
- *  const char **provider      The providerID
- *
- * Returns:
- *  NULL on success or an error string on failure.
- *  
- */
-static const char *am_get_provider_id(apr_pool_t *p,
-                                      server_rec *s,
-                                      const char *file,
-                                      const char **provider)
-{
-    char *data;
-    apr_xml_parser *xp;
-    apr_xml_doc *xd;
-    apr_xml_attr *xa;
-    char error[1024];
-
-    *provider = NULL;
-
-    /*
-     *  Get the data
-     */
-    if ((data = am_getfile(p, s, file)) == NULL)
-        return apr_psprintf(p, "Cannot read file %s", file);
-
-    /* 
-     * Parse 
-     */
-    xp = apr_xml_parser_create(p);
-    if (apr_xml_parser_feed(xp, data, strlen(data)) != 0)
-        return apr_psprintf(p, "Cannot parse %s: %s", file, 
-                            apr_xml_parser_geterror(xp, error, sizeof(error)));
-
-    if (apr_xml_parser_done(xp, &xd) != 0)
-        return apr_psprintf(p, "Parse error %s: %s", file, 
-                            apr_xml_parser_geterror(xp, error, sizeof(error)));
-
-    /*
-     * Extract /EntityDescriptor@EntityID
-     */
-    if (strcasecmp(xd->root->name, "EntityDescriptor") != 0)
-        return apr_psprintf(p, "<EntityDescriptor> is not root in %s", file);
-
-    for (xa = xd->root->attr; xa; xa = xa->next) 
-        if (strcasecmp(xa->name, "entityID") == 0)
-            break;	
-
-    if (xa  == NULL)
-        return apr_psprintf(p, "entityID not found in %s", file);
-
-    *provider = xa->value;
-    return NULL;
-}
-
 /* This function handles configuration directives which use
  * a glob pattern
  *
