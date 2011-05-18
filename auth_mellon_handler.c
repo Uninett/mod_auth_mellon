@@ -211,13 +211,12 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
  * Returns:
  *  number of loaded providers
  */
-static int am_server_add_providers(request_rec *r)
+static guint am_server_add_providers(request_rec *r)
 {
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     const char *idp_metadata_file;
     const char *idp_public_key_file;
     apr_size_t index;
-    int count = 0;
 
     if (cfg->idp_metadata_files->nelts == 1)
         idp_public_key_file = cfg->idp_public_key_file;
@@ -237,12 +236,10 @@ static int am_server_add_providers(request_rec *r)
 	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "Error adding IdP from \"%s\" to lasso server object.",
                           idp_metadata_file);
-        } else {
-            count++;
         }
     }
 
-    return count;
+    return g_hash_table_size(cfg->server->providers);
 }
 
 static LassoServer *am_get_lasso_server(request_rec *r)
