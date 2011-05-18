@@ -1,4 +1,4 @@
-Version 0.3.1
+Version 0.4.0
 ---------------------------------------------------------------------------
 
 * Allow MellonUser variable to be translated through MellonSetEnv
@@ -11,6 +11,15 @@ Version 0.3.1
 
 * New MellonIdPMetadataGlob directive to load mulitple IdP metadata
   using a glob(3) pattern.
+
+* Support for running behind reverse proxy.
+
+* MellonCookieDomain and MellonCookiePath options to configure cookie
+  settings.
+
+* Support for loading federation metadata files.
+
+* Several bugfixes.
 
 Version 0.3.0
 ---------------------------------------------------------------------------
