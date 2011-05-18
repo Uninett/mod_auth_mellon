@@ -214,33 +214,63 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
 static guint am_server_add_providers(request_rec *r)
 {
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
-    const char *idp_metadata_file;
     const char *idp_public_key_file;
     apr_size_t index;
 
-    if (cfg->idp_metadata_files->nelts == 1)
+    if (cfg->idp_metadata->nelts == 1)
         idp_public_key_file = cfg->idp_public_key_file;
     else
         idp_public_key_file = NULL;
 
-    for (index = 0; index < cfg->idp_metadata_files->nelts; index++) {
-        int ret;
-        idp_metadata_file = APR_ARRAY_IDX(cfg->idp_metadata_files, index,
-                                          const char *);
+    for (index = 0; index < cfg->idp_metadata->nelts; index++) {
+        const am_metadata_t *idp_metadata;
+        int error;
+#ifdef HAVE_lasso_server_load_metadata
+        GList *loaded_idp = NULL;
+#endif /* HAVE_lasso_server_load_metadata */
 
-	ret = lasso_server_add_provider(cfg->server, LASSO_PROVIDER_ROLE_IDP,
-					idp_metadata_file,
-					idp_public_key_file,
-					cfg->idp_ca_file);
-	if (ret != 0) {
-	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                          "Error adding IdP from \"%s\" to lasso server object.",
-                          idp_metadata_file);
+        idp_metadata = &APR_ARRAY_IDX(cfg->idp_metadata, index, const am_metadata_t);
+
+#ifdef HAVE_lasso_server_load_metadata
+        error = lasso_server_load_metadata(cfg->server,
+                                           LASSO_PROVIDER_ROLE_IDP,
+                                           idp_metadata->file,
+                                           idp_metadata->chain,
+                                           cfg->idp_ignore,
+                                           &loaded_idp,
+                                           LASSO_SERVER_LOAD_METADATA_FLAG_DEFAULT);
+        if (error == 0) {
+            GList *idx;
+
+            for (idx = loaded_idp; idx != NULL; idx = idx->next) {
+                 ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                               "loaded IdP \"%s\" from \"%s\".",
+                               (char *)idx->data, idp_metadata->file);
+            }
+        }
+
+        if (loaded_idp != NULL)
+            g_free(loaded_idp);
+
+#else /* HAVE_lasso_server_load_metadata */
+        error = lasso_server_add_provider(cfg->server,
+                                          LASSO_PROVIDER_ROLE_IDP,
+                                          idp_metadata->file,
+                                          idp_public_key_file,
+                                          cfg->idp_ca_file);
+#endif /* HAVE_lasso_server_load_metadata */
+
+        if (error != 0) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Error adding metadata \"%s\" to "
+                          "lasso server objects: %s.",
+                          idp_metadata->file, lasso_strerror(error));
         }
     }
 
     return g_hash_table_size(cfg->server->providers);
 }
+
 
 static LassoServer *am_get_lasso_server(request_rec *r)
 {

@@ -151,6 +151,11 @@ typedef struct {
     const char *directive;
 } am_cond_t;
 
+typedef struct am_metadata {
+    const char *file;    /* Metadata file with one or many IdP */
+    const char *chain;   /* Validating chain */
+} am_metadata_t;
+
 typedef struct am_dir_cfg_rec {
     /* enable_mellon is used to enable auth_mellon for a location.
      */
@@ -183,9 +188,10 @@ typedef struct am_dir_cfg_rec {
     const char *sp_metadata_file;
     const char *sp_private_key_file;
     const char *sp_cert_file;
-    apr_array_header_t *idp_metadata_files;
+    apr_array_header_t *idp_metadata;
     const char *idp_public_key_file;
     const char *idp_ca_file;
+    GList *idp_ignore;
 
     /* metadata autogeneration helper */
     apr_hash_t *sp_org_name;

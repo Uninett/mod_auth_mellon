@@ -357,11 +357,20 @@ MellonPostCount 100
         # metadata for the IdP you are authenticating against. This
         # directive is required. Mutliple IdP metadata can be configured
         # by using multiple MellonIdPMetadataFile directives.
+        #
+        # If your lasso library is recent enough (higher than 2.3.5),
+        # then MellonIdPMetadataFile will accept an XML file containing
+        # descriptors for multiple IdP. An optional validating chain can
+        # be supplied as a second argument to MellonIdPMetadataFile. If
+        # ommitted, no metadata validation will take place.
+        #
         # Default: None set.
 	MellonIdPMetadataFile /etc/apache2/mellon/idp-metadata.xml
 
         # MellonIdPMetadataGlob is a glob(3) pattern enabled  alternative 
-        # to MellonIdPMetadataFile.
+        # to MellonIdPMetadataFile. Like MellonIdPMetadataFile it will
+        # accept an optional validating chain if lasso is recent enough.
+        #
         # Default: None set.
 	#MellonIdPMetadataGlob /etc/apache2/mellon/*-metadata.xml
 
@@ -377,6 +386,13 @@ MellonPostCount 100
         # certificate for the IdP.
         # Default: None set.
         MellonIdPCAFile /etc/apache2/mellon/ca.pem
+
+        # MellonIdPIgnore lists IdP entityId that should not loaded
+        # from XML federation metadata files. This is usefull if an
+        # IdP cause bugs. Multiple entityId may be specified through
+        # single MellonIdPIgnore, and multiple MellonIdPIgnore are allowed.
+        # Default: None set.
+        #MellonIdPIgnore "https://bug.example.net/saml/idp"
 
         # MellonDiscoveryURL is the URL for IdP discovery service. 
         # This is used for selecting among multiple configured IdP.

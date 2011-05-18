@@ -163,37 +163,41 @@ static const char *am_set_filestring_slot(cmd_parms *cmd,
 
 
 /* This function handles configuration directives which use
- * a glob pattern
+ * a glob pattern, with a second optional argument
  *
  * Parameters:
  *  cmd_parms *cmd       The command structure for this configuration
  *                       directive.
  *  void *struct_ptr     Pointer to the current directory configuration.
  *                       NULL if we are not in a directory configuration.
- *  const char *arg      The string argument following this configuration
- *                       directive in the configuraion file.
+ *  const char *glob_pat glob(3) pattern
+ *  const char *option   Optional argument
  *
  * Returns:
  *  NULL on success or an error string on failure.
  */
-static const char *am_set_glob_fn(cmd_parms *cmd,
-                                  void *struct_ptr,
-                                  const char *arg)
+static const char *am_set_glob_fn12(cmd_parms *cmd,
+                                    void *struct_ptr,
+                                    const char *glob_pat,
+                                    const char *option)
 {
-    const char *(*take_argv)(cmd_parms *, void *, const char *);
+    const char *(*take_argv)(cmd_parms *, void *, const char *, const char *);
     apr_array_header_t *files;
     const char *error;
     const char *directory;
     int i;
 
     take_argv = cmd->info;
-    directory = am_filepath_dirname(cmd->pool, arg);
 
-    if (arg == NULL || *arg == '\0')
-        return apr_psprintf(cmd->pool, "%s takes one argument", cmd->cmd->name);
+    directory = am_filepath_dirname(cmd->pool, glob_pat);
 
-    if (apr_match_glob(arg, &files, cmd->pool) != 0)
-        return take_argv(cmd, struct_ptr, arg);
+    if (glob_pat == NULL || *glob_pat == '\0')
+        return apr_psprintf(cmd->pool,
+                            "%s takes one or two arguments",
+                            cmd->cmd->name);
+
+    if (apr_match_glob(glob_pat, &files, cmd->pool) != 0)
+        return take_argv(cmd, struct_ptr, glob_pat, option);
     
     for (i = 0; i < files->nelts; i++) {
         const char *path;
@@ -201,7 +205,7 @@ static const char *am_set_glob_fn(cmd_parms *cmd,
         path = apr_pstrcat(cmd->pool, directory, "/", 
                            ((const char **)(files->elts))[i], NULL); 
                            
-        error = take_argv(cmd, struct_ptr, path);
+        error = take_argv(cmd, struct_ptr, path, option);
 
         if (error != NULL)
             return error;
@@ -218,25 +222,85 @@ static const char *am_set_glob_fn(cmd_parms *cmd,
  *                       directive.
  *  void *struct_ptr     Pointer to the current directory configuration.
  *                       NULL if we are not in a directory configuration.
- *  const char *arg      The string argument following this configuration
- *                       directive in the configuraion file.
+ *  const char *metadata Path to metadata file for one or multiple IdP
+ *  const char *chain    Optional path to validating chain
  *
  * Returns:
  *  NULL on success or an error string on failure.
  */
 static const char *am_set_idp_string_slot(cmd_parms *cmd,
                                           void *struct_ptr,
-                                          const char *arg)
+                                          const char *metadata,
+                                          const char *chain)
 {
     server_rec *s = cmd->server;
     apr_pool_t *pconf = s->process->pconf;
     am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
-    const char **filename_slot;
 
-    filename_slot = apr_array_push(cfg->idp_metadata_files);
-    *filename_slot = apr_pstrdup(pconf, arg);
+#ifndef HAVE_lasso_server_load_metadata
+    if (chain != NULL)
+        return apr_psprintf(cmd->pool, "Cannot specify validating chain "
+                            "for %s since lasso library lacks "
+                            "lasso_server_load_metadata()", cmd->cmd->name);
+#endif /* HAVE_lasso_server_load_metadata */
+
+    am_metadata_t *idp_metadata = apr_array_push(cfg->idp_metadata);
+    idp_metadata->file = apr_pstrdup(pconf, metadata);
+    idp_metadata->chain = apr_pstrdup(pconf, chain);
 
     return NULL;
+}
+
+
+/* This function handles configuration directives which set an
+ * idp federation blacklist slot in the module configuration.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *  int argc             Number of blacklisted providerId.
+ *  char *const argv[]   List of blacklisted providerId.
+ *
+ * Returns:
+ *  NULL on success, or errror string
+ */
+static const char *am_set_idp_ignore_slot(cmd_parms *cmd,
+                                          void *struct_ptr,
+                                          int argc,
+                                          char *const argv[])
+{
+#ifdef HAVE_lasso_server_load_metadata
+    server_rec *s = cmd->server;
+    apr_pool_t *pconf = s->process->pconf;
+    am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
+    GList *new_idp_ignore;
+    int i;
+
+    if (argc < 1)
+        return apr_psprintf(cmd->pool, "%s takes at least one arguments",
+                            cmd->cmd->name);
+
+    for (i = 0; i < argc; i++) {
+        new_idp_ignore = apr_palloc(pconf, sizeof(GList));
+        new_idp_ignore->data = apr_pstrdup(pconf, argv[i]);
+
+        /* Prepend it to the list. */
+        new_idp_ignore->next = cfg->idp_ignore;
+        if (cfg->idp_ignore != NULL)
+            cfg->idp_ignore->prev = new_idp_ignore;
+        cfg->idp_ignore = new_idp_ignore;
+    }
+
+    return NULL;
+
+#else /* HAVE_lasso_server_load_metadata */
+
+    return apr_psprintf(cmd->pool, "Cannot use %s since lasso library lacks "
+                        "lasso_server_load_metadata()", cmd->cmd->name);
+
+#endif /* HAVE_lasso_server_load_metadata */
 }
 
 
@@ -861,19 +925,21 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Full path to pem file with certificate for the SP."
         ),
-    AP_INIT_TAKE1(
+    AP_INIT_TAKE12(
         "MellonIdPMetadataFile",
         am_set_idp_string_slot,
         NULL,
         OR_AUTHCFG,
-        "Full path to xml metadata file for the IdP."
+        "Full path to xml metadata file for IdP, "
+        "with optional validating chain."
         ),
-    AP_INIT_TAKE1(
+    AP_INIT_TAKE12(
         "MellonIdPMetadataGlob",
-        am_set_glob_fn,
+        am_set_glob_fn12,
         am_set_idp_string_slot,
         OR_AUTHCFG,
-        "Full path to xml metadata files for the IdP, with glob(3) patterns."
+        "Full path to xml metadata files for IdP, with glob(3) patterns. "
+        "An optional validating chain can be supplied."
         ),
     AP_INIT_TAKE1(
         "MellonIdPPublicKeyFile",
@@ -888,6 +954,13 @@ const command_rec auth_mellon_commands[] = {
         (void *)APR_OFFSETOF(am_dir_cfg_rec, idp_ca_file),
         OR_AUTHCFG,
         "Full path to pem file with CA chain for the IdP."
+        ),
+    AP_INIT_TAKE_ARGV(
+        "MellonIdPIgnore",
+        am_set_idp_ignore_slot,
+        NULL,
+        OR_AUTHCFG,
+        "List of IdP entityId to ignore."
         ),
     AP_INIT_TAKE12(
         "MellonOrganizationName",
@@ -1017,9 +1090,10 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->sp_metadata_file = NULL;
     dir->sp_private_key_file = NULL;
     dir->sp_cert_file = NULL;
-    dir->idp_metadata_files = apr_array_make(p, 0, sizeof(const char *));
+    dir->idp_metadata = apr_array_make(p, 0, sizeof(am_metadata_t));
     dir->idp_public_key_file = NULL;
     dir->idp_ca_file = NULL;
+    dir->idp_ignore = NULL;
     dir->login_path = default_login_path;
     dir->discovery_url = NULL;
     dir->probe_discovery_timeout = -1; /* -1 means no probe discovery */
@@ -1141,9 +1215,9 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                              add_cfg->sp_cert_file :
                              base_cfg->sp_cert_file);
 
-    new_cfg->idp_metadata_files = (add_cfg->idp_metadata_files->nelts > 0 ?
-                                   add_cfg->idp_metadata_files :
-                                   base_cfg->idp_metadata_files);
+    new_cfg->idp_metadata = (add_cfg->idp_metadata->nelts ?
+                             add_cfg->idp_metadata :
+                             base_cfg->idp_metadata);
 
     new_cfg->idp_public_key_file = (add_cfg->idp_public_key_file ?
                                     add_cfg->idp_public_key_file :
@@ -1152,6 +1226,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->idp_ca_file = (add_cfg->idp_ca_file ?
                             add_cfg->idp_ca_file :
                             base_cfg->idp_ca_file);
+
+    new_cfg->idp_ignore = add_cfg->idp_ignore != NULL ?
+                          add_cfg->idp_ignore :
+                          base_cfg->idp_ignore;
 
     new_cfg->sp_org_name = apr_hash_copy(p,
                           (apr_hash_count(add_cfg->sp_org_name) > 0) ?
