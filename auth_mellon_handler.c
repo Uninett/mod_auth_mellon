@@ -229,7 +229,7 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
         GList *loaded_idp = NULL;
 #endif /* HAVE_lasso_server_load_metadata */
 
-        idp_metadata = &APR_ARRAY_IDX(cfg->idp_metadata, index, const am_metadata_t);
+        idp_metadata = &( ((const am_metadata_t*)cfg->idp_metadata->elts) [index] );
 
 #ifdef HAVE_lasso_server_load_metadata
         error = lasso_server_load_metadata(cfg->server,
