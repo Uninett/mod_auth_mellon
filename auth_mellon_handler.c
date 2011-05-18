@@ -2558,13 +2558,19 @@ static int am_handle_login(request_rec *r)
  */
 static int am_handle_probe_discovery(request_rec *r) {
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    LassoServer *server;
     const char *idp = NULL;
     int timeout;
-    apr_hash_index_t *index;
+    GHashTableIter iter;
     char *return_to;
     char *idp_param;
     char *redirect_url;
     int ret;
+
+    server = am_get_lasso_server(r);
+    if(server == NULL) {
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
 
     /*
      * If built-in IdP discovery is not configured, return error.
@@ -2618,17 +2624,13 @@ static int am_handle_probe_discovery(request_rec *r) {
      * The first to answer is chosen, but the list of usable
      * IdP can be restricted in configuration.
      */
-    for (index = apr_hash_first(r->pool, cfg->idp_metadata_files);
-         index;
-         index = apr_hash_next(index)) {
+    g_hash_table_iter_init(&iter, server->providers);
+    while (g_hash_table_iter_next(&iter, (void**)&idp, NULL)) {
         void *dontcare;
         const char *ping_url;
         apr_size_t len;
-        apr_ssize_t slen;
         long status;
- 
-        apr_hash_this(index, (const void **)&idp, 
-                      &slen, (void *)&dontcare);
+
         ping_url = idp;
 
         /*
