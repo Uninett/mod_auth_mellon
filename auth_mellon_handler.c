@@ -216,33 +216,27 @@ static int am_server_add_providers(request_rec *r)
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     const char *idp_metadata_file;
     const char *idp_public_key_file;
-    apr_hash_index_t *index;
+    apr_size_t index;
     int count = 0;
 
-    if (apr_hash_count(cfg->idp_metadata_files) == 1)
+    if (cfg->idp_metadata_files->nelts == 1)
         idp_public_key_file = cfg->idp_public_key_file;
     else
         idp_public_key_file = NULL;
 
-    for (index = apr_hash_first(r->pool, cfg->idp_metadata_files);
-         index;
-         index = apr_hash_next(index)) {
-        const char *idp_provider_id;
-        apr_ssize_t len;
+    for (index = 0; index < cfg->idp_metadata_files->nelts; index++) {
         int ret;
- 
-        apr_hash_this(index, (const void **)&idp_provider_id, 
-                      &len, (void *)&idp_metadata_file);
+        idp_metadata_file = APR_ARRAY_IDX(cfg->idp_metadata_files, index,
+                                          const char *);
 
-      
 	ret = lasso_server_add_provider(cfg->server, LASSO_PROVIDER_ROLE_IDP,
 					idp_metadata_file,
 					idp_public_key_file,
 					cfg->idp_ca_file);
 	if (ret != 0) {
 	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-			  "Error adding IdP \"%s\" to lasso server object.",
-			  idp_provider_id);
+                          "Error adding IdP from \"%s\" to lasso server object.",
+                          idp_metadata_file);
         } else {
             count++;
         }

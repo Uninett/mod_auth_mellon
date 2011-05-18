@@ -291,17 +291,10 @@ static const char *am_set_idp_string_slot(cmd_parms *cmd,
     server_rec *s = cmd->server;
     apr_pool_t *pconf = s->process->pconf;
     am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
-    const char *error;
-    const char *provider_id;
+    const char **filename_slot;
 
-    if ((error = am_get_provider_id(cmd->pool, s, 
-                                    arg, &provider_id)) != NULL)
-        return apr_psprintf(cmd->pool, "%s - %s", cmd->cmd->name, error);
-
-    apr_hash_set(cfg->idp_metadata_files,
-                 apr_pstrdup(pconf, provider_id),
-                 APR_HASH_KEY_STRING,
-                 apr_pstrdup(pconf, arg));
+    filename_slot = apr_array_push(cfg->idp_metadata_files);
+    *filename_slot = apr_pstrdup(pconf, arg);
 
     return NULL;
 }
@@ -1084,7 +1077,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->sp_metadata_file = NULL;
     dir->sp_private_key_file = NULL;
     dir->sp_cert_file = NULL;
-    dir->idp_metadata_files = apr_hash_make(p);
+    dir->idp_metadata_files = apr_array_make(p, 0, sizeof(const char *));
     dir->idp_public_key_file = NULL;
     dir->idp_ca_file = NULL;
     dir->login_path = default_login_path;
@@ -1208,10 +1201,9 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                              add_cfg->sp_cert_file :
                              base_cfg->sp_cert_file);
 
-    new_cfg->idp_metadata_files = apr_hash_copy(p,
-                         (apr_hash_count(add_cfg->idp_metadata_files) > 0) ?
-                         add_cfg->idp_metadata_files :
-                         base_cfg->idp_metadata_files);
+    new_cfg->idp_metadata_files = (add_cfg->idp_metadata_files->nelts > 0 ?
+                                   add_cfg->idp_metadata_files :
+                                   base_cfg->idp_metadata_files);
 
     new_cfg->idp_public_key_file = (add_cfg->idp_public_key_file ?
                                     add_cfg->idp_public_key_file :
