@@ -201,90 +201,6 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
 }
 #endif /* HAVE_lasso_server_new_from_buffers */
 
-/* This function returns the first configured IdP
- *
- * Parameters: 
- *  request_rec *r       The request we received.
- *
- * Returns:
- *  the providerID, or NULL if an error occured
- */
-static const char *am_first_idp(request_rec *r)
-{
-    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
-    apr_hash_index_t *index;
-    const char *provider_id;
-    apr_ssize_t len;
-    void *idp_metadata_file;
-
-    index = apr_hash_first(r->pool, cfg->idp_metadata_files);
-    if (index == NULL)
-        return NULL;
-
-    apr_hash_this(index, (const void **)&provider_id, 
-                  &len, &idp_metadata_file);
-    return provider_id;
-}
-
-
-/* This function selects an IdP and returns its provider_id
- *
- * Parameters:
- *  request_rec *r       The request we received.
- *
- * Returns:
- *  the provider_id, or NULL if an error occured
- */
-static const char *am_get_idp(request_rec *r)
-{
-    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
-    const char *idp_provider_id;
-    const char *idp_metadata_file;
-    
-    /*
-     * If we have a single IdP, return that one.
-     */
-    if (apr_hash_count(cfg->idp_metadata_files) == 1) 
-        return am_first_idp(r);
-
-    /* 
-     * If IdP discovery handed us an IdP, try to use it.
-     */ 
-    idp_provider_id = am_extract_query_parameter(r->pool, r->args, "IdP");
-    if (idp_provider_id != NULL) {
-        int rc;
-
-        rc = am_urldecode((char *)idp_provider_id);
-        if (rc != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
-                          "Could not urldecode IdP discovery value.");
-            idp_provider_id = NULL;
-        } else {
-            idp_metadata_file = apr_hash_get(cfg->idp_metadata_files, 
-                                             idp_provider_id, 
-                                             APR_HASH_KEY_STRING);
-            if (idp_metadata_file == NULL)
-                idp_provider_id = NULL;
-        }
-
-        /*
-         * If we do not know about it, fall back to default.
-         */
-        if (idp_provider_id == NULL) {
-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                          "IdP discovery returned unknown or inexistant IdP");
-            idp_provider_id = am_first_idp(r);
-        }
-
-        return idp_provider_id;
-    }
-
-    /* 
-     * No IdP answered, use default 
-     * Perhaps we should redirect to an error page instead.
-     */
-    return am_first_idp(r);
-}
 
 /*
  * This function loads all IdP metadata in a lasso server
@@ -389,6 +305,92 @@ static LassoServer *am_get_lasso_server(request_rec *r)
     apr_thread_mutex_unlock(cfg->server_mutex);
 
     return cfg->server;
+}
+
+
+/* This function returns the first configured IdP
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  the providerID, or NULL if an error occured
+ */
+static const char *am_first_idp(request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    apr_hash_index_t *index;
+    const char *provider_id;
+    apr_ssize_t len;
+    void *idp_metadata_file;
+
+    index = apr_hash_first(r->pool, cfg->idp_metadata_files);
+    if (index == NULL)
+        return NULL;
+
+    apr_hash_this(index, (const void **)&provider_id,
+                  &len, &idp_metadata_file);
+    return provider_id;
+}
+
+
+/* This function selects an IdP and returns its provider_id
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  the provider_id, or NULL if an error occured
+ */
+static const char *am_get_idp(request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    const char *idp_provider_id;
+    const char *idp_metadata_file;
+
+    /*
+     * If we have a single IdP, return that one.
+     */
+    if (apr_hash_count(cfg->idp_metadata_files) == 1)
+        return am_first_idp(r);
+
+    /*
+     * If IdP discovery handed us an IdP, try to use it.
+     */
+    idp_provider_id = am_extract_query_parameter(r->pool, r->args, "IdP");
+    if (idp_provider_id != NULL) {
+        int rc;
+
+        rc = am_urldecode((char *)idp_provider_id);
+        if (rc != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+                          "Could not urldecode IdP discovery value.");
+            idp_provider_id = NULL;
+        } else {
+            idp_metadata_file = apr_hash_get(cfg->idp_metadata_files,
+                                             idp_provider_id,
+                                             APR_HASH_KEY_STRING);
+            if (idp_metadata_file == NULL)
+                idp_provider_id = NULL;
+        }
+
+        /*
+         * If we do not know about it, fall back to default.
+         */
+        if (idp_provider_id == NULL) {
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                          "IdP discovery returned unknown or inexistant IdP");
+            idp_provider_id = am_first_idp(r);
+        }
+
+        return idp_provider_id;
+    }
+
+    /*
+     * No IdP answered, use default
+     * Perhaps we should redirect to an error page instead.
+     */
+    return am_first_idp(r);
 }
 
 
