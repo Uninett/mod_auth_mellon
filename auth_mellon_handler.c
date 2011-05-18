@@ -318,19 +318,19 @@ static LassoServer *am_get_lasso_server(request_rec *r)
  */
 static const char *am_first_idp(request_rec *r)
 {
-    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
-    apr_hash_index_t *index;
-    const char *provider_id;
-    apr_ssize_t len;
-    void *idp_metadata_file;
+    LassoServer *server;
+    GHashTableIter iter;
+    const char *idp_providerid;
 
-    index = apr_hash_first(r->pool, cfg->idp_metadata_files);
-    if (index == NULL)
+    server = am_get_lasso_server(r);
+    if (server == NULL)
         return NULL;
 
-    apr_hash_this(index, (const void **)&provider_id,
-                  &len, &idp_metadata_file);
-    return provider_id;
+    g_hash_table_iter_init (&iter, server->providers);
+    if (!g_hash_table_iter_next(&iter, (void**)&idp_providerid, NULL))
+        return NULL;
+
+    return idp_providerid;
 }
 
 
