@@ -62,6 +62,9 @@ PKG_CHECK_MODULES(OPENSSL, openssl)
 AC_SUBST(OPENSSL_CFLAGS)
 AC_SUBST(OPENSSL_LIBS)
 
+# We need at least version 2.14 of GLib.
+PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.14])
+
 
 # Create Makefile from Makefile.in
 AC_CONFIG_FILES([Makefile])
