@@ -342,16 +342,20 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 static const char *am_first_idp(request_rec *r)
 {
     LassoServer *server;
-    GHashTableIter iter;
+    GList *idp_list;
     const char *idp_providerid;
 
     server = am_get_lasso_server(r);
     if (server == NULL)
         return NULL;
 
-    g_hash_table_iter_init (&iter, server->providers);
-    if (!g_hash_table_iter_next(&iter, (void**)&idp_providerid, NULL))
-        return NULL;
+    idp_list = g_hash_table_get_keys(server->providers);
+    if (idp_list == NULL)
+      return NULL;
+
+    idp_providerid = idp_list->data;
+
+    g_list_free(idp_list);
 
     return idp_providerid;
 }
@@ -2586,7 +2590,8 @@ static int am_handle_probe_discovery(request_rec *r) {
     LassoServer *server;
     const char *idp = NULL;
     int timeout;
-    GHashTableIter iter;
+    GList *idp_list;
+    GList *iter;
     char *return_to;
     char *idp_param;
     char *redirect_url;
@@ -2649,13 +2654,14 @@ static int am_handle_probe_discovery(request_rec *r) {
      * The first to answer is chosen, but the list of usable
      * IdP can be restricted in configuration.
      */
-    g_hash_table_iter_init(&iter, server->providers);
-    while (g_hash_table_iter_next(&iter, (void**)&idp, NULL)) {
+    idp_list = g_hash_table_get_keys(server->providers);
+    for (iter = idp_list; iter != NULL; iter = iter->next) {
         void *dontcare;
         const char *ping_url;
         apr_size_t len;
         long status;
 
+        idp = iter->data;
         ping_url = idp;
 
         /*
@@ -2692,6 +2698,7 @@ static int am_handle_probe_discovery(request_rec *r) {
                       "probeDiscovery using %s", idp);
         break;
     }
+    g_list_free(idp_list);
 
     /* 
      * On failure, try default
