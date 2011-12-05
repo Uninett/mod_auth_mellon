@@ -210,7 +210,7 @@ typedef struct am_dir_cfg_rec {
     /* IdP discovery service */
     const char *discovery_url;
     int probe_discovery_timeout;
-    apr_hash_t *probe_discovery_idp;
+    apr_table_t *probe_discovery_idp;
 
     /* The configuration record we "inherit" the lasso server object from. */
     struct am_dir_cfg_rec *inherit_server_from;

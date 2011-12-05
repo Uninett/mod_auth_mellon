@@ -2577,6 +2577,38 @@ static int am_handle_login(request_rec *r)
     return am_send_authn_request(r, idp, return_to, is_passive);
 }
 
+/* This function probes an URL (HTTP GET)
+ *
+ * Parameters:
+ *  request_rec *r       The request.
+ *  const char *url      The URL
+ *  int timeout          Timeout in seconds
+ *
+ * Returns:
+ *  OK on success, or an error if any of the steps fail.
+ */
+static int am_probe_url(request_rec *r, const char *url, int timeout)
+{
+    void *dontcare;
+    apr_size_t len;
+    long status;
+    int error;
+
+    status = 0;
+    if ((error = am_httpclient_get(r, url, &dontcare, &len, 
+                                   timeout, &status)) != OK)
+        return error;
+
+    if (status != HTTP_OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Probe on \"%s\" returned HTTP %ld",
+                      url, status);
+        return status;
+    }
+
+    return OK;
+}
+
 /* This function handles requests to the probe discovery handler
  *
  * Parameters:
@@ -2588,10 +2620,8 @@ static int am_handle_login(request_rec *r)
 static int am_handle_probe_discovery(request_rec *r) {
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     LassoServer *server;
-    const char *idp = NULL;
+    const char *disco_idp = NULL;
     int timeout;
-    GList *idp_list;
-    GList *iter;
     char *return_to;
     char *idp_param;
     char *redirect_url;
@@ -2650,75 +2680,69 @@ static int am_handle_probe_discovery(request_rec *r) {
     /*
      * Proceed with built-in IdP discovery. 
      *
-     * Send probes for all configured IdP to check availability.
-     * The first to answer is chosen, but the list of usable
-     * IdP can be restricted in configuration.
+     * First try sending probes to IdP configured for discovery.
+     * Second send probes for all configured IdP
+     * The first to answer is chosen.
+     * If none answer, use the first configured IdP
      */
-    idp_list = g_hash_table_get_keys(server->providers);
-    for (iter = idp_list; iter != NULL; iter = iter->next) {
-        void *dontcare;
-        const char *ping_url;
-        apr_size_t len;
-        long status;
+    if (!apr_is_empty_table(cfg->probe_discovery_idp)) {
+        const apr_array_header_t *header;
+        apr_table_entry_t *elts;
+        const char *url;
+        const char *idp;
+        int i;
 
-        idp = iter->data;
-        ping_url = idp;
+        header = apr_table_elts(cfg->probe_discovery_idp);
+        elts = (apr_table_entry_t *)header->elts;
 
-        /*
-         * If a list of IdP was given for probe discovery, 
-         * skip any IdP that does not match.
-         */
-        if (apr_hash_count(cfg->probe_discovery_idp) != 0) {
-            char *value = apr_hash_get(cfg->probe_discovery_idp,
-                                       idp, APR_HASH_KEY_STRING);
+        for (i = 0; i < header->nelts; i++) { 
+            idp = elts[i].key;
+            url = elts[i].val;
 
-            if (value == NULL) {
-                /* idp not in list, try the next one */
-                continue;
-            } else {
-                /* idp in list, use the value as the ping url */
-                ping_url = value;
+            if (am_probe_url(r, url, timeout) == OK) {
+                disco_idp = idp;
+                break;
             }
         }
+    } else {
+        GList *iter;
+        GList *idp_list;
+        const char *idp;
 
-        status = 0;
-        if (am_httpclient_get(r, ping_url, &dontcare, &len, 
-                              timeout, &status) != OK)
-            continue;
-
-        if (status != HTTP_OK) {
-	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-			  "Cannot probe %s: \"%s\" returned HTTP %ld",
-			  idp, ping_url, status);
-            continue;
+        idp_list = g_hash_table_get_keys(server->providers);
+        for (iter = idp_list; iter != NULL; iter = iter->next) {
+            idp = iter->data;
+    
+            if (am_probe_url(r, idp, timeout) == OK) {
+                disco_idp = idp;
+                break;
+            }
         }
-
-        /* We got some succes */
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                      "probeDiscovery using %s", idp);
-        break;
+        g_list_free(idp_list);
     }
-    g_list_free(idp_list);
 
     /* 
      * On failure, try default
      */
-    if (idp == NULL) {
-        idp = am_first_idp(r);
-        if (idp == NULL) {
+    if (disco_idp == NULL) {
+        disco_idp = am_first_idp(r);
+        if (disco_idp == NULL) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
                           "probeDiscovery found no usable IdP.");
             return HTTP_INTERNAL_SERVER_ERROR;
         } else {
             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, "probeDiscovery "
-                          "failed, trying default IdP %s", idp); 
+                          "failed, trying default IdP %s", disco_idp); 
         }
+    } else {
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                      "probeDiscovery using %s", disco_idp);
     }
 
     redirect_url = apr_psprintf(r->pool, "%s%s%s=%s", return_to, 
                                 strchr(return_to, '?') ? "&" : "?",
                                 am_urlencode(r->pool, idp_param), 
-                                am_urlencode(r->pool, idp));
+                                am_urlencode(r->pool, disco_idp));
 
     apr_table_setn(r->headers_out, "Location", redirect_url);
 

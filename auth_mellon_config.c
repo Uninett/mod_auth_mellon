@@ -77,6 +77,7 @@ static const apr_size_t post_size = 1024 * 1024 * 1024;
  */
 static const int post_count = 100;
 
+#if unused
 /* This function handles configuration directives which set a 
  * multivalued string slot in the module configuration (the destination
  * strucure is a hash).
@@ -86,7 +87,6 @@ static const int post_count = 100;
  *                       directive.
  *  void *struct_ptr     Pointer to the current directory configuration.
  *                       NULL if we are not in a directory configuration.
- *                       This value isn't used by this function.
  *  const char *key      The string argument following this configuration
  *                       directive in the configuraion file.
  *  const char *value    Optional value to be stored in the hash.
@@ -114,6 +114,47 @@ static const char *am_set_hash_string_slot(cmd_parms *cmd,
     offset = (int)(long)cmd->info;
     hash = (apr_hash_t **)((char *)cfg + offset);
     apr_hash_set(*hash, apr_pstrdup(pconf, key), APR_HASH_KEY_STRING, value);
+
+    return NULL;
+}
+#endif /* unused */
+
+/* This function handles configuration directives which set a 
+ * multivalued string slot in the module configuration (the destination
+ * strucure is a table).
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *  const char *key      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *  const char *value    Optional value to be stored in the hash.
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_table_string_slot(cmd_parms *cmd,
+                                          void *struct_ptr,
+                                          const char *key,
+                                          const char *value)
+{
+    server_rec *s = cmd->server;
+    apr_pool_t *pconf = s->process->pconf;
+    am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
+    int offset;
+    apr_table_t **table;
+
+    /*
+     * If no value is given, we just store the key in the hash.
+     */
+    if (value == NULL || *value == '\0')
+        value = key;
+
+    offset = (int)(long)cmd->info;
+    table = (apr_table_t **)((char *)cfg + offset);
+    apr_table_set(*table, apr_pstrdup(pconf, key), value);
 
     return NULL;
 }
@@ -1009,7 +1050,7 @@ const command_rec auth_mellon_commands[] = {
         ),
     AP_INIT_TAKE12(
         "MellonProbeDiscoveryIdP",
-        am_set_hash_string_slot,
+        am_set_table_string_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, probe_discovery_idp),
         OR_AUTHCFG,
         "An IdP that can be used for IdP probe discovery."
@@ -1098,7 +1139,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->login_path = default_login_path;
     dir->discovery_url = NULL;
     dir->probe_discovery_timeout = -1; /* -1 means no probe discovery */
-    dir->probe_discovery_idp = apr_hash_make(p);
+    dir->probe_discovery_idp = apr_table_make(p, 0);
 
     dir->sp_org_name = apr_hash_make(p);
     dir->sp_org_display_name = apr_hash_make(p);
@@ -1293,10 +1334,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                             add_cfg->probe_discovery_timeout :
                             base_cfg->probe_discovery_timeout);
 
-    new_cfg->probe_discovery_idp = apr_hash_copy(p,
-                      (apr_hash_count(add_cfg->probe_discovery_idp) > 0) ?
-                       add_cfg->probe_discovery_idp : 
-                       base_cfg->probe_discovery_idp);
+    new_cfg->probe_discovery_idp = apr_table_copy(p,
+                           (!apr_is_empty_table(add_cfg->probe_discovery_idp)) ?
+                            add_cfg->probe_discovery_idp : 
+                            base_cfg->probe_discovery_idp);
 
 
     if (cfg_can_inherit_lasso_server(add_cfg)) {
