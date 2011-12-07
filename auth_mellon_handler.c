@@ -1578,6 +1578,59 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
     return OK;
 }
 
+/* This function validates that the received assertion verify the security level configured by
+ * MellonAuthnContextClassRef directives
+ */
+static int am_validate_authn_context_class_ref(request_rec *r,
+        LassoSaml2Assertion *assertion) {
+    int i = 0;
+    LassoSaml2AuthnStatement *authn_statement = NULL;
+    LassoSaml2AuthnContext *authn_context = NULL;
+    am_dir_cfg_rec *dir_cfg;
+    apr_array_header_t *refs;
+
+    dir_cfg = am_get_dir_cfg(r);
+    refs = dir_cfg->authn_context_class_ref;
+    if (! refs->nelts)
+        return OK;
+
+    if (! assertion->AuthnStatement) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Missing AuthnStatement in assertion, returning BadRequest.");
+        return HTTP_BAD_REQUEST;
+    }
+    /* we only consider the first AuthnStatement, I do not know of any idp
+     * sending more than one. */
+    authn_statement = g_list_first(assertion->AuthnStatement)->data;
+    if (! authn_statement->AuthnContext) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Missing AuthnContext in assertion, returning BadRequest.");
+        return HTTP_BAD_REQUEST;
+    }
+    authn_context = authn_statement->AuthnContext;
+    if (! authn_context->AuthnContextClassRef) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Missing AuthnContextClassRef in assertion, returning Forbidden.");
+        return HTTP_FORBIDDEN;
+    }
+    for (i = 0; i < refs->nelts; i++) {
+        const char *ref = ((char **)refs->elts)[i];
+        if (strcmp(ref, authn_context->AuthnContextClassRef) == 0) {
+            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                          "AuthnContextClassRef (%s) matches the "
+                          "MellonAuthnContextClassRef directive, "
+                          "access can be granted.",
+                          authn_context->AuthnContextClassRef);
+            return OK;
+        }
+    }
+    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                  "AuthnContextClassRef (%s) does not match the "
+                  "MellonAuthnContextClassRef directive, returning "
+                  "Forbidden.",
+                  authn_context->AuthnContextClassRef);
+    return HTTP_FORBIDDEN;
+}
 
 /* This function finishes handling of a login response after it has been parsed
  * by the HTTP-POST or HTTP-Artifact handler.
@@ -1701,6 +1754,13 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
                 return HTTP_BAD_REQUEST;
             }
         }
+    }
+
+    /* Check AuthnContextClassRef */
+    rc = am_validate_authn_context_class_ref(r, assertion);
+    if (rc != OK) {
+        lasso_login_destroy(login);
+        return rc;
     }
 
     /* Create a new session. */
