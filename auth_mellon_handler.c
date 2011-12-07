@@ -2418,6 +2418,9 @@ static int am_send_authn_request(request_rec *r, const char *idp,
     LassoSamlp2AuthnRequest *request;
     gint ret;
     char *redirect_to;
+    am_dir_cfg_rec *dir_cfg;
+
+    dir_cfg = am_get_dir_cfg(r);
 
     /* Add cookie for cookie test. We know that we should have
      * a valid cookie when we return from the IdP after SP-initiated
@@ -2465,6 +2468,27 @@ static int am_send_authn_request(request_rec *r, const char *idp,
     LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Consent
       = g_strdup(LASSO_SAML2_CONSENT_IMPLICIT);
 
+    /* Add AuthnContextClassRef */
+    if (dir_cfg->authn_context_class_ref->nelts) {
+        apr_array_header_t *refs = dir_cfg->authn_context_class_ref;
+        int i = 0;
+        LassoSamlp2RequestedAuthnContext *req_authn_context;
+
+        req_authn_context = (LassoSamlp2RequestedAuthnContext*)
+            lasso_samlp2_requested_authn_context_new();
+
+        request->RequestedAuthnContext = req_authn_context;
+
+        for (i = 0; i < refs->nelts; i++) {
+            const char *ref = ((char **)refs->elts)[i];
+            req_authn_context->AuthnContextClassRef =
+                    g_list_append(req_authn_context->AuthnContextClassRef,
+                                    g_strdup(ref));
+            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                          "adding AuthnContextClassRef %s to the "
+                          "AuthnRequest", ref);
+        }
+    }
 
     /*
      * Make sure the Destination attribute is set to the IdP
