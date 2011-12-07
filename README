@@ -445,6 +445,16 @@ MellonPostCount 100
         # This option will make the Lasso session available in 
 	# the MELLON_SESSION environement variable. Default is Off.
 	MellonSessionDump Off
+
+	# This option will request specific authentication security-level
+	# through the AuthnContextClassRef element of the AuthnRequest It will
+	# also request enforcement of this level when receiving an
+	# authenticating Assertion.
+	# If the assertion does not have the required security level, an HTTP
+	# Forbidden status code is returned to the browser.
+	# MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:Kerberos"
+	# MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport"
+	# MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:SoftwarePKI"
 </Location>
 
 

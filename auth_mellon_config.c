@@ -755,6 +755,32 @@ static const char *am_set_langstring_slot(cmd_parms *cmd,
     return NULL;
 }
 
+/* This function handles the MellonAuthnContextClassRef directive.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for the MellonAuthnContextClassRef
+ *                       configuration directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *  const char *arg      An URI for an SAMLv2 AuthnContextClassRef
+ *
+ * Returns:
+ *  This function will always return NULL.
+ */
+static const char *am_set_authn_context_class_ref(cmd_parms *cmd,
+                                                  void *struct_ptr,
+                                                  const char *arg)
+{
+    am_dir_cfg_rec *d = (am_dir_cfg_rec *)struct_ptr;
+    apr_pool_t *p= cmd->pool;
+
+    if(strlen(arg) == 0) {
+         return NULL;
+    }
+    APR_ARRAY_PUSH(d->authn_context_class_ref, char*) = apr_pstrdup(p, arg);
+    return NULL;
+}
+
 /* This array contains all the configuration directive which are handled
  * by auth_mellon.
  */    
@@ -1066,6 +1092,14 @@ const command_rec auth_mellon_commands[] = {
         " \"http://<servername>/mellon/*\". The path you specify must"
         " be contained within the current Location directive."
         ),
+    AP_INIT_TAKE1(
+        "MellonAuthnContextClassRef",
+        am_set_authn_context_class_ref,
+        NULL,
+        OR_AUTHCFG,
+        "A list of AuthnContextClassRef to request in the AuthnRequest and "
+        "to validate upon reception of an Assertion"
+        ),
     {NULL}
 };
 
@@ -1148,6 +1182,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     apr_thread_mutex_create(&dir->server_mutex, APR_THREAD_MUTEX_DEFAULT, p);
     dir->inherit_server_from = dir;
     dir->server = NULL;
+    dir->authn_context_class_ref = apr_array_make(p, 0, sizeof(char *));;
 
     return dir;
 }
@@ -1347,7 +1382,13 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                                 APR_THREAD_MUTEX_DEFAULT, p);
         new_cfg->inherit_server_from = new_cfg;
     }
+
     new_cfg->server = NULL;
+
+    new_cfg->authn_context_class_ref = (add_cfg->idp_metadata->nelts ?
+                             add_cfg->authn_context_class_ref :
+                             base_cfg->authn_context_class_ref);
+
 
     return new_cfg;
 }

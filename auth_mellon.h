@@ -216,6 +216,10 @@ typedef struct am_dir_cfg_rec {
     struct am_dir_cfg_rec *inherit_server_from;
     /* Mutex to prevent us from creating several lasso server objects. */
     apr_thread_mutex_t *server_mutex;
+
+    /* AuthnContextClassRef list */
+    apr_array_header_t *authn_context_class_ref;
+
     /* Cached lasso server object. */
     LassoServer *server;
 } am_dir_cfg_rec;
