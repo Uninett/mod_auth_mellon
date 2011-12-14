@@ -773,11 +773,13 @@ static const char *am_set_authn_context_class_ref(cmd_parms *cmd,
 {
     am_dir_cfg_rec *d = (am_dir_cfg_rec *)struct_ptr;
     apr_pool_t *p= cmd->pool;
+    char **context_class_ref_p;
 
     if(strlen(arg) == 0) {
          return NULL;
     }
-    APR_ARRAY_PUSH(d->authn_context_class_ref, char*) = apr_pstrdup(p, arg);
+    context_class_ref_p = apr_array_push(d->authn_context_class_ref);
+    *context_class_ref_p = apr_pstrdup(p, arg);
     return NULL;
 }
 
