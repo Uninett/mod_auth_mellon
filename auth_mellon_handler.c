@@ -2350,54 +2350,6 @@ static int am_handle_metadata(request_rec *r)
 #endif
 }
 
-/* This function handles responses to request on our endpoint
- *
- * Parameters:
- *  request_rec *r       The request we received.
- *
- * Returns:
- *  OK on success, or an error on failure.
- */
-int am_handler(request_rec *r)
-{
-    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
-    const char *endpoint;
-
-    /* Check if this is a request for one of our endpoints. We check if
-     * the uri starts with the path set with the MellonEndpointPath
-     * configuration directive.
-     */
-    if(strstr(r->uri, cfg->endpoint_path) != r->uri)
-        return DECLINED;
-
-    /* Make sure that this is a GET request. */
-    if(r->method_number != M_GET) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Exptected GET request for the metadata endpoint."
-                      " Got a %s request instead.", r->method);
-
-        /* According to the documentation for request_rec, a handler which
-         * doesn't handle a request method, should set r->allowed to the
-         * methods it handles, and return DECLINED.
-         * However, the default handler handles GET-requests, so for GET
-         * requests the handler should return HTTP_METHOD_NOT_ALLOWED.
-         * This endpoints handles GET requests, so it isn't necessary to
-         * check for method_number == M_GET.
-         */
-        r->allowed = M_GET;
-
-        return DECLINED;
-    }
-
-    endpoint = &r->uri[strlen(cfg->endpoint_path)];
-    if (strcmp(endpoint, "metadata") == 0)
-        return am_handle_metadata(r);
-    else if (strcmp(endpoint, "repost") == 0)
-        return am_handle_repost(r);
-    else
-        return DECLINED;
-}
-
 
 /* Create and send an authentication request.
  *
@@ -2834,30 +2786,33 @@ static int am_handle_probe_discovery(request_rec *r) {
 }
 
 
-/* This function takes a request for an endpoint and passes it on to the
- * correct handler function.
+/* This function handles responses to request on our endpoint
  *
  * Parameters:
- *  request_rec *r       The request we are currently handling.
+ *  request_rec *r       The request we received.
  *
  * Returns:
- *  The return value of the endpoint handler function,
- *  or HTTP_NOT_FOUND if we don't have a handler for the requested
- *  endpoint.
+ *  OK on success, or an error on failure.
  */
-static int am_endpoint_handler(request_rec *r)
+int am_handler(request_rec *r)
 {
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     const char *endpoint;
-    am_dir_cfg_rec *dir = am_get_dir_cfg(r);
 
-    /* r->uri starts with cfg->endpoint_path, so we can find the endpoint
-     * by extracting the string following chf->endpoint_path.
+    /* Check if this is a request for one of our endpoints. We check if
+     * the uri starts with the path set with the MellonEndpointPath
+     * configuration directive.
      */
-    endpoint = &r->uri[strlen(dir->endpoint_path)];
+    if(strstr(r->uri, cfg->endpoint_path) != r->uri)
+        return DECLINED;
 
-
-    if(!strcmp(endpoint, "postResponse")) {
-	return am_handle_post_reply(r);
+    endpoint = &r->uri[strlen(cfg->endpoint_path)];
+    if (!strcmp(endpoint, "metadata")) {
+        return am_handle_metadata(r);
+    } else if (!strcmp(endpoint, "repost")) {
+        return am_handle_repost(r);
+    } else if(!strcmp(endpoint, "postResponse")) {
+        return am_handle_post_reply(r);
     } else if(!strcmp(endpoint, "artifactResponse")) {
         return am_handle_artifact_reply(r);
     } else if(!strcmp(endpoint, "auth")) {
@@ -2877,13 +2832,12 @@ static int am_endpoint_handler(request_rec *r)
     } else if(!strcmp(endpoint, "probeDisco")) {
         return am_handle_probe_discovery(r);
     } else {
-	ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-		      "Endpoint \"%s\" not handled by mod_auth_mellon.",
-		      endpoint);
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Endpoint \"%s\" not handled by mod_auth_mellon.",
+                      endpoint);
 
-	return HTTP_NOT_FOUND;
+        return HTTP_NOT_FOUND;
     }
-    
 }
 
 
@@ -2913,7 +2867,8 @@ int am_auth_mellon_user(request_rec *r)
      * configuration directive.
      */
     if(strstr(r->uri, dir->endpoint_path) == r->uri) {
-        return am_endpoint_handler(r);
+        /* No access control on our internal endpoints. */
+        return OK;
     }
 
     /* Get the session of this request. */
@@ -2987,6 +2942,7 @@ int am_auth_mellon_user(request_rec *r)
 
 int am_check_uid(request_rec *r)
 {
+    am_dir_cfg_rec *dir = am_get_dir_cfg(r);
     am_cache_entry_t *session;
     int return_code = HTTP_UNAUTHORIZED;
 
@@ -2994,6 +2950,15 @@ int am_check_uid(request_rec *r)
      * without any checking since these cannot be injected (heh). */
     if (r->main)
         return OK;
+
+    /* Check if this is a request for one of our endpoints. We check if
+     * the uri starts with the path set with the MellonEndpointPath
+     * configuration directive.
+     */
+    if(strstr(r->uri, dir->endpoint_path) == r->uri) {
+        /* No access control on our internal endpoints. */
+        return OK;
+    }
 
 
     /* Get the session of this request. */
