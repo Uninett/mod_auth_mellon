@@ -2507,10 +2507,19 @@ static int am_auth_new_ticket(request_rec *r)
     /* Check if IdP discovery is in use and no IdP was selected yet */
     if ((cfg->discovery_url != NULL) &&
         (am_extract_query_parameter(r->pool, r->args, "IdP") == NULL)) {
+        LassoServer *server;
+        const char *sp_entity_id;
         char *discovery_url;
         char *return_url;
         char *endpoint = am_get_endpoint_url(r);
         char *sep;
+
+        server = am_get_lasso_server(r);
+        if(server == NULL) {
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        sp_entity_id = LASSO_PROVIDER(server)->ProviderID;
 
         /* If discovery URL already has a ? we append a & */
         sep = (strchr(cfg->discovery_url, '?')) ? "&" : "?";
@@ -2520,10 +2529,10 @@ static int am_auth_new_ticket(request_rec *r)
                                   am_urlencode(r->pool, relay_state));
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
                       "return_url = %s", return_url);
-        discovery_url = apr_psprintf(r->pool, "%s%sentityID=%smetadata&"
+        discovery_url = apr_psprintf(r->pool, "%s%sentityID=%s&"
                                      "return=%s&returnIDParam=IdP",
                                      cfg->discovery_url, sep,
-                                     am_urlencode(r->pool, endpoint),
+                                     am_urlencode(r->pool, sp_entity_id),
                                      am_urlencode(r->pool, return_url));
 
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
