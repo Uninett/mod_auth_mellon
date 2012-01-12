@@ -331,6 +331,54 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 }
 
 
+/* Redirect to discovery service.
+ *
+ * Parameters:
+ *  request_rec *r         The request we received.
+ *  const char *return_to  The URL the user should be returned to after login.
+ *
+ * Returns:
+ *  HTTP_SEE_OTHER on success, an error otherwise.
+ */
+static int am_start_disco(request_rec *r, const char *return_to)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    const char *endpoint = am_get_endpoint_url(r);
+    LassoServer *server;
+    const char *sp_entity_id;
+    const char *sep;
+    const char *login_url;
+    const char *discovery_url;
+
+    server = am_get_lasso_server(r);
+    if(server == NULL) {
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    sp_entity_id = LASSO_PROVIDER(server)->ProviderID;
+
+    login_url = apr_psprintf(r->pool, "%slogin?ReturnTo=%s",
+                             endpoint,
+                             am_urlencode(r->pool, return_to));
+    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                  "login_url = %s", login_url);
+
+    /* If discovery URL already has a ? we append a & */
+    sep = (strchr(cfg->discovery_url, '?')) ? "&" : "?";
+
+    discovery_url = apr_psprintf(r->pool, "%s%sentityID=%s&"
+                                 "return=%s&returnIDParam=IdP",
+                                 cfg->discovery_url, sep,
+                                 am_urlencode(r->pool, sp_entity_id),
+                                 am_urlencode(r->pool, login_url));
+
+    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                  "discovery_url = %s", discovery_url);
+    apr_table_setn(r->headers_out, "Location", discovery_url);
+    return HTTP_SEE_OTHER;
+}
+
+
 /* This function returns the first configured IdP
  *
  * Parameters:
@@ -2507,38 +2555,7 @@ static int am_auth_new_ticket(request_rec *r)
     /* Check if IdP discovery is in use and no IdP was selected yet */
     if ((cfg->discovery_url != NULL) &&
         (am_extract_query_parameter(r->pool, r->args, "IdP") == NULL)) {
-        LassoServer *server;
-        const char *sp_entity_id;
-        char *discovery_url;
-        char *return_url;
-        char *endpoint = am_get_endpoint_url(r);
-        char *sep;
-
-        server = am_get_lasso_server(r);
-        if(server == NULL) {
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
-
-        sp_entity_id = LASSO_PROVIDER(server)->ProviderID;
-
-        /* If discovery URL already has a ? we append a & */
-        sep = (strchr(cfg->discovery_url, '?')) ? "&" : "?";
-
-        return_url = apr_psprintf(r->pool, "%slogin?ReturnTo=%s",
-                                  endpoint,
-                                  am_urlencode(r->pool, relay_state));
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                      "return_url = %s", return_url);
-        discovery_url = apr_psprintf(r->pool, "%s%sentityID=%s&"
-                                     "return=%s&returnIDParam=IdP",
-                                     cfg->discovery_url, sep,
-                                     am_urlencode(r->pool, sp_entity_id),
-                                     am_urlencode(r->pool, return_url));
-
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                      "discovery_url = %s", discovery_url);
-        apr_table_setn(r->headers_out, "Location", discovery_url);
-        return HTTP_SEE_OTHER;
+        return am_start_disco(r, relay_state);
     }
 
     /* If IdP discovery is in use and we have an IdP selected,
