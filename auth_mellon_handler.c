@@ -2883,7 +2883,10 @@ int am_handler(request_rec *r)
 static int am_start_auth(request_rec *r)
 {
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    const char *endpoint = am_get_endpoint_url(r);
     const char *return_to;
+    const char *idp;
+    const char *login_url;
 
     return_to = am_reconstruct_url(r);
 
@@ -2898,7 +2901,16 @@ static int am_start_auth(request_rec *r)
         return am_start_disco(r, return_to);
     }
 
-    return am_send_authn_request(r, am_get_idp(r), return_to, FALSE);
+    idp = am_get_idp(r);
+    login_url = apr_psprintf(r->pool, "%slogin?ReturnTo=%s&IdP=%s",
+                             endpoint,
+                             am_urlencode(r->pool, return_to),
+                             am_urlencode(r->pool, idp));
+    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                  "Redirecting to login URL: %s", login_url);
+
+    apr_table_setn(r->headers_out, "Location", login_url);
+    return HTTP_SEE_OTHER;
 }
 
 int am_auth_mellon_user(request_rec *r)
