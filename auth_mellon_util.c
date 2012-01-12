@@ -405,13 +405,9 @@ void am_set_nocache(request_rec *r)
 {
      const char *user_agent;
 
-    /* We set headers in both r->headers_out and r->err_headers_out, so that
-     * we can be sure that they will be included.
+    /* Setting the headers inn err_headers_out ensures that they will be
+     * sent for all responses.
      */
-    apr_table_setn(r->headers_out, 
-		   "Expires", "Thu, 01 Jan 1970 00:00:00 GMT");
-    apr_table_setn(r->headers_out,
-		   "Cache-Control", "private, must-revalidate");
     apr_table_setn(r->err_headers_out,
 		   "Expires", "Thu, 01 Jan 1970 00:00:00 GMT");
     apr_table_setn(r->err_headers_out,
@@ -424,8 +420,6 @@ void am_set_nocache(request_rec *r)
     if ((user_agent == NULL) ||
          (strstr(user_agent, "compatible; MSIE ") == NULL) ||
          (strstr(user_agent, "Opera") != NULL)) {
-        apr_table_addn(r->headers_out,
-		       "Cache-Control", "no-cache, no-store");
         apr_table_addn(r->err_headers_out,
 		       "Cache-Control", "no-cache, no-store");
     }

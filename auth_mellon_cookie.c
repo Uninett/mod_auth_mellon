@@ -166,12 +166,9 @@ void am_cookie_set(request_rec *r, const char *id)
     ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, r->server,
                  "cookie_set: %s", cookie);
 
-    /* For now we're setting the cookie in both header tables since
-     * it is unclear which the user will be sent.  After a minor release
-     * this suddenly changed from headers_out to err_headers_out, so to
-     * be on the safe side...
+    /* Setting the headers inn err_headers_out ensures that they will be
+     * sent for all responses.
      */
-    apr_table_addn(r->headers_out, "Set-Cookie", cookie);
     apr_table_addn(r->err_headers_out, "Set-Cookie", cookie);
 
     /* Add a note on the current request, to allow us to retrieve this
@@ -208,6 +205,5 @@ void am_cookie_delete(request_rec *r)
                           " path=/",
                           name);
 
-    apr_table_addn(r->headers_out, "Set-Cookie", cookie);
     apr_table_addn(r->err_headers_out, "Set-Cookie", cookie);
 }
