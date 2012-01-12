@@ -2399,6 +2399,97 @@ static int am_handle_metadata(request_rec *r)
 }
 
 
+/* Send AuthnRequest using HTTP-Redirect binding.
+ *
+ * Note that this method frees the LassoLogin object.
+ *
+ * Parameters:
+ *  request_rec *r
+ *  LassoLogin *login
+ *
+ * Returns:
+ *  HTTP_SEE_OTHER on success, or an error on failure.
+ */
+static int am_send_authn_request_redirect(request_rec *r, LassoLogin *login)
+{
+    char *redirect_to;
+
+    /* The URL we should send the message to. */
+    redirect_to = apr_pstrdup(r->pool, LASSO_PROFILE(login)->msg_url);
+
+    /* Check if the lasso library added the RelayState. If lasso didn't add
+     * a RelayState parameter, then we add one ourself. This should hopefully
+     * be removed in the future.
+     */
+    if(strstr(redirect_to, "&RelayState=") == NULL
+       && strstr(redirect_to, "?RelayState=") == NULL) {
+        /* The url didn't contain the relaystate parameter. */
+        redirect_to = apr_pstrcat(
+            r->pool, redirect_to, "&RelayState=",
+            am_urlencode(r->pool, LASSO_PROFILE(login)->msg_relayState),
+            NULL
+            );
+    }
+    apr_table_setn(r->headers_out, "Location", redirect_to);
+
+    lasso_login_destroy(login);
+
+    /* We don't want to include POST data (in case this was a POST request). */
+    return HTTP_SEE_OTHER;
+}
+
+/* Send AuthnRequest using HTTP-POST binding.
+ *
+ * Note that this method frees the LassoLogin object.
+ *
+ * Parameters:
+ *  request_rec *r         The request we are processing.
+ *  LassoLogin *login      The login message.
+ *
+ * Returns:
+ *  OK on success, or an error on failure.
+ */
+static int am_send_authn_request_post(request_rec *r, LassoLogin *login)
+{
+    char *url;
+    char *message;
+    char *relay_state;
+    char *output;
+
+    url = am_htmlencode(r, LASSO_PROFILE(login)->msg_url);
+    message = am_htmlencode(r, LASSO_PROFILE(login)->msg_body);
+    relay_state = am_htmlencode(r, LASSO_PROFILE(login)->msg_relayState);
+
+    lasso_login_destroy(login);
+
+    output = apr_psprintf(r->pool,
+      "<!DOCTYPE html>\n"
+      "<html>\n"
+      " <head>\n"
+      "  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n"
+      "  <title>POST data</title>\n"
+      " </head>\n"
+      " <body onload=\"document.forms[0].submit()\">\n"
+      "  <noscript><p>\n"
+      "   <strong>Note:</strong> Since your browser does not support JavaScript, you must press the button below once to proceed.\n"
+      "  </p></noscript>\n"
+      "  <form method=\"POST\" action=\"%s\">\n"
+      "    <input type=\"hidden\" name=\"SAMLRequest\" value=\"%s\">\n"
+      "    <input type=\"hidden\" name=\"RelayState\" value=\"%s\">\n"
+      "    <noscript>\n"
+      "     <input type=\"submit\">\n"
+      "    </noscript>\n"
+      "  </form>\n"
+      " </body>\n"
+      "</html>\n",
+      url, message, relay_state);
+
+    ap_set_content_type(r, "text/html");
+    ap_rputs(output, r);
+
+    return OK;
+}
+
 /* Create and send an authentication request.
  *
  * Parameters:
@@ -2408,16 +2499,18 @@ static int am_handle_metadata(request_rec *r)
  *  int is_passive         Whether to send a passive request.
  *
  * Returns:
- *  HTTP_SEE_OTHER on success, or an error on failure.
+ *  HTTP response code indicating success or failure.
  */
 static int am_send_authn_request(request_rec *r, const char *idp,
                            const char *return_to, int is_passive)
 {
     LassoServer *server;
+    LassoProvider *provider;
     LassoLogin *login;
     LassoSamlp2AuthnRequest *request;
+    LassoHttpMethod http_method;
+    char *sso_url;
     gint ret;
-    char *redirect_to;
     am_dir_cfg_rec *dir_cfg;
 
     dir_cfg = am_get_dir_cfg(r);
@@ -2434,19 +2527,49 @@ static int am_send_authn_request(request_rec *r, const char *idp,
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    /* Find our IdP. */
+    provider = lasso_server_get_provider(server, idp);
+    if (provider == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Could not find metadata for the IdP \"%s\".",
+                      idp);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* Determine what binding and endpoint we should use when
+     * sending the request.
+     */
+    http_method = LASSO_HTTP_METHOD_REDIRECT;
+    sso_url = lasso_provider_get_metadata_one(
+        provider, "SingleSignOnService HTTP-Redirect");
+    if (sso_url == NULL) {
+        /* HTTP-Redirect unsupported - try HTTP-POST. */
+        http_method = LASSO_HTTP_METHOD_POST;
+        sso_url = lasso_provider_get_metadata_one(
+            provider, "SingleSignOnService HTTP-POST");
+    }
+    if (sso_url == NULL) {
+        /* Both HTTP-Redirect and HTTP-POST unsupported - give up. */
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Could not find a supported SingleSignOnService endpoint"
+                      " for the IdP \"%s\".", idp);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
     login = lasso_login_new(server);
     if(login == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
 		      "Error creating LassoLogin object from LassoServer.");
+        g_free(sso_url);
 	return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    ret = lasso_login_init_authn_request(login, idp,
-					 LASSO_HTTP_METHOD_REDIRECT);
+    ret = lasso_login_init_authn_request(login, idp, http_method);
     if(ret != 0) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error creating login request."
                       " Lasso error: [%i] %s", ret, lasso_strerror(ret));
+        g_free(sso_url);
 	lasso_login_destroy(login);
 	return HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -2456,6 +2579,7 @@ static int am_send_authn_request(request_rec *r, const char *idp,
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error creating login request. Please verify the "
                       "MellonSPMetadataFile directive.");
+        g_free(sso_url);
         lasso_login_destroy(login);
         return HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -2495,12 +2619,13 @@ static int am_send_authn_request(request_rec *r, const char *idp,
      * SingleSignOnService endpoint. This is required for
      * Shibboleth 2 interoperability, and older versions of
      * lasso (at least up to 2.2.91) did not do it.
-     * XXX Here we assume HTTP-Redirect method
      */
-    if (LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination == NULL)
-        LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination =
-            g_strdup(am_get_service_url(r, LASSO_PROFILE(login),
-                                        "SingleSignOnService HTTP-Redirect"));
+    if (LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination == NULL) {
+        LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination = g_strdup(sso_url);
+    }
+
+    /* sso_url no longer needed. */
+    g_free(sso_url);
 
     LASSO_PROFILE(login)->msg_relayState = g_strdup(return_to);
 
@@ -2513,29 +2638,19 @@ static int am_send_authn_request(request_rec *r, const char *idp,
 	return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-
-    redirect_to = apr_pstrdup(r->pool, LASSO_PROFILE(login)->msg_url);
-
-    /* Check if the lasso library added the RelayState. If lasso didn't add
-     * a RelayState parameter, then we add one ourself. This should hopefully
-     * be removed in the future.
-     */
-    if(strstr(redirect_to, "&RelayState=") == NULL
-       && strstr(redirect_to, "?RelayState=") == NULL) {
-        /* The url didn't contain the relaystate parameter. */
-        redirect_to = apr_pstrcat(
-            r->pool, redirect_to, "&RelayState=",
-            am_urlencode(r->pool, LASSO_PROFILE(login)->msg_relayState),
-            NULL
-            );
+    /* Time to actually send the authentication request. */
+    switch (http_method) {
+    case LASSO_HTTP_METHOD_REDIRECT:
+        return am_send_authn_request_redirect(r, login);
+    case LASSO_HTTP_METHOD_POST:
+        return am_send_authn_request_post(r, login);
+    default:
+        /* We should never get here. */
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Unsupported http_method.");
+        lasso_login_destroy(login);
+        return HTTP_INTERNAL_SERVER_ERROR;
     }
-
-    apr_table_setn(r->headers_out, "Location", redirect_to);
-
-    lasso_login_destroy(login);
-
-    /* We don't want to include POST data (in case this was a POST request). */
-    return HTTP_SEE_OTHER;
 }
 
 
