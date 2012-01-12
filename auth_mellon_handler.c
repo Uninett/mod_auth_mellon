@@ -2524,7 +2524,7 @@ static int am_auth_new_ticket(request_rec *r)
         /* If discovery URL already has a ? we append a & */
         sep = (strchr(cfg->discovery_url, '?')) ? "&" : "?";
 
-        return_url = apr_psprintf(r->pool, "%sauth?ReturnTo=%s",
+        return_url = apr_psprintf(r->pool, "%slogin?ReturnTo=%s",
                                   endpoint,
                                   am_urlencode(r->pool, relay_state));
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
