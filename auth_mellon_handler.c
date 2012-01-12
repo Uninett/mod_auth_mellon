@@ -2539,18 +2539,22 @@ static int am_send_authn_request(request_rec *r, const char *idp,
 }
 
 
-static int am_auth_new_ticket(request_rec *r)
+/* Handle the "auth" endpoint.
+ *
+ * This endpoint is included for backwards-compatibility.
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  OK or HTTP_SEE_OTHER on success, an error on failure.
+ */
+static int am_handle_auth(request_rec *r)
 {
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     const char *relay_state;
 
     relay_state = am_reconstruct_url(r);
-
-    /* If this is a POST request, attempt to save it */
-    if (r->method_number == M_POST) {
-        if (am_save_post(r, &relay_state) != OK)
-            return HTTP_INTERNAL_SERVER_ERROR;
-    }
 
     /* Check if IdP discovery is in use and no IdP was selected yet */
     if ((cfg->discovery_url != NULL) &&
@@ -2842,7 +2846,7 @@ int am_handler(request_rec *r)
     } else if(!strcmp(endpoint, "artifactResponse")) {
         return am_handle_artifact_reply(r);
     } else if(!strcmp(endpoint, "auth")) {
-        return am_auth_new_ticket(r);
+        return am_handle_auth(r);
     } else if(!strcmp(endpoint, "metadata")) {
         return OK;
     } else if(!strcmp(endpoint, "repost")) {
@@ -2867,6 +2871,35 @@ int am_handler(request_rec *r)
 }
 
 
+/**
+ * Trigger a login operation from a "normal" request.
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  HTTP_SEE_OTHER on success, or an error on failure.
+ */
+static int am_start_auth(request_rec *r)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    const char *return_to;
+
+    return_to = am_reconstruct_url(r);
+
+    /* If this is a POST request, attempt to save it */
+    if (r->method_number == M_POST) {
+        if (am_save_post(r, &return_to) != OK)
+            return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* Check if IdP discovery is in use. */
+    if (cfg->discovery_url) {
+        return am_start_disco(r, return_to);
+    }
+
+    return am_send_authn_request(r, am_get_idp(r), return_to, FALSE);
+}
 
 int am_auth_mellon_user(request_rec *r)
 {
@@ -2913,7 +2946,7 @@ int am_auth_mellon_user(request_rec *r)
             }
 
             /* Send the user to the authentication page on the IdP. */
-            return am_auth_new_ticket(r);
+            return am_start_auth(r);
         }
 
         /* Verify that the user has access to this resource. */
