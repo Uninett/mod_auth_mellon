@@ -219,6 +219,8 @@ typedef struct am_dir_cfg_rec {
 
     /* AuthnContextClassRef list */
     apr_array_header_t *authn_context_class_ref;
+    /* Controls the checking of SubjectConfirmationData.Address attribute */
+    int subject_confirmation_data_address_check;
 
     /* Cached lasso server object. */
     LassoServer *server;
@@ -254,6 +256,26 @@ typedef enum {
 } am_cache_key_t;
 
 extern const command_rec auth_mellon_commands[];
+
+/* When using a value from a directory configuration structure, a special value is used
+ * to state "inherit" from parent, when reading a value and the value is still inherit from, it
+ * means that no value has ever been set for this directive, in this case, we use the default
+ * value.
+ *
+ * This macro expects that if your variable is called "name" there is a static const variable named
+ * "default_name" which holds the default value for this variable.
+ */
+#define CFG_VALUE(container, name) \
+	(container->name == inherit_##name ? default_##name : container->name)
+
+#define CFG_MERGE(add_cfg, base_cfg, name) \
+	(add_cfg->name == inherit_##name ? base_cfg->name : add_cfg->name)
+
+/** Default and inherit value for SubjectConfirmationData Address check setting.
+ */
+static const int default_subject_confirmation_data_address_check = 1;
+static const int inherit_subject_confirmation_data_address_check = -1;
+
 
 void *auth_mellon_dir_config(apr_pool_t *p, char *d);
 void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add);

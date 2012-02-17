@@ -1102,6 +1102,13 @@ const command_rec auth_mellon_commands[] = {
         "A list of AuthnContextClassRef to request in the AuthnRequest and "
         "to validate upon reception of an Assertion"
         ),
+    AP_INIT_FLAG(
+        "MellonSubjectConfirmationDataAddressCheck",
+        ap_set_flag_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, subject_confirmation_data_address_check),
+        OR_AUTHCFG,
+        "Check address given in SubjectConfirmationData Address attribute. Default is on."
+        ),
     {NULL}
 };
 
@@ -1185,6 +1192,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->inherit_server_from = dir;
     dir->server = NULL;
     dir->authn_context_class_ref = apr_array_make(p, 0, sizeof(char *));;
+    dir->subject_confirmation_data_address_check = inherit_subject_confirmation_data_address_check;
 
     return dir;
 }
@@ -1391,6 +1399,8 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                              add_cfg->authn_context_class_ref :
                              base_cfg->authn_context_class_ref);
 
+    new_cfg->subject_confirmation_data_address_check =
+        CFG_MERGE(add_cfg, base_cfg, subject_confirmation_data_address_check);
 
     return new_cfg;
 }

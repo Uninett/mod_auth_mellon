@@ -1150,6 +1150,7 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
     apr_time_t t;
     LassoSaml2SubjectConfirmation *sc;
     LassoSaml2SubjectConfirmationData *scd;
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
 
     if (assertion->Subject == NULL) {
         /* No Subject to validate. */
@@ -1226,7 +1227,7 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
         }
     }
 
-    if (scd->Address) {
+    if (scd->Address && CFG_VALUE(cfg, subject_confirmation_data_address_check)) {
         if (strcasecmp(scd->Address, r->connection->remote_ip)) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "Wrong Address in SubjectConfirmationData."

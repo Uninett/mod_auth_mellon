@@ -455,6 +455,13 @@ MellonPostCount 100
 	# MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:Kerberos"
 	# MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport"
 	# MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:SoftwarePKI"
+
+        # MellonSubjectConfirmationDataAddressCheck is used to control
+        # the checking of client IP address against the address returned by the
+        # IdP in Address attribute of the SubjectConfirmationData node. Can be useful if your SP is
+        # behind a reverse proxy or any kind of strange network topology making IP address of client
+        # different for the IdP and the SP. Default is on.
+        # MellonSubjectConfirmationDataAddressCheck On
 </Location>
 
 
