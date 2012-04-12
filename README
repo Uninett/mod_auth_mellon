@@ -166,10 +166,9 @@ MellonPostCount 100
         # They have the following meanings:
         #   "none":  mod_auth_mellon will store the attribute as it is
         #            received from the IdP. This is the default behaviour.
-        #   "feide": FEIDE currently stores several values in a single
-        #            AttributeValue element. The values are base64 encoded
-        #            and separated by a underscore. This decoder reverses
-        #            this encoding.
+        #   "feide": *DEPRECATED* Feide used to transmit attributes with a
+        #            special encoding. That is no longer necessary, and
+        #            this decoder should therefore no longer be used.
         # Default: MellonDecoder "none"
         MellonDecoder "none"
 
