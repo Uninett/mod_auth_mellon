@@ -1,4 +1,4 @@
-AC_INIT([mod_auth_mellon],[0.4.0],[olav.morken@uninett.no])
+AC_INIT([mod_auth_mellon],[0.5.0],[olav.morken@uninett.no])
 
 AC_SUBST(NAMEVER, AC_PACKAGE_TARNAME()-AC_PACKAGE_VERSION())
 
