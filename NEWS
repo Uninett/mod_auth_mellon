@@ -1,6 +1,26 @@
-Version 0.4.1
+Version 0.5.0
+---------------------------------------------------------------------------
 
-* Honour MellonProbeDiscoveryIdP order when sending probes
+* Honour MellonProbeDiscoveryIdP order when sending probes.
+
+* MellonAuthnContextClassRef configuration directive, to limit
+  authentication to specific authentication methods.
+
+* Support for the HTTP-POST binding when sending authentication
+  requests to the IdP.
+
+* MellonSubjectConfirmationDataAddressCheck option to disable received
+  address checking.
+
+* Various cleanups and bugfixes:
+
+  * Support for older versions of GLib and APR.
+
+  * Send the correct SP entityID to the discovery service.
+
+  * Do not set response headers twice.
+
+  * Several cleanups in the code that starts authentication.
 
 Version 0.4.0
 ---------------------------------------------------------------------------
