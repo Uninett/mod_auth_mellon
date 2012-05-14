@@ -113,7 +113,17 @@ const char *am_cookie_get(request_rec *r)
          */
         value += strlen(name) + 1;
 
+        /* The cookie value may be double-quoted. */
+        if(*value == '"') {
+            value += 1;
+        }
+
         buffer = apr_pstrdup(r->pool, value);
+        end = strchr(buffer, '"');
+        if(end) {
+            /* Double-quoted string. */
+            *end = '\0';
+        }
         end = strchr(buffer, ';');
         if(end) {
             *end = '\0';
