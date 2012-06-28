@@ -1395,7 +1395,7 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
 
     new_cfg->server = NULL;
 
-    new_cfg->authn_context_class_ref = (add_cfg->idp_metadata->nelts ?
+    new_cfg->authn_context_class_ref = (add_cfg->authn_context_class_ref->nelts ?
                              add_cfg->authn_context_class_ref :
                              base_cfg->authn_context_class_ref);
 
