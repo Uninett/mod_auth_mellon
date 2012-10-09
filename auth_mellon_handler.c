@@ -601,25 +601,25 @@ static int am_return_logout_response(request_rec *r,
  * Parameters:
  *  request_rec *r         The current request.
  *  LassoProfile *profile  The profile object.
+ *  am_cache_entry_t *am_session The session structure.
  *
  * Returns:
  *  OK on success or HTTP_INTERNAL_SERVER_ERROR on failure.
  */
-static int am_restore_lasso_profile_state(request_rec *r,
-                                          LassoProfile *profile)
+static void am_restore_lasso_profile_state(request_rec *r, 
+                                           LassoProfile *profile,
+                                           am_cache_entry_t *am_session)
 {
-    am_cache_entry_t *am_session;
     const char *identity_dump;
     const char *session_dump;
     int rc;
 
 
-    am_session = am_get_request_session(r);
     if(am_session == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Could not get auth_mellon session while attempting"
                       " to restore the lasso profile state.");
-        return HTTP_INTERNAL_SERVER_ERROR;
+        return;
     }
 
     identity_dump = am_cache_get_lasso_identity(am_session);
@@ -630,7 +630,6 @@ static int am_restore_lasso_profile_state(request_rec *r,
                           "Could not restore identity from dump."
                           " Lasso error: [%i] %s", rc, lasso_strerror(rc));
             am_release_request_session(r, am_session);
-            return HTTP_INTERNAL_SERVER_ERROR;
         }
     }
 
@@ -642,15 +641,9 @@ static int am_restore_lasso_profile_state(request_rec *r,
                           "Could not restore session from dump."
                           " Lasso error: [%i] %s", rc, lasso_strerror(rc));
             am_release_request_session(r, am_session);
-            return HTTP_INTERNAL_SERVER_ERROR;
         }
     }
-
-    am_release_request_session(r, am_session);
-
-    return OK;
 }
-
 
 /* This function handles an IdP initiated logout request.
  *
@@ -665,7 +658,7 @@ static int am_restore_lasso_profile_state(request_rec *r,
 static int am_handle_logout_request(request_rec *r, 
                                     LassoLogout *logout, char *msg)
 {
-    gint res;
+    gint res = 0, rc = HTTP_OK;
     am_cache_entry_t *session;
 
     /* Process the logout message. Ignore missing signature. */
@@ -675,8 +668,34 @@ static int am_handle_logout_request(request_rec *r,
                       "Error processing logout request message."
                       " Lasso error: [%i] %s", res, lasso_strerror(res));
 
-        lasso_logout_destroy(logout);
-        return HTTP_BAD_REQUEST;
+        rc = HTTP_BAD_REQUEST;
+        goto exit;
+    }
+
+    /* Search session using NameID */
+    if (! LASSO_IS_SAML2_NAME_ID(logout->parent.nameIdentifier)) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Error processing logout request message."
+                      " No NameID found");
+        rc = HTTP_BAD_REQUEST;
+        goto exit;
+    }
+    session = am_get_request_session_by_nameid(r,
+                    ((LassoSaml2NameID*)logout->parent.nameIdentifier)->content);
+    if (session == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Error processing logout request message."
+                      " No session found for NameID %s",
+                      ((LassoSaml2NameID*)logout->parent.nameIdentifier)->content);
+
+    }
+    if (session == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Error processing logout request message."
+                      " No session found.");
+
+    } else {
+        am_restore_lasso_profile_state(r, &logout->parent, session);
     }
 
     /* Validate the logout message. Ignore missing signature. */
@@ -687,27 +706,15 @@ static int am_handle_logout_request(request_rec *r,
         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
                       "Error validating logout request."
                       " Lasso error: [%i] %s", res, lasso_strerror(res));
-        /* We continue with the logout despite the error. A error could be
-         * caused by the IdP believing that we are logged in when we are not.
-         */
+        rc = HTTP_INTERNAL_SERVER_ERROR;
+        goto exit;
     }
-
-
-    /* Search session using cookie */
-    session = am_get_request_session(r);
-
-    /* If no session found, search by NameID, for IdP initiated SOAP SLO */
-    if (session == NULL) {
-            LassoSaml2NameID *nameid;
-
-            nameid = LASSO_SAML2_NAME_ID(LASSO_PROFILE(logout)->nameIdentifier);
-
-            if (nameid != NULL)
-                session = am_get_request_session_by_nameid(r, nameid->content);
-    }
+    /* We continue with the logout despite those errors. They could be
+     * caused by the IdP believing that we are logged in when we are not.
+     */
 
     /* Delete the session. */
-    if (session != NULL)
+    if (session != NULL && res != LASSO_PROFILE_ERROR_SESSION_NOT_FOUND)
         am_delete_request_session(r, session);
 
 
@@ -718,21 +725,14 @@ static int am_handle_logout_request(request_rec *r,
                       "Error building logout response message."
                       " Lasso error: [%i] %s", res, lasso_strerror(res));
 
-        lasso_logout_destroy(logout);
-        return HTTP_INTERNAL_SERVER_ERROR;
+        rc = HTTP_INTERNAL_SERVER_ERROR;
+        goto exit;
     }
+    rc = am_return_logout_response(r, &logout->parent);
 
-
-    /* Set redirect target. */
-    apr_table_setn(r->headers_out, "Location",
-		   apr_pstrdup(r->pool, LASSO_PROFILE(logout)->msg_url));
-
+exit:
     lasso_logout_destroy(logout);
-
-    /* HTTP_SEE_OTHER is a redirect where post-data isn't sent to the
-     * new target.
-     */
-    return HTTP_SEE_OTHER;
+    return rc;
 }
 
 
@@ -976,12 +976,6 @@ static int am_handle_logout(request_rec *r)
                       "Error creating lasso logout object.");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
-
-    /* Restore lasso profile state. We ignore errors since we want to be able
-     * to redirect the user back to the IdP even in the case of an error.
-     */
-    am_restore_lasso_profile_state(r, LASSO_PROFILE(logout));
-
 
     /* Check which type of request to the logout handler this is.
      * We have three types:
