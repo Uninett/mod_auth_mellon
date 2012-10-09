@@ -556,6 +556,44 @@ static int am_save_lasso_profile_state(request_rec *r,
 }
 
 
+/* Returns a SAML response
+ *
+ * Parameters:
+ *  request_rec *r         The current request.
+ *  LassoProfile *profile  The profile object.
+ *
+ * Returns:
+ *  HTTP_INTERNAL_SERVER_ERROR if an error occurs, HTTP_SEE_OTHER for the
+ *  Redirect binding and OK for the SOAP binding.
+ */
+static int am_return_logout_response(request_rec *r,
+                              LassoProfile *profile)
+{
+    if (profile->msg_url && profile->msg_body) {
+        /* POST binding response */
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Error building logout response message."
+                      " POST binding is unsupported.");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    } else if (profile->msg_url) {
+        /* HTTP-Redirect binding response */
+        apr_table_setn(r->headers_out, "Location",
+                       apr_pstrdup(r->pool, profile->msg_url));
+        return HTTP_SEE_OTHER;
+    } else if (profile->msg_body) {
+        /* SOAP binding response */
+        r->content_type = "text/xml";
+        ap_rputs(profile->msg_body, r);
+        return OK;
+    } else {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Error building logout response message."
+                      " There is no content to return.");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+}
+
+
 /* This function restores dumps of a LassoIdentity object and a LassoSession
  * object. The dumps are fetched from the session belonging to the current
  * request and restored to the given LassoProfile object.
