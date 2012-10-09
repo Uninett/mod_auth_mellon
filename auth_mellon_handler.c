@@ -582,7 +582,7 @@ static int am_return_logout_response(request_rec *r,
         return HTTP_SEE_OTHER;
     } else if (profile->msg_body) {
         /* SOAP binding response */
-        r->content_type = "text/xml";
+        ap_set_content_type(r, "text/xml");
         ap_rputs(profile->msg_body, r);
         return OK;
     } else {
@@ -2386,15 +2386,14 @@ static int am_handle_repost(request_rec *r)
     }
 
     if (charset != NULL) {
-         r->content_type = apr_psprintf(r->pool, 
-                                        "text/html; charset=\"%s\"",
-                                        charset);
+         ap_set_content_type(r, apr_psprintf(r->pool,
+                             "text/html; charset=\"%s\"", charset));
          charset = apr_psprintf(r->pool, " accept-charset=\"%s\"", charset);
     } else {
-         r->content_type = "text/html";
+         ap_set_content_type(r, "text/html");
          charset = (char *)"";
     }
-    
+
     output = apr_psprintf(r->pool,
       "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n"
       "<html>\n"
@@ -2445,7 +2444,7 @@ static int am_handle_metadata(request_rec *r)
     if (data == NULL)
         return HTTP_INTERNAL_SERVER_ERROR;
 
-    r->content_type = "application/samlmetadata+xml";
+    ap_set_content_type(r, "application/samlmetadata+xml");
 
     ap_rputs(data, r);
 
