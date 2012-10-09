@@ -221,6 +221,8 @@ typedef struct am_dir_cfg_rec {
     apr_array_header_t *authn_context_class_ref;
     /* Controls the checking of SubjectConfirmationData.Address attribute */
     int subject_confirmation_data_address_check;
+    /* MellonDoNotVerifyLogoutSignature idp set */
+    apr_hash_t *do_not_verify_logout_signature;
 
     /* Cached lasso server object. */
     LassoServer *server;

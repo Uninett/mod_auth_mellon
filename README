@@ -461,6 +461,9 @@ MellonPostCount 100
         # behind a reverse proxy or any kind of strange network topology making IP address of client
         # different for the IdP and the SP. Default is on.
         # MellonSubjectConfirmationDataAddressCheck On
+
+        # Does not check signature on logout messages exchanges with idp1
+        # MellonDoNotVerifyLogoutSignature http://idp1.example.com/saml/metadata
 </Location>
 
 

@@ -77,7 +77,6 @@ static const apr_size_t post_size = 1024 * 1024 * 1024;
  */
 static const int post_count = 100;
 
-#if unused
 /* This function handles configuration directives which set a 
  * multivalued string slot in the module configuration (the destination
  * strucure is a hash).
@@ -117,7 +116,6 @@ static const char *am_set_hash_string_slot(cmd_parms *cmd,
 
     return NULL;
 }
-#endif /* unused */
 
 /* This function handles configuration directives which set a 
  * multivalued string slot in the module configuration (the destination
@@ -783,6 +781,35 @@ static const char *am_set_authn_context_class_ref(cmd_parms *cmd,
     return NULL;
 }
 
+/* This function handles the MellonDoNotVerifyLogoutSignature configuration directive, 
+ * it is identical to the am_set_hash_string_slot function. You can refer to it.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *  const char *key      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_do_not_verify_logout_signature(cmd_parms *cmd,
+                                          void *struct_ptr,
+                                          const char *key)
+{
+#ifdef HAVE_lasso_profile_set_signature_verify_hint
+    return am_set_hash_string_slot(cmd, struct_ptr, key, NULL);
+#else
+    return apr_pstrcat(cmd->pool, cmd->cmd->name,
+                       " is not usable as modmellon was compiled against "
+                       "a version of the lasso library which miss the "
+                       "function lasso_profile_set_signature_verify_hint.",
+                       NULL);
+#endif
+}
+
 /* This array contains all the configuration directive which are handled
  * by auth_mellon.
  */    
@@ -1109,6 +1136,14 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Check address given in SubjectConfirmationData Address attribute. Default is on."
         ),
+    AP_INIT_TAKE1(
+        "MellonDoNotVerifyLogoutSignature",
+        am_set_do_not_verify_logout_signature,
+        NULL,
+        OR_AUTHCFG,
+        "A list of entity of IdP whose logout requests signatures will not "
+        "be valided"
+        ),
     {NULL}
 };
 
@@ -1191,8 +1226,9 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     apr_thread_mutex_create(&dir->server_mutex, APR_THREAD_MUTEX_DEFAULT, p);
     dir->inherit_server_from = dir;
     dir->server = NULL;
-    dir->authn_context_class_ref = apr_array_make(p, 0, sizeof(char *));;
+    dir->authn_context_class_ref = apr_array_make(p, 0, sizeof(char *));
     dir->subject_confirmation_data_address_check = inherit_subject_confirmation_data_address_check;
+    dir->do_not_verify_logout_signature = apr_hash_make(p);
 
     return dir;
 }
@@ -1398,6 +1434,11 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->authn_context_class_ref = (add_cfg->authn_context_class_ref->nelts ?
                              add_cfg->authn_context_class_ref :
                              base_cfg->authn_context_class_ref);
+
+    new_cfg->do_not_verify_logout_signature = apr_hash_copy(p, 
+                             (apr_hash_count(add_cfg->do_not_verify_logout_signature) > 0) ?
+                             add_cfg->do_not_verify_logout_signature :
+                             base_cfg->do_not_verify_logout_signature);
 
     new_cfg->subject_confirmation_data_address_check =
         CFG_MERGE(add_cfg, base_cfg, subject_confirmation_data_address_check);

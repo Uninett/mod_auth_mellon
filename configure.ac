@@ -48,6 +48,8 @@ AC_CHECK_LIB(lasso, lasso_server_new_from_buffers,
 	     LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_lasso_server_new_from_buffers")
 AC_CHECK_LIB(lasso, lasso_server_load_metadata,
              LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_lasso_server_load_metadata")
+AC_CHECK_LIB(lasso, lasso_profile_set_signature_verify_hint,
+             LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_lasso_profile_set_signature_verify_hint")
 LIBS=$saved_LIBS;
 AC_SUBST(LASSO_CFLAGS)
 AC_SUBST(LASSO_LIBS)
