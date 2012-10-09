@@ -842,31 +842,34 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
 
     /* Create the logout request message. */
     res = lasso_logout_init_request(logout, NULL, LASSO_HTTP_METHOD_REDIRECT);
-    if(res == LASSO_PROFILE_ERROR_SESSION_NOT_FOUND) {
-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                      "User attempted to initiate logout without being"
-                      " loggged in.");
+    /* Early non failing return. */
+    if (res != 0) {
+        if(res == LASSO_PROFILE_ERROR_SESSION_NOT_FOUND) {
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                          "User attempted to initiate logout without being"
+                          " loggged in.");
+        } else if (res == LASSO_LOGOUT_ERROR_UNSUPPORTED_PROFILE || res == LASSO_PROFILE_ERROR_UNSUPPORTED_PROFILE) {
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, "Current identity provider "
+                            "does not support single logout. Destroying local session only.");
 
+        } else if(res != 0) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Unable to create logout request."
+                          " Lasso error: [%i] %s", res, lasso_strerror(res));
+
+            lasso_logout_destroy(logout);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
         lasso_logout_destroy(logout);
-
         /* Check for bad characters in ReturnTo. */
         rc = am_check_url(r, return_to);
         if (rc != OK) {
             return rc;
         }
-
         /* Redirect to the page the user should be sent to after logout. */
         apr_table_setn(r->headers_out, "Location", return_to);
         return HTTP_SEE_OTHER;
-    } else if(res != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Unable to create logout request."
-                      " Lasso error: [%i] %s", res, lasso_strerror(res));
-
-        lasso_logout_destroy(logout);
-        return HTTP_INTERNAL_SERVER_ERROR;
     }
-
 
     profile = LASSO_PROFILE(logout);
 
