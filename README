@@ -178,7 +178,7 @@ MellonPostCount 100
         # you will have to choose a different name for the cookie for each
         # site.
         # Default: "cookie"
-	MellonVariable "cookie"
+        MellonVariable "cookie"
 
         # MellonSecureCookie enforces the HttpOnly and secure flags
         # for the mod_mellon cookie
@@ -201,20 +201,20 @@ MellonPostCount 100
         # page the user visits. NAME_ID is an attribute which we set to
         # the id we get from the IdP.
         # Default: MellonUser "NAME_ID"
-	MellonUser "NAME_ID"
+        MellonUser "NAME_ID"
 
         # MellonIdP selects in which attribute we should dump the remote 
         # IdP providerId. This is passed to other apache modules and to 
         # the web pages the user visits.
         # Default: none
-	# MellonIdP "IDP"
+        # MellonIdP "IDP"
 
         # MellonSetEnv configuration directives allows you to map
         # attribute names received from the IdP to names you choose
         # yourself. The syntax is 'MellonSetEnv <local name> <IdP name>'.
         # You can list multiple MellonSetEnv directives.
         # Default. None set.
-	MellonSetEnv "e-mail" "mail"
+        MellonSetEnv "e-mail" "mail"
 
         # If MellonSessionDump is set, then the SAML session will be
         # available in the MELLON_SESSION environment variable
@@ -239,7 +239,7 @@ MellonPostCount 100
         # attribute, the last overrides the previous ones.
         #
         # Default: None set.
-	MellonRequire "eduPersonAffiliation" "student" "employee"
+        MellonRequire "eduPersonAffiliation" "student" "employee"
 
         # MellonCond provides the same function as MellonRequire, with
         # extra functionnality (MellonRequire is retained for backward
@@ -289,9 +289,9 @@ MellonPostCount 100
         # option has effect on a following MellonRequire directive.
         # 
         # Default: none set
-	# MellonCond "mail" "@example\.net$" [OR,REG]
-	# MellonCond "mail" "@example\.com$" [OR,REG]
-	# MellonCond "uid" "superuser"
+        # MellonCond "mail" "@example\.net$" [OR,REG]
+        # MellonCond "mail" "@example\.com$" [OR,REG]
+        # MellonCond "uid" "superuser"
 
         # MellonEndpointPath selects which directory mod_auth_mellon
         # should assume contains the SAML 2.0 endpoints. Any request to
@@ -301,7 +301,7 @@ MellonPostCount 100
         # the directory. The directory must be a sub-directory of this
         # <Location ...>.
         # Default: MellonEndpointPath "/mellon"
-	MellonEndpointPath "/secret/endpoint"
+        MellonEndpointPath "/secret/endpoint"
 
         # MellonDefaultLoginPath is the location where one should be
         # redirected after an IdP-initiated login. Default is "/"
@@ -345,7 +345,7 @@ MellonPostCount 100
         # private key only needs to be readable by root, otherwise it has
         # to be reasbable by the Apache pseudo user.
         # Default: None set.
-	MellonSPPrivateKeyFile /etc/apache2/mellon/sp-private-key.pem
+        MellonSPPrivateKeyFile /etc/apache2/mellon/sp-private-key.pem
 
         # MellonSPCertFile is a .pem file with the certificate for the
         # service provider. This directive is optional.
@@ -364,21 +364,21 @@ MellonPostCount 100
         # ommitted, no metadata validation will take place.
         #
         # Default: None set.
-	MellonIdPMetadataFile /etc/apache2/mellon/idp-metadata.xml
+        MellonIdPMetadataFile /etc/apache2/mellon/idp-metadata.xml
 
         # MellonIdPMetadataGlob is a glob(3) pattern enabled  alternative 
         # to MellonIdPMetadataFile. Like MellonIdPMetadataFile it will
         # accept an optional validating chain if lasso is recent enough.
         #
         # Default: None set.
-	#MellonIdPMetadataGlob /etc/apache2/mellon/*-metadata.xml
+        #MellonIdPMetadataGlob /etc/apache2/mellon/*-metadata.xml
 
         # MellonIdpPublicKeyFile is the full path of the public key of the
         # IdP. This parameter is optional if the public key is embedded
         # in the IdP's metadata file, or if a certificate authority is
         # used. This parameter cannot be used if multiple IdP are configured.
         # Default: None set.
-	MellonIdPPublicKeyFile /etc/apache2/mellon/idp-public-key.pem
+        MellonIdPPublicKeyFile /etc/apache2/mellon/idp-public-key.pem
 
         # MellonIdPCAFile is the full path to the certificate of the
         # certificate authority. This can be used instead of an
@@ -439,21 +439,21 @@ MellonPostCount 100
         # available in the MELLON_SAML_RESPONSE environement 
         # variable. This assertion holds a verifiable signature
         # that can be checked again. Default is Off.
-	MellonSamlResponseDump Off
+        MellonSamlResponseDump Off
 
         # This option will make the Lasso session available in 
-	# the MELLON_SESSION environement variable. Default is Off.
-	MellonSessionDump Off
+        # the MELLON_SESSION environement variable. Default is Off.
+        MellonSessionDump Off
 
-	# This option will request specific authentication security-level
-	# through the AuthnContextClassRef element of the AuthnRequest It will
-	# also request enforcement of this level when receiving an
-	# authenticating Assertion.
-	# If the assertion does not have the required security level, an HTTP
-	# Forbidden status code is returned to the browser.
-	# MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:Kerberos"
-	# MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport"
-	# MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:SoftwarePKI"
+        # This option will request specific authentication security-level
+        # through the AuthnContextClassRef element of the AuthnRequest It will
+        # also request enforcement of this level when receiving an
+        # authenticating Assertion.
+        # If the assertion does not have the required security level, an HTTP
+        # Forbidden status code is returned to the browser.
+        # MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:Kerberos"
+        # MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport"
+        # MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:SoftwarePKI"
 
         # MellonSubjectConfirmationDataAddressCheck is used to control
         # the checking of client IP address against the address returned by the
