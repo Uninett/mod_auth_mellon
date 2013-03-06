@@ -2762,6 +2762,7 @@ static int am_handle_auth(request_rec *r)
  */
 static int am_handle_login(request_rec *r)
 {
+    char *idp_param;
     const char *idp;
     char *return_to;
     char *is_passive_str;
@@ -2782,14 +2783,15 @@ static int am_handle_login(request_rec *r)
         return ret;
     }
 
-    idp = am_extract_query_parameter(r->pool, r->args, "IdP");
-    if(idp != NULL) {
-        ret = am_urldecode((char*)idp);
+    idp_param = am_extract_query_parameter(r->pool, r->args, "IdP");
+    if(idp_param != NULL) {
+        ret = am_urldecode(idp_param);
         if(ret != OK) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "Error urldecoding IdP parameter.");
             return ret;
         }
+        idp = idp_param;
     } else {
         /* Use the default IdP. */
         idp = am_get_idp(r);
