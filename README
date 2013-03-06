@@ -642,3 +642,9 @@ including:
 - IdP discovery service support.
 - SOAP logout support.
 
+Benjamin Dauvergne <bdauvergne@entrouvert.com> has contributed many
+patches, both with bugfixes and new features:
+- Cookie settings, for specifying domain and path of cookie.
+- Support for SAML 2.0 authentication contexts.
+- Support for running behind a reverse proxy.
+- Logout improvements, including support for local logout.
