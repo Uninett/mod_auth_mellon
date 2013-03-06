@@ -1893,6 +1893,7 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
         if(idp != NULL) {
             rc = am_cache_env_append(session, dir_cfg->idpattr, idp);
             if(rc != OK) {
+                am_release_request_session(r, session);
                 lasso_login_destroy(login);
                 return rc;
             }
