@@ -57,11 +57,6 @@ static const int default_dump_saml_response = 0;
  */
 static const char *default_login_path = "/";
 
-/* This is the directory for storing saved POST sessions
- * the MellonPostDirectory configuration directive if you change this.
- */
-static const char *post_dir = "/var/tmp/mellonpost";
-
 /* saved POST session time to live
  * the MellonPostTTL configuration directive if you change this.
  */
@@ -1489,7 +1484,7 @@ void *auth_mellon_server_config(apr_pool_t *p, server_rec *s)
 
     mod->cache_size = 100;  /* ought to be enough for everybody */
     mod->lock_file  = "/var/run/mod_auth_mellon.lock";
-    mod->post_dir   = post_dir;
+    mod->post_dir   = NULL;
     mod->post_ttl   = post_ttl;
     mod->post_count = post_count;
     mod->post_size  = post_size;

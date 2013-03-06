@@ -2307,8 +2307,15 @@ static int am_handle_repost(request_rec *r)
     }
 
     mod_cfg = am_get_mod_cfg(r->server);
+
+    if (!mod_cfg->post_dir) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Repost query without MellonPostDirectory.");
+        return HTTP_NOT_FOUND;
+    }
+
     query = r->parsed_uri.query;
-    
+
     enctype = am_extract_query_parameter(r->pool, query, "enctype");
     if (enctype == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 

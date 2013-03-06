@@ -105,11 +105,10 @@ MellonCacheSize 100
 MellonLockFile "/var/run/mod_auth_mellon.lock"
 
 # MellonPostDirectory is the full path of a directory where POST requests
-# are saved during authentication. This directory must be owned by the
-# Apache user and be mode 700. We will attempt to create it if it does not
-# exist.
-# Default: MellonPostDirectory "/var/tmp/mellonpost"
-MellonPostDirectory "/var/tmp/mellonpost"
+# are saved during authentication. This directory must writeable by the
+# Apache user. It should not be writeable (or readable) by other users.
+# Default: None
+# Example: MellonPostDirectory "/var/cache/mod_auth_mellon_postdata"
 
 # MellonPostTTL is the delay in seconds before a saved POST request can
 # be flushed.
@@ -469,6 +468,9 @@ MellonPostCount 100
         # enabled, POST requests that trigger authentication will be saved until the
         # authentication is completed, and then replayed. If this option isn't enabled,
         # the requests will be turned into normal GET requests after authentication.
+        #
+        # Note that if this option is enabled, you must also
+        # set the MellonPostDirectory option in the server configuration.
         #
         # The default is that it is "Off".
         # MellonPostReplay Off

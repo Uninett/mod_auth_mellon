@@ -911,72 +911,8 @@ char *am_getfile(apr_pool_t *conf, server_rec *s, const char *file)
     return data;
 }
 
-/* 
- * Create a directory for saved POST sessions, check for proper permissions
- *
- * Parameters:
- *   request_rec *r     The current request
- *
- * Returns:
- *  OK on success, or HTTP_INTERNAL_SERVER on failure.
- */
-static int am_postdir_mkdir(request_rec *r)
-{
-    apr_int32_t wanted;
-    apr_finfo_t afi;
-    apr_status_t rv;
-    char buffer[512];
-    am_mod_cfg_rec *mod_cfg;
-    apr_fileperms_t mode;
-    apr_uid_t user;
-    apr_uid_t group;
-    apr_fileperms_t prot;
-
-    mod_cfg = am_get_mod_cfg(r->server);
-
-    mode = APR_FPROT_UREAD|APR_FPROT_UWRITE|APR_FPROT_UEXECUTE;
-    if ((rv = apr_dir_make_recursive(mod_cfg->post_dir, mode, r->pool)) != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
-                      "cannot create POST directory \"%s\": %s",
-                      mod_cfg->post_dir,
-                      apr_strerror(rv, buffer, sizeof(buffer)));
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
-
-    /* 
-     * The directory may have already existed. Check we really own it
-     */
-    wanted = APR_FINFO_USER|APR_FINFO_UPROT|APR_FINFO_GPROT|APR_FINFO_WPROT;
-    if (apr_stat(&afi, mod_cfg->post_dir, wanted, r->pool) == OK) {
-        if (apr_uid_current(&user, &group, r->pool) != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
-                          "apr_uid_current failed");
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
-
-        if (afi.user != user) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
-                          "POST directory \"%s\" must be owned by the same "
-                          "user as the web server is running as.",
-                          mod_cfg->post_dir);
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
-
-        prot = APR_FPROT_UREAD|APR_FPROT_UWRITE|APR_FPROT_UEXECUTE;
-        if (afi.protection != prot) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
-                          "Premissions on POST directory \"%s\" must be 0700.",
-                          mod_cfg->post_dir);
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
-    }
-
-    return OK;
-}
-
-/* 
- * Purge outdated saved POST requests. If the MellonPostDirectory
- * directory does not exist, create it first.
+/*
+ * Purge outdated saved POST requests.
  *
  * Parameters:
  *   request_rec *r     The current request
@@ -989,6 +925,7 @@ int am_postdir_cleanup(request_rec *r)
     am_mod_cfg_rec *mod_cfg;
     apr_dir_t *postdir;
     apr_status_t rv;
+    char error_buffer[64];
     apr_finfo_t afi;
     char *fname;
     int count;
@@ -998,8 +935,14 @@ int am_postdir_cleanup(request_rec *r)
     /*
      * Open our POST directory or create it. 
      */
-    if (apr_dir_open(&postdir, mod_cfg->post_dir, r->pool) != OK)
-        return am_postdir_mkdir(r);
+    rv = apr_dir_open(&postdir, mod_cfg->post_dir, r->pool);
+    if (rv != 0) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Unable to open MellonPostDirectory \"%s\": %s",
+                      mod_cfg->post_dir,
+                      apr_strerror(rv, error_buffer, sizeof(error_buffer)));
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
 
     /*
      * Purge outdated items
