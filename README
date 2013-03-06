@@ -464,6 +464,15 @@ MellonPostCount 100
 
         # Does not check signature on logout messages exchanges with idp1
         # MellonDoNotVerifyLogoutSignature http://idp1.example.com/saml/metadata
+
+        # Whether to enable replay of POST requests after authentication. When this option is
+        # enabled, POST requests that trigger authentication will be saved until the
+        # authentication is completed, and then replayed. If this option isn't enabled,
+        # the requests will be turned into normal GET requests after authentication.
+        #
+        # The default is that it is "Off".
+        # MellonPostReplay Off
+
 </Location>
 
 

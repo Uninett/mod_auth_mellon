@@ -224,6 +224,9 @@ typedef struct am_dir_cfg_rec {
     /* MellonDoNotVerifyLogoutSignature idp set */
     apr_hash_t *do_not_verify_logout_signature;
 
+    /* Whether we should replay POST data after authentication. */
+    int post_replay;
+
     /* Cached lasso server object. */
     LassoServer *server;
 } am_dir_cfg_rec;
@@ -277,6 +280,10 @@ extern const command_rec auth_mellon_commands[];
  */
 static const int default_subject_confirmation_data_address_check = 1;
 static const int inherit_subject_confirmation_data_address_check = -1;
+
+/* Default and inherit values for MellonPostReplay option. */
+static const int default_post_replay = 0;
+static const int inherit_post_replay = -1;
 
 
 void *auth_mellon_dir_config(apr_pool_t *p, char *d);

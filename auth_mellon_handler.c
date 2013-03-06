@@ -3063,8 +3063,14 @@ static int am_start_auth(request_rec *r)
 
     /* If this is a POST request, attempt to save it */
     if (r->method_number == M_POST) {
-        if (am_save_post(r, &return_to) != OK)
-            return HTTP_INTERNAL_SERVER_ERROR;
+        if (CFG_VALUE(cfg, post_replay)) {
+            if (am_save_post(r, &return_to) != OK)
+                return HTTP_INTERNAL_SERVER_ERROR;
+        } else {
+            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                          "POST data dropped because we do not have a"
+                          " MellonPostReplay is not enabled.");
+        }
     }
 
     /* Check if IdP discovery is in use. */

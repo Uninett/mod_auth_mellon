@@ -1144,6 +1144,13 @@ const command_rec auth_mellon_commands[] = {
         "A list of entity of IdP whose logout requests signatures will not "
         "be valided"
         ),
+    AP_INIT_FLAG(
+        "MellonPostReplay",
+        ap_set_flag_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, post_replay),
+        OR_AUTHCFG,
+        "Whether we should replay POST requests that trigger authentication. Default is off."
+        ),
     {NULL}
 };
 
@@ -1229,6 +1236,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->authn_context_class_ref = apr_array_make(p, 0, sizeof(char *));
     dir->subject_confirmation_data_address_check = inherit_subject_confirmation_data_address_check;
     dir->do_not_verify_logout_signature = apr_hash_make(p);
+    dir->post_replay = inherit_post_replay;
 
     return dir;
 }
@@ -1442,6 +1450,7 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
 
     new_cfg->subject_confirmation_data_address_check =
         CFG_MERGE(add_cfg, base_cfg, subject_confirmation_data_address_check);
+    new_cfg->post_replay = CFG_MERGE(add_cfg, base_cfg, post_replay);
 
     return new_cfg;
 }
