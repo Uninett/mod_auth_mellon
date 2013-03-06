@@ -17,17 +17,7 @@ DISTFILES=$(SRC) \
 	TODO \
 	README \
 	COPYING \
-	NEWS \
-	debian/auth_mellon.conf \
-	debian/auth_mellon.load \
-	debian/changelog \
-	debian/compat \
-	debian/control \
-	debian/copyright \
-	debian/dirs \
-	debian/docs \
-	debian/install \
-	debian/rules
+	NEWS
 
 
 all:	mod_auth_mellon.la
