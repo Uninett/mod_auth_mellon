@@ -101,8 +101,8 @@ MellonCacheSize 100
 # to the session data. The path should only be used by one instance of
 # apache at a time. The server must be restarted before any changes to this
 # option takes effect.
-# Default: MellonLockFile "/tmp/mellonLock"
-MellonLockFile "/tmp/mellonLock"
+# Default: MellonLockFile "/var/run/mod_auth_mellon.lock"
+MellonLockFile "/var/run/mod_auth_mellon.lock"
 
 # MellonPostDirectory is the full path of a directory where POST requests
 # are saved during authentication. This directory must be owned by the

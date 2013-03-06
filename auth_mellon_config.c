@@ -1479,7 +1479,7 @@ void *auth_mellon_server_config(apr_pool_t *p, server_rec *s)
     mod = apr_palloc(p, sizeof(*mod));
 
     mod->cache_size = 100;  /* ought to be enough for everybody */
-    mod->lock_file  = "/tmp/mellonLock";
+    mod->lock_file  = "/var/run/mod_auth_mellon.lock";
     mod->post_dir   = post_dir;
     mod->post_ttl   = post_ttl;
     mod->post_count = post_count;
