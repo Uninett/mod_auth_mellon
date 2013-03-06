@@ -3022,10 +3022,6 @@ int am_handler(request_rec *r)
         return am_handle_artifact_reply(r);
     } else if(!strcmp(endpoint, "auth")) {
         return am_handle_auth(r);
-    } else if(!strcmp(endpoint, "metadata")) {
-        return OK;
-    } else if(!strcmp(endpoint, "repost")) {
-        return OK;
     } else if(!strcmp(endpoint, "logout")
               || !strcmp(endpoint, "logoutRequest")) {
         /* logoutRequest is included for backwards-compatibility
