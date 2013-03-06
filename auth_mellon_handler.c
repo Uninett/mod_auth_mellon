@@ -1591,9 +1591,6 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
                                 + apr_time_make(dir_cfg->session_length, 0));
     }
 
-    /* Mark user as logged in. */
-    session->logged_in = 1;
-
     /* Save session information. */
     ret = am_cache_env_append(session, "NAME_ID", name_id);
     if(ret != OK) {
@@ -1910,6 +1907,9 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
         lasso_login_destroy(login);
         return rc;
     }
+
+    /* Mark user as logged in. */
+    session->logged_in = 1;
 
     am_release_request_session(r, session);
     lasso_login_destroy(login);
