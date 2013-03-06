@@ -474,17 +474,19 @@ static const char *am_get_idp(request_rec *r)
  * belonging to the current request.
  *
  * Parameters:
- *  request_rec *r         The current request.
- *  LassoProfile *profile  The profile object.
+ *  request_rec *r             The current request.
+ *  am_cache_entry_t *session  The session we are creating.
+ *  LassoProfile *profile      The profile object.
+ *  char *saml_response        The full SAML 2.0 response message.
  *
  * Returns:
  *  OK on success or HTTP_INTERNAL_SERVER_ERROR on failure.
  */
-static int am_save_lasso_profile_state(request_rec *r, 
-                                       LassoProfile *profile, 
+static int am_save_lasso_profile_state(request_rec *r,
+                                       am_cache_entry_t *session,
+                                       LassoProfile *profile,
                                        char *saml_response)
 {
-    am_cache_entry_t *am_session;
     LassoIdentity *lasso_identity;
     LassoSession *lasso_session;
     gchar *identity_dump;
@@ -527,22 +529,11 @@ static int am_save_lasso_profile_state(request_rec *r,
     }
 
 
-    am_session = am_get_request_session(r);
-    if(am_session == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Could not get auth_mellon session while attempting"
-                      " to store the lasso profile state.");
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
-
     /* Save the profile state. */
-    ret = am_cache_set_lasso_state(am_session, 
-                                   identity_dump, 
+    ret = am_cache_set_lasso_state(session,
+                                   identity_dump,
                                    session_dump,
                                    saml_response);
-
-    am_release_request_session(r, am_session);
-
 
     if(identity_dump != NULL) {
         g_free(identity_dump);
@@ -1900,25 +1891,27 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
         }
     }
 
-    am_release_request_session(r, session);
-
     rc = lasso_login_accept_sso(login);
     if(rc < 0) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Unable to accept SSO message."
                       " Lasso error: [%i] %s", rc, lasso_strerror(rc));
+        am_release_request_session(r, session);
         lasso_login_destroy(login);
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
 
     /* Save the profile state. */
-    rc = am_save_lasso_profile_state(r, LASSO_PROFILE(login), saml_response);
+    rc = am_save_lasso_profile_state(r, session, LASSO_PROFILE(login),
+                                     saml_response);
     if(rc != OK) {
+        am_release_request_session(r, session);
         lasso_login_destroy(login);
         return rc;
     }
 
+    am_release_request_session(r, session);
     lasso_login_destroy(login);
 
 
