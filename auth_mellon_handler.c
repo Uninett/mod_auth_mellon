@@ -2762,6 +2762,7 @@ static int am_handle_auth(request_rec *r)
  */
 static int am_handle_login(request_rec *r)
 {
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     char *idp_param;
     const char *idp;
     char *return_to;
@@ -2791,10 +2792,6 @@ static int am_handle_login(request_rec *r)
                           "Error urldecoding IdP parameter.");
             return ret;
         }
-        idp = idp_param;
-    } else {
-        /* Use the default IdP. */
-        idp = am_get_idp(r);
     }
 
     is_passive_str = am_extract_query_parameter(r->pool, r->args, "IsPassive");
@@ -2816,6 +2813,21 @@ static int am_handle_login(request_rec *r)
         }
     } else {
         is_passive = FALSE;
+    }
+
+    if(idp_param != NULL) {
+        idp = idp_param;
+    } else if(cfg->discovery_url) {
+        if(is_passive) {
+            /* We cannot currently do discovery with passive authentication requests. */
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Discovery service with passive authentication request unsupported.");
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+        return am_start_disco(r, return_to);
+    } else {
+        /* No discovery service -- just use the default IdP. */
+        idp = am_get_idp(r);
     }
 
     return am_send_authn_request(r, idp, return_to, is_passive);
