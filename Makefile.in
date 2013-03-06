@@ -14,7 +14,6 @@ DISTFILES=$(SRC) \
 	configure.ac \
 	Makefile.in \
 	autogen.sh \
-	TODO \
 	README \
 	COPYING \
 	NEWS
