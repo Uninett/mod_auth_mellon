@@ -642,6 +642,44 @@ directive can be used to limit the usable IdP for probe discovery:
   MellonProbeDiscoveryIdP "https://idp1.example.net/saml/metadata"
   MellonProbeDiscoveryIdP "https://idp2.example.net/saml/metadata"
 
+
+===========================================================================
+ Replaying POST requests
+===========================================================================
+
+By default, POST requests received when the user isn't logged in are turned
+into GET requests after authentication. mod_auth_mellon can instead save
+the received POST request and replay / repost it after authentication. To
+enable this:
+
+1. Create a data directory where mod_auth_mellon can store the saved data:
+
+     mkdir /var/cache/mod_auth_mellon_postdata
+
+2. Set the appropriate permissions on this directory. It needs to be
+   accessible for the web server, but nobody else.
+
+     chown www-data /var/cache/mod_auth_mellon_postdata
+     chgrp www-data /var/cache/mod_auth_mellon_postdata
+     chmod 0700 /var/cache/mod_auth_mellon_postdata
+
+3. Set the MellonPostDirectory option in your server configuration:
+
+     MellonPostDirectory "/var/cache/mod_auth_mellon_postdata"
+
+4. Enable POST replay functionality for the locations you want:
+
+     <Location /secret>
+         MellonEnable auth
+         [...]
+         MellonPostReplay On
+     </Location>
+
+After you restart Apache to activate the new configuration, any POST
+requests that trigger authentication should now be stored while the
+user logs in.
+
+
 ===========================================================================
  Contributors
 ===========================================================================
