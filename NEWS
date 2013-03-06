@@ -1,3 +1,54 @@
+Version 0.6.0
+---------------------------------------------------------------------------
+
+Backwards-incompatible changes:
+
+* The POST replay functionality has been disabled by default, and the
+  automatic creation of the MellonPostDirectory target directory has been
+  removed. If you want to use the POST replay functionality, take a
+  look at the README file for instructions for how to enable this.
+
+* Start discovery service when accessing the login endpoint. We used
+  to bypass the discovery service in this case, and just pick the first
+  IdP. This has been changed to send a request to the discovery service
+  instead, if one is configured.
+
+* The MellonLockFile default path has been changed to:
+    /var/run/mod_auth_mellon.lock
+  This only affects platforms where a lock file is required and
+  where Apache doesn't have write access to that directory during
+  startup. (Apache can normally create files in that directory
+  during startup.)
+
+Other changes:
+
+* Fix support for SOAP logout.
+
+* Local logout when IdP does not support SAML 2.0 Single Logout.
+
+* MellonDoNotVerifyLogoutSignature option to disable logout signature
+  validation.
+
+* Support for relative file paths in configuration.
+
+* The debian build-directory has been removed from the repository.
+
+* Various cleanups and bugfixes:
+
+  * Fix cookie parsing header parsing for some HTTP libraries.
+
+  * Fix inheritance of MellonAuthnContextClassRef option.
+
+  * Use ap_set_content_type() instead of accessing request->content_type.
+
+  * README indentation cleanups.
+
+  * Support for even older versions of GLib.
+
+  * Fixes for error handling during session initialization.
+
+  * Some code cleanups.
+
 Version 0.5.0
 ---------------------------------------------------------------------------
 
