@@ -860,6 +860,7 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
     /* Disable the the local session (in case the IdP doesn't respond). */
     mellon_session = am_get_request_session(r);
     if(mellon_session != NULL) {
+        am_restore_lasso_profile_state(r, &logout->parent, mellon_session);
         mellon_session->logged_in = 0;
         am_release_request_session(r, mellon_session);
     }
