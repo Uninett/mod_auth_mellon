@@ -173,24 +173,34 @@ static const char *am_set_filestring_slot(cmd_parms *cmd,
                                           const char *arg)
 {
     const char *data;
+    const char *path;
+
+    path = ap_server_root_relative(cmd->pool, arg);
+    if (!path) {
+        return apr_pstrcat(cmd->pool, cmd->cmd->name,
+                           ": Invalid file path ", arg, NULL);
+    }
+
 #ifdef HAVE_lasso_server_new_from_buffers
-    if ((data = am_getfile(cmd->pool, cmd->server, arg)) == NULL)
-        return apr_psprintf(cmd->pool, "%s - Cannot read file %s",
-                            cmd->cmd->name, arg);
+    data = am_getfile(cmd->pool, cmd->server, path);
+    if (!data) {
+        return apr_pstrcat(cmd->pool, cmd->cmd->name,
+                           ": Cannot read file ", path, NULL);
+    }
 #else
     apr_finfo_t finfo;
     apr_status_t rv;
     char error[64];
 
-    rv = apr_stat(&finfo, arg, APR_FINFO_SIZE, cmd->pool);
+    rv = apr_stat(&finfo, path, APR_FINFO_SIZE, cmd->pool);
     if(rv != 0) {
         apr_strerror(rv, error, sizeof(error));
         return apr_psprintf(cmd->pool,
                             "%s - Cannot read file \"%s\" [%d] \"%s\"",
-                            cmd->cmd->name, arg, rv, error);
+                            cmd->cmd->name, path, rv, error);
     }
 
-    data = arg;
+    data = path;
 #endif
 
     return ap_set_string_slot(cmd, struct_ptr, data);
@@ -339,7 +349,7 @@ static const char *am_set_idp_ignore_slot(cmd_parms *cmd,
 }
 
 
-/* This function handles configuration directives which set a string
+/* This function handles configuration directives which set a file path
  * slot in the module configuration.
  *
  * Parameters:
@@ -354,11 +364,11 @@ static const char *am_set_idp_ignore_slot(cmd_parms *cmd,
  * Returns:
  *  NULL on success or an error string on failure.
  */
-static const char *am_set_module_config_string_slot(cmd_parms *cmd,
+static const char *am_set_module_config_file_slot(cmd_parms *cmd,
                                                     void *struct_ptr,
                                                     const char *arg)
 {
-    return ap_set_string_slot(cmd, am_get_mod_cfg(cmd->server), arg);
+    return ap_set_file_slot(cmd, am_get_mod_cfg(cmd->server), arg);
 }
 
 /* This function handles configuration directives which set an int
@@ -823,7 +833,7 @@ const command_rec auth_mellon_commands[] = {
         ),
     AP_INIT_TAKE1(
         "MellonLockFile",
-        am_set_module_config_string_slot,
+        am_set_module_config_file_slot,
         (void *)APR_OFFSETOF(am_mod_cfg_rec, lock_file),
         RSRC_CONF,
         "The lock file for session synchronization."
@@ -831,7 +841,7 @@ const command_rec auth_mellon_commands[] = {
         ), 
     AP_INIT_TAKE1(
         "MellonPostDirectory",
-        am_set_module_config_string_slot,
+        am_set_module_config_file_slot,
         (void *)APR_OFFSETOF(am_mod_cfg_rec, post_dir),
         RSRC_CONF,
         "The directory for saving POST requests."
@@ -1035,14 +1045,14 @@ const command_rec auth_mellon_commands[] = {
         ),
     AP_INIT_TAKE1(
         "MellonIdPPublicKeyFile",
-        ap_set_string_slot,
+        ap_set_file_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, idp_public_key_file),
         OR_AUTHCFG,
         "Full path to pem file with the public key for the IdP."
         ),
     AP_INIT_TAKE1(
         "MellonIdPCAFile",
-        ap_set_string_slot,
+        ap_set_file_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, idp_ca_file),
         OR_AUTHCFG,
         "Full path to pem file with CA chain for the IdP."
