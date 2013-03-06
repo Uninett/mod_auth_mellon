@@ -76,9 +76,10 @@
 #define AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE 65536
 
 
-/* This is the length of the session id we use.
+/* This is the length of the id we use (for session IDs and
+ * replaying POST data).
  */
-#define AM_SESSION_ID_LENGTH 32
+#define AM_ID_LENGTH 32
 
 
 #define am_get_srv_cfg(s) (am_srv_cfg_rec *)ap_get_module_config((s)->module_config, &auth_mellon_module)
@@ -336,7 +337,7 @@ char *am_extract_query_parameter(apr_pool_t *pool,
 char *am_urlencode(apr_pool_t *pool, const char *str);
 int am_urldecode(char *data);
 int am_check_url(request_rec *r, const char *url);
-char *am_generate_session_id(request_rec *r);
+char *am_generate_id(request_rec *r);
 char *am_getfile(apr_pool_t *conf, server_rec *s, const char *file);
 char *am_get_endpoint_url(request_rec *r);
 int am_postdir_cleanup(request_rec *s);

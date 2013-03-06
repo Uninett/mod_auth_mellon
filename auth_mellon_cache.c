@@ -51,7 +51,7 @@ am_cache_entry_t *am_cache_lock(server_rec *s,
 
     switch (type) {
     case AM_CACHE_SESSION:
-        if (strlen(key) != AM_SESSION_ID_LENGTH)
+        if (strlen(key) != AM_ID_LENGTH)
             return NULL;
         break;
     case AM_CACHE_NAMEID:
@@ -140,7 +140,7 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
     char buffer[512];
 
     /* Check if we have a valid session key. We abort if we don't. */
-    if(key == NULL || strlen(key) != AM_SESSION_ID_LENGTH) {
+    if(key == NULL || strlen(key) != AM_ID_LENGTH) {
         return NULL;
     }
 

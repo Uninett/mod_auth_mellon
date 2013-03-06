@@ -764,17 +764,17 @@ int am_generate_random_bytes(request_rec *r, void *dest, apr_size_t count)
 }
 
 
-/* This function generates a session id which is AM_SESSION_ID_LENGTH
- * characters long. The session id will consist of hexadecimal characters.
+/* This function generates an id which is AM_ID_LENGTH characters long.
+ * The id will consist of hexadecimal characters.
  *
  * Parameters:
- *  request_rec *r       The request we generate a session id for.
+ *  request_rec *r       The request we associate allocated memory with.
  *
  * Returns:
- *  The session id, made up of AM_SESSION_ID_LENGTH hexadecimal characters,
+ *  The session id, made up of AM_ID_LENGTH hexadecimal characters,
  *  terminated by a null-byte.
  */
-char *am_generate_session_id(request_rec *r)
+char *am_generate_id(request_rec *r)
 {
     int rc;
     char *ret;
@@ -784,18 +784,18 @@ char *am_generate_session_id(request_rec *r)
     unsigned char b;
     int hi, low;
 
-    ret = (char *)apr_palloc(r->pool, AM_SESSION_ID_LENGTH + 1);
+    ret = (char *)apr_palloc(r->pool, AM_ID_LENGTH + 1);
 
     /* We need to round the length of the random data _up_, in case the
      * length of the session id isn't even.
      */
-    rand_data_len = (AM_SESSION_ID_LENGTH + 1) / 2;
+    rand_data_len = (AM_ID_LENGTH + 1) / 2;
 
     /* Fill the last rand_data_len bytes of the string with
      * random bytes. This allows us to overwrite from the beginning of
      * the string.
      */
-    rand_data = (unsigned char *)&ret[AM_SESSION_ID_LENGTH - rand_data_len];
+    rand_data = (unsigned char *)&ret[AM_ID_LENGTH - rand_data_len];
 
     /* Generate random numbers. */
     rc = am_generate_random_bytes(r, rand_data, rand_data_len);
@@ -804,11 +804,11 @@ char *am_generate_session_id(request_rec *r)
     }
 
     /* Convert the random bytes to hexadecimal. Note that we will write
-     * AM_SESSION_LENGTH+1 characters if we have a non-even length of the
+     * AM_ID_LENGTH+1 characters if we have a non-even length of the
      * session id. This is OK - we will simply overwrite the last character
      * with the null-terminator afterwards.
      */
-    for(i = 0; i < AM_SESSION_ID_LENGTH; i += 2) {
+    for(i = 0; i < AM_ID_LENGTH; i += 2) {
         b = rand_data[i / 2];
         hi = (b >> 4) & 0xf;
         low = b & 0xf;
@@ -827,7 +827,7 @@ char *am_generate_session_id(request_rec *r)
     }
 
     /* Add null-terminator- */
-    ret[AM_SESSION_ID_LENGTH] = '\0';
+    ret[AM_ID_LENGTH] = '\0';
 
     return ret;
 }
@@ -1098,7 +1098,7 @@ int am_save_post(request_rec *r, const char **relay_state)
 
     mod_cfg = am_get_mod_cfg(r->server);
 
-    if ((psf_id = am_generate_session_id(r)) == NULL) {
+    if ((psf_id = am_generate_id(r)) == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "cannot generate id");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
