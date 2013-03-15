@@ -47,6 +47,9 @@ Other changes:
 
   * Fixes for error handling during session initialization.
 
+  * Directly link with GLib rather than relying on the Lasso library
+    linking to it for us.
+
   * Some code cleanups.
 
 Version 0.5.0
