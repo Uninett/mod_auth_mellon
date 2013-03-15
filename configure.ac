@@ -66,8 +66,6 @@ AC_SUBST(OPENSSL_LIBS)
 
 # We need at least version 2.12 of GLib.
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.12])
-AC_SUBST(GLIB_CFLAGS)
-AC_SUBST(GLIB_LIBS)
 
 
 # Create Makefile from Makefile.in
