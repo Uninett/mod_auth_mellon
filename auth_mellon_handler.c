@@ -2375,11 +2375,14 @@ static int am_handle_repost(request_rec *r)
         return HTTP_BAD_REQUEST;
     }
 
-    psf_filename = apr_psprintf(r->pool, "%s/%s", mod_cfg->post_dir, psf_id); 
-    if ((post_data = am_getfile(r->pool, r->server, psf_filename)) == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+    psf_filename = apr_psprintf(r->pool, "%s/%s", mod_cfg->post_dir, psf_id);
+    post_data = am_getfile(r->pool, r->server, psf_filename);
+    if (post_data == NULL) {
+        /* Unable to load repost data. Just redirect us instead. */
+        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
                       "Bad repost query: cannot find \"%s\"", psf_filename);
-        return HTTP_BAD_REQUEST;
+        apr_table_setn(r->headers_out, "Location", return_url);
+        return HTTP_SEE_OTHER;
     }
 
     if ((post_form = (*post_mkform)(r, post_data)) == NULL) {
