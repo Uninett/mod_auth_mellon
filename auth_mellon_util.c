@@ -929,8 +929,12 @@ int am_postdir_cleanup(request_rec *r)
     apr_finfo_t afi;
     char *fname;
     int count;
+    apr_time_t expire_before;
 
     mod_cfg = am_get_mod_cfg(r->server);
+
+    /* The oldes file we should keep. Delete files that are older. */
+    expire_before = apr_time_now() - mod_cfg->post_ttl * APR_USEC_PER_SEC;
 
     /*
      * Open our POST directory or create it. 
@@ -957,7 +961,7 @@ int am_postdir_cleanup(request_rec *r)
         if (afi.name[0] == '.')
              continue;
 
-        if (afi.ctime + mod_cfg->post_ttl > apr_time_sec(apr_time_now())) {
+        if (afi.ctime < expire_before) {
             fname = apr_psprintf(r->pool, "%s/%s", mod_cfg->post_dir, afi.name);
             (void)apr_file_remove(fname , r->pool); 
         } else {
