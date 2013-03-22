@@ -1,3 +1,12 @@
+Version 0.6.1
+---------------------------------------------------------------------------
+
+* Fix the POST replay functionality when multiple users logging in
+  at once.
+
+* Add a fallback for the case where the POST replay data has expired
+  before the user logs in.
+
 Version 0.6.0
 ---------------------------------------------------------------------------
 
