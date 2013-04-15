@@ -1064,6 +1064,13 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "List of IdP entityId to ignore."
         ),
+    AP_INIT_TAKE1(
+        "MellonSPentityId",
+        ap_set_string_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_entity_id),
+        OR_AUTHCFG,
+        "SP entity Id to be used for metadata auto generation."
+        ),
     AP_INIT_TAKE12(
         "MellonOrganizationName",
         am_set_langstring_slot,
@@ -1231,6 +1238,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->probe_discovery_timeout = -1; /* -1 means no probe discovery */
     dir->probe_discovery_idp = apr_table_make(p, 0);
 
+    dir->sp_entity_id = NULL;
     dir->sp_org_name = apr_hash_make(p);
     dir->sp_org_display_name = apr_hash_make(p);
     dir->sp_org_url = apr_hash_make(p);
@@ -1399,6 +1407,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->idp_ignore = add_cfg->idp_ignore != NULL ?
                           add_cfg->idp_ignore :
                           base_cfg->idp_ignore;
+
+    new_cfg->sp_entity_id = (add_cfg->sp_entity_id ?
+                             add_cfg->sp_entity_id :
+                             base_cfg->sp_entity_id);
 
     new_cfg->sp_org_name = apr_hash_copy(p,
                           (apr_hash_count(add_cfg->sp_org_name) > 0) ?

@@ -332,7 +332,11 @@ MellonPostCount 100
         # Default: None set.
         MellonSPMetadataFile /etc/apache2/mellon/sp-metadata.xml
 
-        # If you choose to autogenerate metadata, these option 
+        # If you choose to autogenerate metadata, this option
+        # can be used to control the SP entityId
+        # MellonSPentityId "https://www.example.net/foo"
+        #
+        # If you choose to autogenerate metadata, these options 
         # can be used to fill the <Organization> element. They
         # all follow the syntax "option [lang] value":
         # MellonOrganizationName "random-service"

@@ -195,6 +195,7 @@ typedef struct am_dir_cfg_rec {
     GList *idp_ignore;
 
     /* metadata autogeneration helper */
+    char *sp_entity_id;
     apr_hash_t *sp_org_name;
     apr_hash_t *sp_org_display_name;
     apr_hash_t *sp_org_url;

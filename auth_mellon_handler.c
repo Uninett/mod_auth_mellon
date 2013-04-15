@@ -117,6 +117,9 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     char *url = am_get_endpoint_url(r);
     char *cert = "";
+    const char *sp_entity_id;
+
+    sp_entity_id = cfg->sp_entity_id ? cfg->sp_entity_id : url;
 
     if (cfg->sp_cert_file) {
 	char *sp_cert_file;
@@ -171,7 +174,7 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
     return apr_psprintf(p,
       "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\
 <EntityDescriptor\n\
- entityID=\"%smetadata\"\n\
+ entityID=\"%s%s\"\n\
  xmlns=\"urn:oasis:names:tc:SAML:2.0:metadata\">\n\
  <SPSSODescriptor\n\
    AuthnRequestsSigned=\"true\"\n\
@@ -197,7 +200,8 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
  </SPSSODescriptor>\n\
  %s\n\
 </EntityDescriptor>",
-      url, cert, url, url, url, url, am_optional_metadata(p, r));
+      sp_entity_id, cfg->sp_entity_id ? "" : "metadata", 
+      cert, url, url, url, url, am_optional_metadata(p, r));
 }
 #endif /* HAVE_lasso_server_new_from_buffers */
 
