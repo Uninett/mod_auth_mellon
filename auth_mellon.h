@@ -64,6 +64,10 @@
 #include "mod_ssl.h"
 
 
+/* Backwards-compatibility helpers. */
+#include "auth_mellon_compat.h"
+
+
 /* Size definitions for the session cache.
  */
 #define AM_CACHE_KEYSIZE 120
@@ -378,27 +382,5 @@ int am_httpclient_post_str(request_rec *r, const char *uri,
 
 
 extern module AP_MODULE_DECLARE_DATA auth_mellon_module;
-
-/* Old glib compatibility */
-
-#if (GLIB_MAJOR_VERSION == 2) && (GLIB_MINOR_VERSION < 14)
-
-static void g_hash_table_get_keys_helper(gpointer key, gpointer value,
-                                         gpointer user_data)
-{
-    GList **out = user_data;
-
-    *out = g_list_prepend(*out, key);
-}
-
-static GList *g_hash_table_get_keys(GHashTable *ht)
-{
-    GList *ret = NULL;
-
-    g_hash_table_foreach(ht, g_hash_table_get_keys_helper, &ret);
-
-    return g_list_reverse(ret);
-}
-#endif
 
 #endif /* MOD_AUTH_MELLON_H */
