@@ -24,11 +24,6 @@
 
 #include <curl/curl.h>
 
-#ifdef AP_NEED_SET_MUTEX_PERMS
-#include "unixd.h"
-#endif
-
-
 /* This function is called after the configuration of the server is parsed
  * (it's a post-config hook).
  *
@@ -133,7 +128,7 @@ static int am_global_init(apr_pool_t *conf, apr_pool_t *log,
     /* On some platforms the mutex is implemented as a file. To allow child
      * processes running as a different user to open it, it is necessary to
      * change the permissions on it. */
-    rv = unixd_set_global_mutex_perms(mod->lock);
+    rv = ap_unixd_set_global_mutex_perms(mod->lock);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
                      "Failed to set permissions on session table lock;"
