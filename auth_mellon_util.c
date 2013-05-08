@@ -589,6 +589,27 @@ char *am_extract_query_parameter(apr_pool_t *pool,
     }
 }
 
+
+/* Convert a hexadecimal digit to an integer.
+ *
+ * Parameters:
+ *  char c           The digit we should convert.
+ *
+ * Returns:
+ *  The digit as an integer, or -1 if it isn't a hex digit.
+ */
+static int am_unhex_digit(char c) {
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    } else if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 0xa;
+    } else if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 0xa;
+    } else {
+        return -1;
+    }
+}
+
 /* This function urldecodes a string in-place.
  *
  * Parameters:
@@ -600,24 +621,51 @@ char *am_extract_query_parameter(apr_pool_t *pool,
  */
 int am_urldecode(char *data)
 {
-    int rc;
     char *ip;
+    char *op;
+    int c1, c2;
 
-    /* First we replace all '+'-characters with space. */
-    for (ip = strchr(data, '+'); ip != NULL; ip = strchr(ip, '+')) {
-        *ip = ' ';
+    ip = data;
+    op = data;
+    while (*ip) {
+        switch (*ip) {
+        case '+':
+            *op = ' ';
+            ip++;
+            op++;
+            break;
+        case '%':
+            /* Decode the hex digits. Note that we need to check the
+             * result of the first conversion before attempting the
+             * second conversion -- otherwise we may read past the end
+             * of the string.
+             */
+            c1 = am_unhex_digit(ip[1]);
+            if (c1 < 0) {
+                return HTTP_BAD_REQUEST;
+            }
+            c2 = am_unhex_digit(ip[2]);
+            if (c2 < 0) {
+                return HTTP_BAD_REQUEST;
+            }
+
+            *op = (c1 << 4) | c2;
+            if (*op == '\0') {
+                /* null-byte. */
+                return HTTP_BAD_REQUEST;
+            }
+            ip += 3;
+            op++;
+            break;
+        default:
+            *op = *ip;
+            ip++;
+            op++;
+        }
     }
+    *op = '\0';
 
-    /* Then we call ap_unescape_url_keep2f to decode all the "%xx"
-     * escapes. This function returns HTTP_NOT_FOUND if the string
-     * contains a null-byte.
-     */
-    rc = ap_unescape_url_keep2f(data);
-    if (rc == HTTP_NOT_FOUND) {
-        return HTTP_BAD_REQUEST;
-    }
-
-    return rc;
+    return OK;
 }
 
 
