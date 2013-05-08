@@ -1920,7 +1920,7 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
 
 
     /* No RelayState - we don't know what to do. Use default login path. */
-    if(relay_state == NULL) {
+    if(relay_state == NULL || strlen(relay_state) == 0) {
        dir_cfg = am_get_dir_cfg(r);
        apr_table_setn(r->headers_out, "Location", dir_cfg->login_path);
        return HTTP_SEE_OTHER;
