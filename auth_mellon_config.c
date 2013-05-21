@@ -959,14 +959,14 @@ const command_rec auth_mellon_commands[] = {
         ap_set_flag_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, dump_session),
         OR_AUTHCFG,
-        "Dump session in environement. Default is off"
+        "Dump session in environment. Default is off"
         ),
     AP_INIT_FLAG(
         "MellonSamlResponseDump",
         ap_set_flag_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, dump_saml_response),
         OR_AUTHCFG,
-        "Dump SAML authentication response in environement. Default is off"
+        "Dump SAML authentication response in environment. Default is off"
         ),
     AP_INIT_RAW_ARGS(
         "MellonRequire",

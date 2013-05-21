@@ -17,7 +17,7 @@ mod_auth_mellon has four dependencies:
  * OpenSSL
  * lasso (>=2.1)
 
-You will also require developement headers and tools for all of the
+You will also require development headers and tools for all of the
 dependencies.
 
 If OpenSSL or lasso are installed in a "strange" directory, then you may
@@ -68,7 +68,7 @@ your distribution, it may be named '/etc/apache/httpd.conf' or something
 different.
 
 
-You need to add a LoadModule directove for mod_auth_mellon. This will
+You need to add a LoadModule directive for mod_auth_mellon. This will
 look similar to this:
 
 LoadModule auth_mellon_module /usr/lib/apache2/modules/mod_auth_mellon.so
@@ -119,7 +119,7 @@ MellonPostTTL 900
 # Default: MellonPostSize 1073741824 (1 MB)
 MellonPostSize 1073741824
 
-# MellonPostCount is the maxmimum amount of saved POST requests
+# MellonPostCount is the maximum amount of saved POST requests
 # Default: MellonPostCount 100
 MellonPostCount 100
 
@@ -241,7 +241,7 @@ MellonPostCount 100
         MellonRequire "eduPersonAffiliation" "student" "employee"
 
         # MellonCond provides the same function as MellonRequire, with
-        # extra functionnality (MellonRequire is retained for backward
+        # extra functionality (MellonRequire is retained for backward
         # compatibility). The syntax is
         # 'MellonCond <attribute name> <value> [<options>]'
         #
@@ -260,14 +260,14 @@ MellonPostCount 100
         #             are substituted.
         #    %{num}   Same as %n, with num being a number that may be 
         #             greater than 9.
-        #    %{ENV:x} Substitute Apache environement variable x.
-        #    %%       Escape substitution to get a litteral %.
+        #    %{ENV:x} Substitute Apache environment variable x.
+        #    %%       Escape substitution to get a literal %.
         #
         # <options> is an optional, comma-separated list of option
-        # encloseed with brackets. Here is an example: [NOT,NC]
+        # enclosed with brackets. Here is an example: [NOT,NC]
         # The valid options are:
-        #    OR  If this MellonCond evaluted to false, then the
-        #        next one will be checked. If it evalutes to true,
+        #    OR  If this MellonCond evaluated to false, then the
+        #        next one will be checked. If it evaluates to true,
         #        then the overall check succeeds.
         #    NOT This MellonCond evaluates to true if the attribute 
         #        does not match the value.
@@ -318,7 +318,7 @@ MellonPostCount 100
         # mod_auth_mellon will redirect the user to if he returns from the
         # IdP without a cookie with a session id.
         # Note that the user may also get this error if he for some reason
-        # loses the cookie between being redirected to the IdPs login page
+        # loses the cookie between being redirected to the IdP's login page
         # and returning from it.
         # If this option is unset, then mod_auth_mellon will return a
         # 400 Bad Request error if the cookie is missing.
@@ -348,7 +348,7 @@ MellonPostCount 100
         # key of the service provider. The .pem-file cannot be encrypted
         # with a password. If built with lasso-2.2.2 or higher, the
         # private key only needs to be readable by root, otherwise it has
-        # to be reasbable by the Apache pseudo user.
+        # to be readable by the Apache pseudo user.
         # Default: None set.
         MellonSPPrivateKeyFile /etc/apache2/mellon/sp-private-key.pem
 
@@ -359,14 +359,14 @@ MellonPostCount 100
 
         # MellonIdPMetadataFile is the full path to the file which contains
         # metadata for the IdP you are authenticating against. This
-        # directive is required. Mutliple IdP metadata can be configured
+        # directive is required. Multiple IdP metadata can be configured
         # by using multiple MellonIdPMetadataFile directives.
         #
         # If your lasso library is recent enough (higher than 2.3.5),
         # then MellonIdPMetadataFile will accept an XML file containing
         # descriptors for multiple IdP. An optional validating chain can
         # be supplied as a second argument to MellonIdPMetadataFile. If
-        # ommitted, no metadata validation will take place.
+        # omitted, no metadata validation will take place.
         #
         # Default: None set.
         MellonIdPMetadataFile /etc/apache2/mellon/idp-metadata.xml
@@ -392,7 +392,7 @@ MellonPostCount 100
         MellonIdPCAFile /etc/apache2/mellon/ca.pem
 
         # MellonIdPIgnore lists IdP entityId that should not loaded
-        # from XML federation metadata files. This is usefull if an
+        # from XML federation metadata files. This is useful if an
         # IdP cause bugs. Multiple entityId may be specified through
         # single MellonIdPIgnore, and multiple MellonIdPIgnore are allowed.
         # Default: None set.
@@ -400,16 +400,16 @@ MellonPostCount 100
 
         # MellonDiscoveryURL is the URL for IdP discovery service. 
         # This is used for selecting among multiple configured IdP.
-        # On initiali user authentication, it is redirected to the 
+        # On initial user authentication, it is redirected to the
         # IdP discovery URL, with the following arguments set:
         #
         #   entityID         SP providerID URL, where our metadata 
-        #                    are pubblished.
-        #   retueniDParam    Argument that IdP discovery must send back.
+        #                    are published.
+        #   returnIDParam    Argument that IdP discovery must send back.
         #   return           Return URL the IdP discovery should return to.
         #
         # The IdP discovery must redirect the user to the return URL, 
-        # with retueniDParam set to the selected IdP providerID.
+        # with returnIDParam set to the selected IdP providerID.
         # 
         # The builtin:get-metadata discovery URL is not supported anymore
         # starting with 0.3.1. See MellonProbeDiscoveryTimeout for
@@ -441,13 +441,13 @@ MellonPostCount 100
         # MellonProbeDiscoveryIdP http://idp2.example.net/saml/metadata
 
         # This option will make the SAML authentication assertion 
-        # available in the MELLON_SAML_RESPONSE environement 
+        # available in the MELLON_SAML_RESPONSE environment
         # variable. This assertion holds a verifiable signature
         # that can be checked again. Default is Off.
         MellonSamlResponseDump Off
 
         # This option will make the Lasso session available in 
-        # the MELLON_SESSION environement variable. Default is Off.
+        # the MELLON_SESSION environment variable. Default is Off.
         MellonSessionDump Off
 
         # This option will request specific authentication security-level

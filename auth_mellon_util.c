@@ -189,7 +189,7 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
 
         } else if (strcmp(ns, "ENV") == 0) {
             /*
-             * ENV namespace. Get value from apache environement
+             * ENV namespace. Get value from apache environment
              */
             value = getenv(name);
         }
