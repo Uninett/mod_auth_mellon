@@ -266,6 +266,14 @@ typedef enum {
     AM_CACHE_NAMEID 
 } am_cache_key_t;
 
+/* Type for configuring environment variable names */
+typedef struct am_envattr_conf_t {
+    // Name of the variable
+    const char *name;
+    // Should a prefix be added
+    int prefixed;
+} am_envattr_conf_t;
+
 extern const command_rec auth_mellon_commands[];
 
 /* When using a value from a directory configuration structure, a special value is used

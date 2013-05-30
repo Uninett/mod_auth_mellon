@@ -215,6 +215,13 @@ MellonPostCount 100
         # Default. None set.
         MellonSetEnv "e-mail" "mail"
 
+        # MellonSetEnvNoPrefix is identical to MellonSetEnv, except this
+        # does not prepend 'MELLON_' to the constructed environment variable.
+        # The syntax is 'MellonSetEnvNoPrefix <local name> <IdP name>'.
+        # You can list multiple MellonSetEnvNoPrefix directives.
+        # Default. None set.
+        MellonSetEnvNoPrefix "DISPLAY_NAME" "displayName"
+
         # If MellonSessionDump is set, then the SAML session will be
         # available in the MELLON_SESSION environment variable
         MellonSessionDump Off
@@ -545,8 +552,9 @@ https://example.com/secret/, and get the contents of that page.
 When authenticating a user, mod_auth_mellon will set some environment
 variables to the attributes it received from the IdP. The name of the
 variables will be MELLON_<attribute name>. If you have specified a
-different name with the MellonSetEnv configuration directive, then that
-name will be used instead. The name will still be prefixed by 'MELLON_'.
+different name with the MellonSetEnv or MellonSetEnvNoPrefix configuration
+directive, then that name will be used instead. In the case of MellonSetEnv,
+the name will still be prefixed by 'MELLON_'.
 
 The value of the attribute will be base64 decoded.
 

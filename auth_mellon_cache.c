@@ -351,8 +351,9 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
     am_dir_cfg_rec *d;
     int i;
     apr_hash_t *counters;
+    am_envattr_conf_t *env_varname_conf;
     const char *varname;
-    const char *env_varname;
+    const char *varname_prefix;
     const char *value;
     int *count;
 
@@ -376,12 +377,17 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
      */
     for(i = 0; i < t->size; ++i) {
         varname = t->env[i].varname;
+        varname_prefix = "MELLON_";
 
         /* Check if we should map this name into another name. */
-        env_varname = (const char*)apr_hash_get(
+        env_varname_conf = (am_envattr_conf_t *)apr_hash_get(
             d->envattr, varname, APR_HASH_KEY_STRING);
-        if(env_varname != NULL) {
-            varname = env_varname;
+
+        if(env_varname_conf != NULL) {
+            varname = env_varname_conf->name;
+            if (!env_varname_conf->prefixed) {
+              varname_prefix = "";
+            }
         }
 
         value = t->env[i].value;
@@ -403,7 +409,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
 
             /* Add the variable without a suffix. */
             apr_table_set(r->subprocess_env,
-                          apr_pstrcat(r->pool, "MELLON_", varname, NULL),
+                          apr_pstrcat(r->pool, varname_prefix, varname, NULL),
                           value);
         }
 
@@ -411,7 +417,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
          * been added before.
          */
         apr_table_set(r->subprocess_env,
-                      apr_psprintf(r->pool, "MELLON_%s_%d", varname, *count),
+                      apr_psprintf(r->pool, "%s%s_%d", varname_prefix, varname, *count),
                       value);
 
         /* Increase the count. */

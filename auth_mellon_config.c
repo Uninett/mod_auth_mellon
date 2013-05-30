@@ -508,7 +508,38 @@ static const char *am_set_setenv_slot(cmd_parms *cmd,
                                       const char *oldName)
 {
     am_dir_cfg_rec *d = (am_dir_cfg_rec *)struct_ptr;
-    apr_hash_set(d->envattr, oldName, APR_HASH_KEY_STRING, newName);
+    /* Configure as prefixed attribute name */
+    am_envattr_conf_t *envattr_conf = (am_envattr_conf_t *)apr_palloc(cmd->pool, sizeof(am_envattr_conf_t));
+    envattr_conf->name = newName;
+    envattr_conf->prefixed = 1;
+    apr_hash_set(d->envattr, oldName, APR_HASH_KEY_STRING, envattr_conf);
+    return NULL;
+}
+
+/* This function handles the MellonSetEnvNoPrefix configuration directive.
+ * This directive allows the user to change the name of attributes without prefixing them with MELLON_.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for the MellonSetEnv
+ *                       configuration directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *  const char *newName  The new name of the attribute.
+ *  const char *oldName  The old name of the attribute.
+ *
+ * Returns:
+ *  This function will always return NULL.
+ */
+static const char *am_set_setenv_no_prefix_slot(cmd_parms *cmd,
+                                      void *struct_ptr,
+                                      const char *newName,
+                                      const char *oldName)
+{
+    am_dir_cfg_rec *d = (am_dir_cfg_rec *)struct_ptr;
+    /* Configure as not prefixed attribute name */
+    am_envattr_conf_t *envattr_conf = (am_envattr_conf_t *)apr_palloc(cmd->pool, sizeof(am_envattr_conf_t));
+    envattr_conf->name = newName;
+    envattr_conf->prefixed = 0;
+    apr_hash_set(d->envattr, oldName, APR_HASH_KEY_STRING, envattr_conf);
     return NULL;
 }
 
@@ -951,8 +982,16 @@ const command_rec auth_mellon_commands[] = {
         am_set_setenv_slot,
         NULL,
         OR_AUTHCFG,
-        "Renames attributes received from the server. The format is"
+        "Renames attributes received from the server while retaining prefix MELLON_. The format is"
         " MellonSetEnv <old name> <new name>."
+        ),
+     AP_INIT_TAKE2(
+        "MellonSetEnvNoPrefix",
+        am_set_setenv_no_prefix_slot,
+        NULL,
+        OR_AUTHCFG,
+        "Renames attributes received from the server without adding prefix. The format is"
+        " MellonSetEnvNoPrefix <old name> <new name>."
         ),
     AP_INIT_FLAG(
         "MellonSessionDump",
