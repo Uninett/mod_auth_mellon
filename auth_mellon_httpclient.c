@@ -294,24 +294,6 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
         goto cleanup_fail;
     }
 
-    /* Enable SSL peer certificate verification. */
-    res = curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-    if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Failed to enable SSL peer certificate verification:"
-                      " [%u] %s", res, curl_error);
-        goto cleanup_fail;
-    }
-
-    /* Enable SSL peer hostname verification. */
-    res = curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
-    if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Failed to enable SSL peer hostname verification:"
-                      " [%u] %s", res, curl_error);
-        goto cleanup_fail;
-    }
-
     /* If we have a CA configured, try to use it */
     if (cfg->idp_ca_file != NULL) {
         res = curl_easy_setopt(curl, CURLOPT_CAINFO, cfg->idp_ca_file);
