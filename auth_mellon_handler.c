@@ -1970,7 +1970,7 @@ static int am_handle_post_reply(request_rec *r)
     /* Make sure that this is a POST request. */
     if(r->method_number != M_POST) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Exptected POST request for HTTP-POST endpoint."
+                      "Expected POST request for HTTP-POST endpoint."
                       " Got a %s request instead.", r->method);
 
         /* According to the documentation for request_rec, a handler which
@@ -2060,11 +2060,13 @@ static int am_handle_artifact_reply(request_rec *r)
     LassoLogin *login;
     char *response;
     char *relay_state;
+    char *saml_art;
+    char *post_data;
 
     /* Make sure that this is a GET request. */
-    if(r->method_number != M_GET) {
+    if(r->method_number != M_GET && r->method_number != M_POST) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Exptected GET request for the HTTP-Artifact endpoint."
+                      "Expected GET or POST request for the HTTP-Artifact endpoint."
                       " Got a %s request instead.", r->method);
 
         /* According to the documentation for request_rec, a handler which
@@ -2093,14 +2095,41 @@ static int am_handle_artifact_reply(request_rec *r)
     }
 
     /* Parse artifact url. */
-    rc = lasso_login_init_request(login, r->args,
+    if (r->method_number == M_GET) {
+        rc = lasso_login_init_request(login, r->args,
                                   LASSO_HTTP_METHOD_ARTIFACT_GET);
-    if(rc < 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Failed to handle login response."
-                      " Lasso error: [%i] %s", rc, lasso_strerror(rc));
-        lasso_login_destroy(login);
-        return HTTP_BAD_REQUEST;
+
+        if(rc < 0) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Failed to handle login response."
+                          " Lasso error: [%i] %s", rc, lasso_strerror(rc));
+            lasso_login_destroy(login);
+            return HTTP_BAD_REQUEST;
+        }
+    } else {
+        rc = am_read_post_data(r, &post_data, NULL);
+        if (rc != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+                    "Error reading POST data.");
+            return HTTP_BAD_REQUEST;
+        }
+
+        saml_art = am_extract_query_parameter(r->pool, post_data, "SAMLart");
+        if (saml_art == NULL) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+                    "Error reading POST data missing SAMLart form parameter.");
+            return HTTP_BAD_REQUEST;
+        }
+        ap_unescape_url(saml_art);
+
+        rc = lasso_login_init_request(login, saml_art, LASSO_HTTP_METHOD_ARTIFACT_POST);
+        if(rc < 0) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Failed to handle login response."
+                          " Lasso error: [%i] %s", rc, lasso_strerror(rc));
+            lasso_login_destroy(login);
+            return HTTP_BAD_REQUEST;
+        }
     }
 
     /* Prepare SOAP request. */
@@ -2138,8 +2167,13 @@ static int am_handle_artifact_reply(request_rec *r)
     }
 
     /* Extract the RelayState parameter. */
-    relay_state = am_extract_query_parameter(r->pool, r->args,
-                                               "RelayState");
+    if (r->method_number == M_GET) {
+        relay_state = am_extract_query_parameter(r->pool, r->args,
+                                                   "RelayState");
+    } else {
+        relay_state = am_extract_query_parameter(r->pool, post_data,
+                                                   "RelayState");
+    }
 
     /* Finish handling the reply with the common handler. */
     return am_handle_reply_common(r, login, relay_state, "");
