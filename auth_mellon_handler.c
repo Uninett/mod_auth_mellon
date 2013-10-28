@@ -654,7 +654,7 @@ static int am_handle_logout_request(request_rec *r,
                                     LassoLogout *logout, char *msg)
 {
     gint res = 0, rc = HTTP_OK;
-    am_cache_entry_t *session;
+    am_cache_entry_t *session = NULL;
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
 
     /* Process the logout message. Ignore missing signature. */
@@ -720,10 +720,11 @@ static int am_handle_logout_request(request_rec *r,
      * caused by the IdP believing that we are logged in when we are not.
      */
 
-    /* Delete the session. */
-    if (session != NULL && res != LASSO_PROFILE_ERROR_SESSION_NOT_FOUND)
+    if (session != NULL && res != LASSO_PROFILE_ERROR_SESSION_NOT_FOUND) {
+        /* We found a matching session -- delete it. */
         am_delete_request_session(r, session);
-
+        session = NULL;
+    }
 
     /* Create response message. */
     res = lasso_logout_build_response_msg(logout);
@@ -738,6 +739,10 @@ static int am_handle_logout_request(request_rec *r,
     rc = am_return_logout_response(r, &logout->parent);
 
 exit:
+    if (session != NULL) {
+        am_release_request_session(r, session);
+    }
+
     lasso_logout_destroy(logout);
     return rc;
 }
