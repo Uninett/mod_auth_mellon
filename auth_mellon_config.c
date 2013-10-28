@@ -1190,7 +1190,7 @@ const command_rec auth_mellon_commands[] = {
     AP_INIT_TAKE1(
         "MellonDoNotVerifyLogoutSignature",
         am_set_do_not_verify_logout_signature,
-        NULL,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, do_not_verify_logout_signature),
         OR_AUTHCFG,
         "A list of entity of IdP whose logout requests signatures will not "
         "be valided"
