@@ -696,6 +696,43 @@ After you restart Apache to activate the new configuration, any POST
 requests that trigger authentication should now be stored while the
 user logs in.
 
+===========================================================================
+ Mellon & User Agent Caching behavior
+===========================================================================
+
+For each content within Apache Location enabled with "info" or "auth"
+mod_auth_mellon sends by default HTTP1.1 Cache-Control header with values
+"private, must-revalidate":
+
+- private-value protects content against caching by any proxy servers.
+- must-revalidate-value obligates user agent to revalidate maybe locally
+  cached or stored content each time on accessing location.
+
+This default behavior ensures that user agent never shows cached static
+HTML pages after logout without revalidationg. So that user couldn't be
+misleaded about malfunction of logout procedure. Revalidating content after
+logout leads to new authentication procedure via mellon.
+
+But mod_auth_mellon will never prohibit specifically any user agent to
+cache or store content locally, that have to be revalidated. So that during
+the session user agent only revalidates data by server 304-Not-Modified
+response and does not have to download content again.
+
+For special content types like images it could make sense to disable
+revalidation completely, so that user agent can provide cached and stored
+content directly to user. This can be achieved by using other Apache
+modules mod_headers and mod_setenvif. E.g. for PNG images:
+
+Using Apache 2.2 configuration options:
+
+  SetEnvIf Request_URI "\.png$" DISABLE_REVALIDATION
+  Header always unset Cache-Control env=DISABLE_REVALIDATION
+
+For Apache 2.4 exists shorter notation:
+
+  Header always unset Cache-Control expr=%{CONTENT_TYPE}==image/png
+
+Editing, appanding, overwriting headers is possible in other cases.
 
 ===========================================================================
  Contributors
