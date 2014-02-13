@@ -342,7 +342,7 @@ void am_delete_request_session(request_rec *r, am_cache_entry_t *session);
 
 char *am_reconstruct_url(request_rec *r);
 int am_check_permissions(request_rec *r, am_cache_entry_t *session);
-void am_set_nocache(request_rec *r);
+void am_set_cache_control_headers(request_rec *r);
 int am_read_post_data(request_rec *r, char **data, apr_size_t *length);
 char *am_extract_query_parameter(apr_pool_t *pool,
                                  const char *query_string,

@@ -391,9 +391,7 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
     return OK;
 }
 
-
-/* This function disables caching of the response to this request. It does
- * this by setting the Pragme: no-cache and Cache-Control: no-cache headers.
+/* This function sets default Cache-Control headers.
  *
  * Parameters:
  *  request_rec *r       The request we are handling.
@@ -401,30 +399,20 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
  * Returns:
  *  Nothing.
  */
-void am_set_nocache(request_rec *r)
+void am_set_cache_control_headers(request_rec *r)
 {
-     const char *user_agent;
-
-    /* Setting the headers inn err_headers_out ensures that they will be
+    /* Send Cache-Control header to ensure that:
+     * - no proxy in the path caches content inside this location (private),
+     * - user agent have to revalidate content on server (must-revalidate).
+     *
+     * But never prohibit specifically any user agent to cache or store content
+     *
+     * Setting the headers in err_headers_out ensures that they will be
      * sent for all responses.
      */
     apr_table_setn(r->err_headers_out,
-		   "Expires", "Thu, 01 Jan 1970 00:00:00 GMT");
-    apr_table_setn(r->err_headers_out,
-		   "Cache-Control", "private, must-revalidate");
-
-    /* 
-     * Never use Cache-Control: no-cache for IE
-     */
-    user_agent = apr_table_get(r->headers_in, "User-Agent");
-    if ((user_agent == NULL) ||
-         (strstr(user_agent, "compatible; MSIE ") == NULL) ||
-         (strstr(user_agent, "Opera") != NULL)) {
-        apr_table_addn(r->err_headers_out,
-		       "Cache-Control", "no-cache, no-store");
-    }
+                   "Cache-Control", "private, must-revalidate");
 }
-
 
 /* This function reads the post data for a request.
  *

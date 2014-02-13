@@ -3168,8 +3168,8 @@ int am_auth_mellon_user(request_rec *r)
 	return DECLINED;
     }
 
-    /* Disable all caching within this location. */
-    am_set_nocache(r);
+    /* Set defaut Cache-Control headers within this location */
+    am_set_cache_control_headers(r);
 
     /* Check if this is a request for one of our endpoints. We check if
      * the uri starts with the path set with the MellonEndpointPath
