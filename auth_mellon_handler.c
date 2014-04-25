@@ -1974,6 +1974,7 @@ static int am_handle_post_reply(request_rec *r)
     LassoServer *server;
     LassoLogin *login;
     char *relay_state;
+    int i, err;
 
     /* Make sure that this is a POST request. */
     if(r->method_number != M_POST) {
@@ -2040,7 +2041,14 @@ static int am_handle_post_reply(request_rec *r)
                       " Lasso error: [%i] %s", rc, lasso_strerror(rc));
 
         lasso_login_destroy(login);
-        return HTTP_BAD_REQUEST;
+        err = HTTP_BAD_REQUEST;
+        for (i = 0; auth_mellon_errormap[i].lasso_error != 0; i++) {
+            if (auth_mellon_errormap[i].lasso_error == rc) {
+                err = auth_mellon_errormap[i].http_error;
+                break;
+            }
+        }
+        return err;
     }
 
     /* Extract RelayState parameter. */

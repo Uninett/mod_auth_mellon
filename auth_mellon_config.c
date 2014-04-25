@@ -1205,6 +1205,13 @@ const command_rec auth_mellon_commands[] = {
     {NULL}
 };
 
+const am_error_map_t auth_mellon_errormap[] = {
+    { LASSO_PROFILE_ERROR_STATUS_NOT_SUCCESS, HTTP_UNAUTHORIZED },
+#ifdef LASSO_PROFILE_ERROR_REQUEST_DENIED
+    { LASSO_PROFILE_ERROR_REQUEST_DENIED, HTTP_UNAUTHORIZED },
+#endif
+    { 0, 0 }
+};
 
 /* Release a lasso_server object associated with this configuration.
  *

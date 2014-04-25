@@ -276,6 +276,13 @@ typedef struct am_envattr_conf_t {
 
 extern const command_rec auth_mellon_commands[];
 
+typedef struct am_error_map_t {
+    int lasso_error;
+    int http_error;
+} am_error_map_t;
+
+extern const am_error_map_t auth_mellon_errormap[];
+
 /* When using a value from a directory configuration structure, a special value is used
  * to state "inherit" from parent, when reading a value and the value is still inherit from, it
  * means that no value has ever been set for this directive, in this case, we use the default
