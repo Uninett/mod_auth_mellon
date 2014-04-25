@@ -491,6 +491,15 @@ MellonPostCount 100
         # The default is that it is "Off".
         # MellonPostReplay Off
 
+        # Page to redirect to if the IdP sends an error in response to
+        # the authentication request.
+        #
+        # Example:
+        #  MellonNoSuccessErrorPage https://sp.example.org/login_failed.html
+        #
+        # The default is to not redirect, but rather send a
+        # 401 Unautorized error.
+
 </Location>
 
 
