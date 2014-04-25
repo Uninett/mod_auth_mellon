@@ -1046,6 +1046,15 @@ const command_rec auth_mellon_commands[] = {
         " ha disabled cookies."
         ),
     AP_INIT_TAKE1(
+        "MellonNoSuccessErrorPage",
+        ap_set_string_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, no_success_error_page),
+        OR_AUTHCFG,
+        "Web page to display if the idp posts with a failed"
+        " authentication error. We will return a 401 Unauthorized error"
+        " if this is unset and the idp posts such assertion."
+        ),
+    AP_INIT_TAKE1(
         "MellonSPMetadataFile",
         am_set_filestring_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_metadata_file),
@@ -1271,6 +1280,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->session_length = -1; /* -1 means use default. */
 
     dir->no_cookie_error_page = NULL;
+    dir->no_success_error_page = NULL;
 
     dir->sp_metadata_file = NULL;
     dir->sp_private_key_file = NULL;
@@ -1424,6 +1434,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->no_cookie_error_page = (add_cfg->no_cookie_error_page != NULL ?
                                      add_cfg->no_cookie_error_page :
                                      base_cfg->no_cookie_error_page);
+
+    new_cfg->no_success_error_page = (add_cfg->no_success_error_page != NULL ?
+                                     add_cfg->no_success_error_page :
+                                     base_cfg->no_success_error_page);
 
 
     new_cfg->sp_metadata_file = (add_cfg->sp_metadata_file ?

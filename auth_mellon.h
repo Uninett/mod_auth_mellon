@@ -210,6 +210,9 @@ typedef struct am_dir_cfg_rec {
     /* No cookie error page. */
     const char *no_cookie_error_page;
 
+    /* Authorization error page. */
+    const char *no_success_error_page;
+
     /* Login path for IdP initiated logins */
     const char *login_path;
 

@@ -1974,6 +1974,7 @@ static int am_handle_post_reply(request_rec *r)
     LassoServer *server;
     LassoLogin *login;
     char *relay_state;
+    am_dir_cfg_rec *dir_cfg = am_get_dir_cfg(r);
     int i, err;
 
     /* Make sure that this is a POST request. */
@@ -2046,6 +2047,13 @@ static int am_handle_post_reply(request_rec *r)
             if (auth_mellon_errormap[i].lasso_error == rc) {
                 err = auth_mellon_errormap[i].http_error;
                 break;
+            }
+        }
+        if (err == HTTP_UNAUTHORIZED) {
+            if (dir_cfg->no_success_error_page != NULL) {
+                apr_table_setn(r->headers_out, "Location",
+                               dir_cfg->no_success_error_page);
+                return HTTP_SEE_OTHER;
             }
         }
         return err;
