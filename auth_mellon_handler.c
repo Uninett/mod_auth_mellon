@@ -218,13 +218,16 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
  */
 static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
 {
-    const char *idp_public_key_file;
     apr_size_t index;
+
+#ifndef HAVE_lasso_server_load_metadata
+    const char *idp_public_key_file;
 
     if (cfg->idp_metadata->nelts == 1)
         idp_public_key_file = cfg->idp_public_key_file;
     else
         idp_public_key_file = NULL;
+#endif /* ! HAVE_lasso_server_load_metadata */
 
     for (index = 0; index < cfg->idp_metadata->nelts; index++) {
         const am_metadata_t *idp_metadata;
