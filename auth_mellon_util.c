@@ -613,6 +613,10 @@ int am_urldecode(char *data)
     char *op;
     int c1, c2;
 
+    if (data == NULL) {
+        return HTTP_BAD_REQUEST;
+    }
+
     ip = data;
     op = data;
     while (*ip) {
@@ -1343,8 +1347,8 @@ const char *am_get_mime_header(request_rec *r, const char *m, const char *h)
 
         if (((value = am_xstrtok(r, line, ":", &l2)) != NULL) &&
             (strcasecmp(value, h) == 0)) {
-            value =  am_xstrtok(r, NULL, ":", &l2);
-            am_strip_blank(&value);
+            if ((value = am_xstrtok(r, NULL, ":", &l2)) != NULL)
+                am_strip_blank(&value);
             return value;
         }
    }
@@ -1395,9 +1399,9 @@ const char *am_get_header_attr(request_rec *r, const char *h,
 
         attr_name = am_xstrtok(r, attr, "=", &l2); 
         if ((attr_name != NULL) && (strcasecmp(attr_name, a) == 0)) {
-        	attr_value = am_xstrtok(r, NULL, "=", &l2);
+            if ((attr_value = am_xstrtok(r, NULL, "=", &l2)) != NULL)
                 am_strip_blank(&attr_value);
-        	break;
+            break;
         }
     }
   
