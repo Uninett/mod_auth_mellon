@@ -55,8 +55,6 @@ am_cache_entry_t *am_cache_lock(server_rec *s,
             return NULL;
         break;
     case AM_CACHE_NAMEID:
-        if (strlen(key) > AM_CACHE_MAX_LASSO_IDENTITY_SIZE)
-            return NULL;
         break;
     default:
         return NULL;
@@ -314,7 +312,7 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
     t->size = 0;
     t->user[0] = '\0';
 
-    t->lasso_identity[0] = '\0';
+    am_cache_storage_null(&t->lasso_identity);
     t->lasso_session[0] = '\0';
 
     t->pool_size = am_cache_entry_pool_size(mod_cfg);
@@ -590,21 +588,17 @@ int am_cache_set_lasso_state(am_cache_entry_t *session,
                              const char *lasso_session,
                              const char *lasso_saml_response)
 {
-    if(lasso_identity != NULL) {
-        if(strlen(lasso_identity) < AM_CACHE_MAX_LASSO_IDENTITY_SIZE) {
-            strcpy(session->lasso_identity, lasso_identity);
-        } else {
-            ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
-                         "Lasso identity is to big for storage. Size of lasso"
-                         " identity is %" APR_SIZE_T_FMT ", max size is %"
-                         APR_SIZE_T_FMT ".",
-                         (apr_size_t)strlen(lasso_identity),
-                         (apr_size_t)AM_CACHE_MAX_LASSO_IDENTITY_SIZE - 1);
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
-    } else {
-        /* No identity dump to save. */
-        strcpy(session->lasso_identity, "");
+    int status;
+
+    status = am_cache_entry_store_string(session,
+                                         &session->lasso_identity,
+                                         lasso_identity);
+    if (status != 0) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
+                     "Lasso identity is to big for storage. Size of lasso"
+                     " identity is %" APR_SIZE_T_FMT ".",
+                     (apr_size_t)strlen(lasso_identity));
+        return HTTP_INTERNAL_SERVER_ERROR;
     }
 
 
@@ -656,11 +650,7 @@ int am_cache_set_lasso_state(am_cache_entry_t *session,
  */
 const char *am_cache_get_lasso_identity(am_cache_entry_t *session)
 {
-    if(strlen(session->lasso_identity) == 0) {
-        return NULL;
-    }
-
-    return session->lasso_identity;
+    return am_cache_entry_get_string(session, &session->lasso_identity);
 }
 
 

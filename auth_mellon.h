@@ -75,7 +75,6 @@
 #define AM_CACHE_VALSIZE 512-AM_CACHE_VARSIZE
 #define AM_CACHE_ENVSIZE 128
 #define AM_CACHE_USERSIZE 512
-#define AM_CACHE_MAX_LASSO_IDENTITY_SIZE 1024
 #define AM_CACHE_MAX_LASSO_SESSION_SIZE 32768
 #define AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE 65536
 #define AM_CACHE_DEFAULT_ENTRY_SIZE 196608
@@ -265,7 +264,7 @@ typedef struct am_cache_entry_t {
     /* Variables used to store lasso state between login requests
      *and logout requests.
      */
-    char lasso_identity[AM_CACHE_MAX_LASSO_IDENTITY_SIZE];
+    am_cache_storage_t lasso_identity;
     char lasso_session[AM_CACHE_MAX_LASSO_SESSION_SIZE];
     char lasso_saml_response[AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE];
 
