@@ -313,7 +313,7 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
     t->user[0] = '\0';
 
     am_cache_storage_null(&t->lasso_identity);
-    t->lasso_session[0] = '\0';
+    am_cache_storage_null(&t->lasso_session);
 
     t->pool_size = am_cache_entry_pool_size(mod_cfg);
     t->pool[0] = '\0';
@@ -533,13 +533,15 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
     /* Populate with the session? */
     if (d->dump_session) {
         char *session;
+        const char *srcstr;
         int srclen, dstlen;
 
-        srclen = strlen(t->lasso_session);
+        srcstr = am_cache_entry_get_string(t, &t->lasso_session);
+        srclen = strlen(srcstr);
         dstlen = apr_base64_encode_len(srclen);
 
         session = apr_palloc(r->pool, dstlen);
-        (void)apr_base64_encode(session, t->lasso_session, srclen);
+        (void)apr_base64_encode(session, srcstr, srclen);
         apr_table_set(r->subprocess_env, "MELLON_SESSION", session);
     }
 
@@ -601,22 +603,15 @@ int am_cache_set_lasso_state(am_cache_entry_t *session,
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-
-    if(lasso_session != NULL) {
-        if(strlen(lasso_session) < AM_CACHE_MAX_LASSO_SESSION_SIZE) {
-            strcpy(session->lasso_session, lasso_session);
-        } else {
-            ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
-                         "Lasso session is to big for storage. Size of lasso"
-                         " session is %" APR_SIZE_T_FMT ", max size is %"
-                         APR_SIZE_T_FMT ".",
-                         (apr_size_t)strlen(lasso_session),
-                         (apr_size_t)AM_CACHE_MAX_LASSO_SESSION_SIZE - 1);
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
-    } else {
-        /* No session dump to save. */
-        strcpy(session->lasso_session, "");
+    status = am_cache_entry_store_string(session,
+                                         &session->lasso_session,
+                                         lasso_session);
+    if (status != 0) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
+                     "Lasso session is to big for storage. Size of lasso"
+                     " session is %" APR_SIZE_T_FMT ".",
+                     (apr_size_t)strlen(lasso_session));
+        return HTTP_INTERNAL_SERVER_ERROR;
     }
 
     if(lasso_saml_response != NULL) {
@@ -664,9 +659,5 @@ const char *am_cache_get_lasso_identity(am_cache_entry_t *session)
  */
 const char *am_cache_get_lasso_session(am_cache_entry_t *session)
 {
-    if(strlen(session->lasso_session) == 0) {
-        return NULL;
-    }
-
-    return session->lasso_session;
+    return am_cache_entry_get_string(session, &session->lasso_session);
 }
