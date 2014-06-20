@@ -314,6 +314,7 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
 
     am_cache_storage_null(&t->lasso_identity);
     am_cache_storage_null(&t->lasso_session);
+    am_cache_storage_null(&t->lasso_saml_response);
 
     t->pool_size = am_cache_entry_pool_size(mod_cfg);
     t->pool[0] = '\0';
@@ -545,10 +546,12 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
         apr_table_set(r->subprocess_env, "MELLON_SESSION", session);
     }
 
-    if (d->dump_saml_response)
-        apr_table_set(r->subprocess_env, 
-		      "MELLON_SAML_RESPONSE", 
-		       t->lasso_saml_response);
+    if (d->dump_saml_response) {
+        const char *sr = am_cache_entry_get_string(t, &t->lasso_saml_response);
+        if (sr) {
+            apr_table_set(r->subprocess_env, "MELLON_SAML_RESPONSE", sr);
+        }
+    }
 }
 
 
@@ -614,21 +617,15 @@ int am_cache_set_lasso_state(am_cache_entry_t *session,
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    if(lasso_saml_response != NULL) {
-        if(strlen(lasso_saml_response) < AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE) {
-            strcpy(session->lasso_saml_response, lasso_saml_response);
-        } else {
-            ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
-                         "Lasso SAML response is to big for storage. "
-                         "Size of lasso session is %" APR_SIZE_T_FMT
-                         ", max size is %" APR_SIZE_T_FMT ".",
-                         (apr_size_t)strlen(lasso_saml_response),
-                         (apr_size_t)AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE - 1);
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
-    } else {
-        /* No session dump to save. */
-        strcpy(session->lasso_saml_response, "");
+    status = am_cache_entry_store_string(session,
+                                         &session->lasso_saml_response,
+                                         lasso_saml_response);
+    if (status != 0) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
+                     "Lasso SAML response is to big for storage. Size of "
+                     "lasso SAML Reponse is %" APR_SIZE_T_FMT ".",
+                     (apr_size_t)strlen(lasso_saml_response));
+        return HTTP_INTERNAL_SERVER_ERROR;
     }
 
     return OK;

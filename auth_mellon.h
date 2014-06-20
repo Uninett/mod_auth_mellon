@@ -75,7 +75,6 @@
 #define AM_CACHE_VALSIZE 512-AM_CACHE_VARSIZE
 #define AM_CACHE_ENVSIZE 128
 #define AM_CACHE_USERSIZE 512
-#define AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE 65536
 #define AM_CACHE_DEFAULT_ENTRY_SIZE 196608
 #define AM_CACHE_MIN_ENTRY_SIZE 65536
 
@@ -265,7 +264,7 @@ typedef struct am_cache_entry_t {
      */
     am_cache_storage_t lasso_identity;
     am_cache_storage_t lasso_session;
-    char lasso_saml_response[AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE];
+    am_cache_storage_t lasso_saml_response;
 
     am_cache_env_t env[AM_CACHE_ENVSIZE];
 
