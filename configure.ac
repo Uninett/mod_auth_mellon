@@ -1,5 +1,8 @@
 AC_INIT([mod_auth_mellon],[0.7.0],[olav.morken@uninett.no])
 
+# We require support for C99.
+AC_PROG_CC_C99
+
 AC_SUBST(NAMEVER, AC_PACKAGE_TARNAME()-AC_PACKAGE_VERSION())
 
 
