@@ -113,6 +113,96 @@ am_cache_entry_t *am_cache_lock(server_rec *s,
     return NULL;
 }
 
+static inline void am_cache_storage_null(am_cache_storage_t *slot)
+{
+    slot->ptr = 0;
+}
+
+static inline apr_size_t am_cache_entry_pool_left(am_cache_entry_t *e)
+{
+    return e->pool_size - e->pool_used;
+}
+
+static inline apr_size_t am_cache_entry_pool_size(am_mod_cfg_rec *cfg)
+{
+    return cfg->init_entry_size - sizeof(am_cache_entry_t);
+}
+
+/* This function sets a string into the specified storage on the entry.
+ *
+ * NOTE: The string pointer may be NULL, in that case storage is freed
+ * and set to NULL.
+ *
+ * Parametrs:
+ *  am_cache_entry_t *entry         Pointer to an entry
+ *  am_cache_storage_t *slot        Pointer to storage
+ *  const char *string              Pointer to a replacement string
+ *
+ * Returns:
+ *  0 on success, HTTP_INTERNAL_SERVER_ERROR on error.
+ */
+static int am_cache_entry_store_string(am_cache_entry_t *entry,
+                                       am_cache_storage_t *slot,
+                                       const char *string)
+{
+    char *datastr = NULL;
+    apr_size_t datalen = 0;
+    apr_size_t str_len = 0;
+
+    if (string == NULL) return 0;
+
+    if (slot->ptr != 0) {
+        datastr = &entry->pool[slot->ptr];
+        datalen = strlen(datastr) + 1;
+    }
+    str_len = strlen(string) + 1;
+    if (str_len - datalen <= 0) {
+        memcpy(datastr, string, str_len);
+        return 0;
+    }
+
+    /* recover space if slot happens to point to the last allocated space */
+    if (slot->ptr + datalen == entry->pool_used) {
+        entry->pool_used -= datalen;
+        slot->ptr = 0;
+    }
+
+    if (am_cache_entry_pool_left(entry) < str_len) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
+                     "apr_cache_entry_store_string() asked %zd available: %zd. "
+                     "It may be a good idea to increase MellonCacheEntrySize.",
+                     str_len, am_cache_entry_pool_left(entry));
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    slot->ptr = entry->pool_used;
+    datastr = &entry->pool[slot->ptr];
+    memcpy(datastr, string, str_len);
+    entry->pool_used += str_len;
+    return 0;
+}
+
+/* Returns a pointer to the string in the storage slot specified
+ *
+ *
+ * Parametrs:
+ *  am_cache_entry_t *entry         Pointer to an entry
+ *  am_cache_storage_t *slot        Pointer to storage slot
+ *
+ * Returns:
+ *  A string or NULL if the slot is empty.
+ */
+const char *am_cache_entry_get_string(am_cache_entry_t *e,
+                                      am_cache_storage_t *slot)
+{
+    char *ret = NULL;
+
+    if (slot->ptr != 0) {
+        ret = &e->pool[slot->ptr];
+    }
+
+    return ret;
+}
 
 /* This function locks the session table and creates a new session entry.
  * It will first attempt to locate a free session. If it doesn't find a
@@ -226,6 +316,10 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
 
     t->lasso_identity[0] = '\0';
     t->lasso_session[0] = '\0';
+
+    t->pool_size = am_cache_entry_pool_size(mod_cfg);
+    t->pool[0] = '\0';
+    t->pool_used = 1;
 
     return t;
 }

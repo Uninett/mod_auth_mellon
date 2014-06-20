@@ -88,9 +88,13 @@ static int am_global_init(apr_pool_t *conf, apr_pool_t *log,
      */
     mod->init_cache_size = mod->cache_size;
     mod->init_lock_file = apr_pstrdup(conf, mod->lock_file);
+    mod->init_entry_size = mod->entry_size;
+    if (mod->init_entry_size < AM_CACHE_MIN_ENTRY_SIZE) {
+        mod->init_entry_size = AM_CACHE_MIN_ENTRY_SIZE;
+    }
 
     /* find out the memory size of the cache */
-    mem_size = sizeof(am_cache_entry_t) * mod->init_cache_size;
+    mem_size = mod->init_entry_size * mod->init_cache_size;
 
 
     /* Create the shared memory, exit if it fails. */

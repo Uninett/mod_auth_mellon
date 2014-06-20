@@ -78,6 +78,8 @@
 #define AM_CACHE_MAX_LASSO_IDENTITY_SIZE 1024
 #define AM_CACHE_MAX_LASSO_SESSION_SIZE 32768
 #define AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE 65536
+#define AM_CACHE_DEFAULT_ENTRY_SIZE 196608
+#define AM_CACHE_MIN_ENTRY_SIZE 65536
 
 
 /* This is the length of the id we use (for session IDs and
@@ -101,12 +103,15 @@ typedef struct am_mod_cfg_rec {
     int post_count;
     apr_size_t post_size;
 
+    int entry_size;
+
     /* These variables can't be allowed to change after the session store
      * has been initialized. Therefore we copy them before initializing
      * the session store.
      */
     int init_cache_size;
     const char *init_lock_file;
+    apr_size_t init_entry_size;
 
     apr_shm_t *cache;
     apr_global_mutex_t *lock;
@@ -240,6 +245,9 @@ typedef struct am_dir_cfg_rec {
     LassoServer *server;
 } am_dir_cfg_rec;
 
+typedef struct am_cache_storage_t {
+    apr_uintptr_t ptr;
+} am_cache_storage_t;
 
 typedef struct am_cache_env_t {
     char varname[AM_CACHE_VARSIZE];
@@ -262,6 +270,10 @@ typedef struct am_cache_entry_t {
     char lasso_saml_response[AM_CACHE_MAX_LASSO_SAML_RESPONSE_SIZE];
 
     am_cache_env_t env[AM_CACHE_ENVSIZE];
+
+    apr_size_t pool_size;
+    apr_size_t pool_used;
+    char pool[];
 } am_cache_entry_t;
 
 typedef enum { 
@@ -322,6 +334,8 @@ void am_cookie_delete(request_rec *r);
 
 am_cache_entry_t *am_cache_lock(server_rec *s, 
                                 am_cache_key_t type, const char *key);
+const char *am_cache_entry_get_string(am_cache_entry_t *e,
+                                      am_cache_storage_t *slot);
 am_cache_entry_t *am_cache_new(server_rec *s, const char *key);
 void am_cache_unlock(server_rec *s, am_cache_entry_t *entry);
 

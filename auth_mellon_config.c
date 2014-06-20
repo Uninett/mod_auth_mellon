@@ -863,6 +863,15 @@ const command_rec auth_mellon_commands[] = {
         " take effect. The default value is 100."
         ),
     AP_INIT_TAKE1(
+        "MellonCacheEntrySize",
+        am_set_module_config_int_slot,
+        (void *)APR_OFFSETOF(am_mod_cfg_rec, entry_size),
+        RSRC_CONF,
+        "The maximum size for a single session entry. You must"
+        " restart the server before any changes to this directive will"
+        " take effect. The default value is 192KiB."
+        ),
+    AP_INIT_TAKE1(
         "MellonLockFile",
         am_set_module_config_file_slot,
         (void *)APR_OFFSETOF(am_mod_cfg_rec, lock_file),
@@ -1571,8 +1580,11 @@ void *auth_mellon_server_config(apr_pool_t *p, server_rec *s)
     mod->post_count = post_count;
     mod->post_size  = post_size;
 
+    mod->entry_size = AM_CACHE_DEFAULT_ENTRY_SIZE;
+
     mod->init_cache_size = 0;
     mod->init_lock_file = NULL;
+    mod->init_entry_size = 0;
 
     mod->cache      = NULL;
     mod->lock       = NULL;

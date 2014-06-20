@@ -97,6 +97,13 @@ for mod_auth_mellon. The following is an example configuration:
 # Default: MellonCacheSize 100
 MellonCacheSize 100
 
+# MellonCacheEntrySize sets the maximum size for a single session entry in
+# bytes. When mod_auth_mellon reaches this limit, it cannot store any more
+# data in the session and will return an error. The minimum entry size is
+# 65536 bytes, values lower than that will be ignored and the minimum will
+# be used.
+# Default: MellonCacheEntrySize 196608
+
 # MellonLockFile is the full path to a file used for synchronizing access
 # to the session data. The path should only be used by one instance of
 # apache at a time. The server must be restarted before any changes to this
