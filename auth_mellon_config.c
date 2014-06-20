@@ -19,8 +19,6 @@
  *
  */
 
-#include <stdbool.h>
-
 #include "auth_mellon.h"
 
 /* This is the default endpoint path. Remember to update the description of

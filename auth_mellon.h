@@ -22,6 +22,8 @@
 #ifndef MOD_AUTH_MELLON_H
 #define MOD_AUTH_MELLON_H
 
+#include <stdbool.h>
+
 #include <lasso/lasso.h>
 #include <lasso/xml/saml-2.0/samlp2_authn_request.h>
 #include <lasso/xml/saml-2.0/samlp2_logout_request.h>
@@ -255,7 +257,7 @@ typedef struct am_cache_entry_t {
     apr_time_t expires;
     int logged_in;
     unsigned short size;
-    char user[AM_CACHE_USERSIZE];
+    am_cache_storage_t user;
 
     /* Variables used to store lasso state between login requests
      *and logout requests.

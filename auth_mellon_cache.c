@@ -111,6 +111,11 @@ am_cache_entry_t *am_cache_lock(server_rec *s,
     return NULL;
 }
 
+static inline bool am_cache_entry_slot_is_empty(am_cache_storage_t *slot)
+{
+    return (slot->ptr == 0);
+}
+
 static inline void am_cache_storage_null(am_cache_storage_t *slot)
 {
     slot->ptr = 0;
@@ -318,8 +323,8 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
 
     t->logged_in = 0;
     t->size = 0;
-    t->user[0] = '\0';
 
+    am_cache_storage_null(&t->user);
     am_cache_storage_null(&t->lasso_identity);
     am_cache_storage_null(&t->lasso_session);
     am_cache_storage_null(&t->lasso_saml_response);
@@ -471,17 +476,24 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
     const char *varname_prefix;
     const char *value;
     int *count;
+    int status;
 
     d = am_get_dir_cfg(r);
 
     /* Check if the user attribute has been set, and set it if it
      * hasn't been set. */
-    if(t->user[0] == '\0') {
+    if (am_cache_entry_slot_is_empty(&t->user)) {
         for(i = 0; i < t->size; ++i) {
             varname = am_cache_entry_get_string(t, &t->env[i].varname);
             if (strcmp(varname, d->userattr) == 0) {
                 value = am_cache_entry_get_string(t, &t->env[i].value);
-                strcpy(t->user, value);
+                status = am_cache_entry_store_string(t, &t->user, value);
+                if (status != 0) {
+                    ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
+                                  "Unable to store the user name because there"
+                                  " is no more space in the session. "
+                                  "Username = \"%s\".", value);
+                }
             }
         }
     }
@@ -512,8 +524,16 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
         /*  
          * If we find a variable remapping to MellonUser, use it.
          */
-        if ((t->user[0] == '\0') && (strcmp(varname, d->userattr) == 0))
-            strcpy(t->user, value);
+        if (am_cache_entry_slot_is_empty(&t->user) &&
+            (strcmp(varname, d->userattr) == 0)) {
+            status = am_cache_entry_store_string(t, &t->user, value);
+            if (status != 0) {
+                ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
+                              "Unable to store the user name because there"
+                              " is no more space in the session. "
+                              "Username = \"%s\".", value);
+            }
+        }
 
         /* Find the number of times this variable has been set. */
         count = apr_hash_get(counters, varname, APR_HASH_KEY_STRING);
@@ -541,9 +561,9 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
         ++(*count);
     }
 
-    if(t->user[0] != '\0') {
+    if (!am_cache_entry_slot_is_empty(&t->user)) {
         /* We have a user-"name". Set r->user and r->ap_auth_type. */
-        r->user = apr_pstrdup(r->pool, t->user);
+        r->user = apr_pstrdup(r->pool, am_cache_entry_get_string(t, &t->user));
         r->ap_auth_type = apr_pstrdup(r->pool, "Mellon");
     } else {
         /* We don't have a user-"name". Log error. */
