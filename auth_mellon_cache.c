@@ -116,6 +116,14 @@ static inline void am_cache_storage_null(am_cache_storage_t *slot)
     slot->ptr = 0;
 }
 
+static inline void am_cache_entry_env_null(am_cache_entry_t *e)
+{
+    for (int i = 0; i < AM_CACHE_ENVSIZE; i++) {
+        am_cache_storage_null(&e->env[i].varname);
+        am_cache_storage_null(&e->env[i].value);
+    }
+}
+
 static inline apr_size_t am_cache_entry_pool_left(am_cache_entry_t *e)
 {
     return e->pool_size - e->pool_used;
@@ -315,6 +323,7 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
     am_cache_storage_null(&t->lasso_identity);
     am_cache_storage_null(&t->lasso_session);
     am_cache_storage_null(&t->lasso_saml_response);
+    am_cache_entry_env_null(t);
 
     t->pool_size = am_cache_entry_pool_size(mod_cfg);
     t->pool[0] = '\0';
@@ -379,27 +388,36 @@ void am_cache_update_expires(am_cache_entry_t *t, apr_time_t expires)
 int am_cache_env_append(am_cache_entry_t *t,
                         const char *var, const char *val)
 {
+    int status;
+
     /* Make sure that the name and value will fit inside the
      * fixed size buffer.
      */
-    if(strlen(val) >= AM_CACHE_VALSIZE ||
-       strlen(var) >= AM_CACHE_VARSIZE) {
-        ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
-                     "Unable to store session data because it is to big. "
-                     "Name = \"%s\"; Value = \"%s\".", var, val);
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
-
     if(t->size >= AM_CACHE_ENVSIZE) {
         ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
                      "Unable to store attribute value because we have"
                      " reached the maximum number of name-value pairs for"
-                     " this session.");
+                     " this session. The maximum number is %d.",
+                     AM_CACHE_ENVSIZE);
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    strcpy(t->env[t->size].varname, var);
-    strcpy(t->env[t->size].value, val);
+    status = am_cache_entry_store_string(t, &t->env[t->size].varname, var);
+    if (status != 0) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
+                     "Unable to store session data because there is no more "
+                     "space in the session. Attribute Name = \"%s\".", var);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    status = am_cache_entry_store_string(t, &t->env[t->size].value, val);
+    if (status != 0) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
+                     "Unable to store session data because there is no more "
+                     "space in the session. Attribute Value = \"%s\".", val);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
     t->size++;
 
     return OK;
@@ -418,11 +436,15 @@ int am_cache_env_append(am_cache_entry_t *t,
 const char *am_cache_env_fetch_first(am_cache_entry_t *t,
                                      const char *var)
 {
+    const char *str;
     int i;
 
     for (i = 0; t->size; i++) {
-        if (strcmp(t->env[i].varname, var) == 0)
-            return t->env[i].value;
+        str = am_cache_entry_get_string(t, &t->env[i].varname);
+        if (str == NULL)
+            break;
+        if (strcmp(str, var) == 0)
+            return str;
     }
 
     return NULL;
@@ -456,8 +478,10 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
      * hasn't been set. */
     if(t->user[0] == '\0') {
         for(i = 0; i < t->size; ++i) {
-            if(strcmp(t->env[i].varname, d->userattr) == 0) {
-                strcpy(t->user, t->env[i].value);
+            varname = am_cache_entry_get_string(t, &t->env[i].varname);
+            if (strcmp(varname, d->userattr) == 0) {
+                value = am_cache_entry_get_string(t, &t->env[i].value);
+                strcpy(t->user, value);
             }
         }
     }
@@ -469,7 +493,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
      * received from the IdP.
      */
     for(i = 0; i < t->size; ++i) {
-        varname = t->env[i].varname;
+        varname = am_cache_entry_get_string(t, &t->env[i].varname);
         varname_prefix = "MELLON_";
 
         /* Check if we should map this name into another name. */
@@ -483,7 +507,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
             }
         }
 
-        value = t->env[i].value;
+        value = am_cache_entry_get_string(t, &t->env[i].value);
 
         /*  
          * If we find a variable remapping to MellonUser, use it.

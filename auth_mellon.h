@@ -71,8 +71,6 @@
 /* Size definitions for the session cache.
  */
 #define AM_CACHE_KEYSIZE 120
-#define AM_CACHE_VARSIZE 128
-#define AM_CACHE_VALSIZE 512-AM_CACHE_VARSIZE
 #define AM_CACHE_ENVSIZE 128
 #define AM_CACHE_USERSIZE 512
 #define AM_CACHE_DEFAULT_ENTRY_SIZE 196608
@@ -247,8 +245,8 @@ typedef struct am_cache_storage_t {
 } am_cache_storage_t;
 
 typedef struct am_cache_env_t {
-    char varname[AM_CACHE_VARSIZE];
-    char value[AM_CACHE_VALSIZE];
+    am_cache_storage_t varname;
+    am_cache_storage_t value;
 } am_cache_env_t;
 
 typedef struct am_cache_entry_t {

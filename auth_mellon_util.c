@@ -307,7 +307,8 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
              */
             if (ce->flags & AM_COND_FLAG_MAP)
                 varname = apr_hash_get(dir_cfg->envattr, 
-                                       session->env[j].varname, 
+                                       am_cache_entry_get_string(session,
+                                                    &session->env[j].varname),
                                        APR_HASH_KEY_STRING);
 
             /*
@@ -315,12 +316,13 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
              * sent by the IdP.
              */
             if (varname == NULL)
-                varname = session->env[j].varname;
+                varname = am_cache_entry_get_string(session,
+                                                    &session->env[j].varname);
                       
             if (strcmp(varname, ce->varname) != 0)
                     continue;
 
-            value = session->env[j].value;
+            value = am_cache_entry_get_string(session, &session->env[j].value);
 
             /*
              * Substiture backrefs if available
