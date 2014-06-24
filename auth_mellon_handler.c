@@ -256,8 +256,12 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
             }
         }
 
-        if (loaded_idp != NULL)
-            g_free(loaded_idp);
+        if (loaded_idp != NULL) {
+            for (GList *idx = loaded_idp; idx != NULL; idx = idx->next) {
+                g_free(idx->data);
+            }
+            g_list_free(loaded_idp);
+        }
 
 #else /* HAVE_lasso_server_load_metadata */
         error = lasso_server_add_provider(cfg->server,
