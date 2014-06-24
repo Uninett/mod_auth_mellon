@@ -1,3 +1,35 @@
+Version 0.8.0
+---------------------------------------------------------------------------
+
+* Add support for receiving HTTP-Artifact identifiers as POST data.
+
+* Simplify caching headers.
+
+* Map login errors into more appropriate HTTP error codes than
+  400 Bad Request.
+
+* Add MellonNoSuccessErrorPage option to redirect to a error page on login
+  failure.
+
+* Turn session storage into a dynamic pool of memory, which means that
+  attribute values (and other items) can have arbitrary sizes as long as
+  they fit in the session as a whole.
+
+* Various bugfixes:
+
+  * Fix for compatibility with recent versions of CURL.
+
+  * Fix broken option MellonDoNotVerifyLogoutSignature.
+
+  * Fix deadlock that could occur during logout processing.
+
+  * Fix some compile warnings.
+
+  * Fix some NULL derefernce bugs that may lead to segmentation faults.
+
+  * Fix a minor memory leak during IdP metadata loading.
+
+
 Version 0.7.0
 ---------------------------------------------------------------------------
 
