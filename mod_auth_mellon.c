@@ -109,7 +109,7 @@ static int am_global_init(apr_pool_t *conf, apr_pool_t *log,
 
     /* Initialize the session table. */
     table = apr_shm_baseaddr_get(mod->cache);
-    for (i = 0; i < mod->cache_size; i++) {
+    for (i = 0; i < mod->init_cache_size; i++) {
         table[i].key[0] = '\0';
         table[i].access = 0;
     }
