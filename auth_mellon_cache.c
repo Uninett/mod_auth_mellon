@@ -78,6 +78,11 @@ am_cache_entry_t *am_cache_lock(server_rec *s,
     for(i = 0; i < mod_cfg->init_cache_size; i++) {
         const char *tablekey;
 
+        if (table[i].key[0] == '\0') {
+            /* This entry is empty. Skip it. */
+            continue;
+        }
+
         switch (type) {
         case AM_CACHE_SESSION:
             tablekey = table[i].key;
