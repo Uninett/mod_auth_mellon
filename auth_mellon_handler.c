@@ -2642,6 +2642,7 @@ static int am_send_authn_request(request_rec *r, const char *idp,
     char *sso_url;
     gint ret;
     am_dir_cfg_rec *dir_cfg;
+    char *acs_url;
 
     dir_cfg = am_get_dir_cfg(r);
 
@@ -2756,6 +2757,19 @@ static int am_send_authn_request(request_rec *r, const char *idp,
 
     /* sso_url no longer needed. */
     g_free(sso_url);
+
+    /* Some IdPs insist they want to see an AttributeConsumerServiceURL
+     * attribute in the authentication request, so try to add one if the
+     * metadata contains one */
+    acs_url = lasso_provider_get_assertion_consumer_service_url(
+        LASSO_PROVIDER(server), NULL);
+    if (acs_url) {
+        request->AssertionConsumerServiceURL = g_strdup(acs_url);
+        /* Can't set request->ProtocolBinding (which is usually set along side
+         * AssertionConsumerServiceURL) as there is no immediate function
+         * like lasso_provider_get_assertion_consumer_service_url to get them.
+         * So leave that empty for now, it is not strictly required */
+    }
 
     LASSO_PROFILE(login)->msg_relayState = g_strdup(return_to);
 
