@@ -489,12 +489,12 @@ const char *am_cache_env_fetch_first(am_cache_entry_t *t,
     const char *str;
     int i;
 
-    for (i = 0; t->size; i++) {
+    for (i = 0; i < t->size; i++) {
         str = am_cache_entry_get_string(t, &t->env[i].varname);
         if (str == NULL)
             break;
         if (strcmp(str, var) == 0)
-            return str;
+            return am_cache_entry_get_string(t, &t->env[i].value);
     }
 
     return NULL;
