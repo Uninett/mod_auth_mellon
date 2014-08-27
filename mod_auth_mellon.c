@@ -45,10 +45,9 @@
 static int am_global_init(apr_pool_t *conf, apr_pool_t *log,
                           apr_pool_t *tmp, server_rec *s)
 {
-    am_cache_entry_t *table;
     apr_size_t        mem_size;
     am_mod_cfg_rec   *mod;
-    int rv, i;
+    int rv;
     const char userdata_key[] = "auth_mellon_init";
     char buffer[512];
     void *data;
@@ -108,11 +107,7 @@ static int am_global_init(apr_pool_t *conf, apr_pool_t *log,
     }
 
     /* Initialize the session table. */
-    table = apr_shm_baseaddr_get(mod->cache);
-    for (i = 0; i < mod->cache_size; i++) {
-        table[i].key[0] = '\0';
-        table[i].access = 0;
-    }
+    am_cache_init(mod);
 
     /* Now create the mutex that we need for locking the shared memory, then
      * test for success. we really need this, so we exit on failure. */
