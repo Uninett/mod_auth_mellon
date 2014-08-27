@@ -21,6 +21,24 @@
 
 #include "auth_mellon.h"
 
+/* Calculate the pointer to a cache entry.
+ *
+ * Parameters:
+ *  am_mod_cfg_rec *mod_cfg  The module configuration.
+ *  void *table              The base pointer for the table.
+ *  apr_size_t index         The index we are looking for.
+ *
+ * Returns:
+ *  The session entry with the given index.
+ */
+static inline am_cache_entry_t *am_cache_entry_ptr(am_mod_cfg_rec *mod_cfg,
+                                                   void *table, apr_size_t index)
+{
+    uint8_t *table_calc;
+    table_calc = table;
+    return (am_cache_entry_t *)&table_calc[mod_cfg->init_entry_size * index];
+}
+
 /* Initialize the session table.
  *
  * Parameters:
@@ -31,13 +49,14 @@
  */
 void am_cache_init(am_mod_cfg_rec *mod_cfg)
 {
-    am_cache_entry_t *table;
-    int i;
+    void *table;
+    apr_size_t i;
     /* Initialize the session table. */
     table = apr_shm_baseaddr_get(mod_cfg->cache);
     for (i = 0; i < mod_cfg->init_cache_size; i++) {
-        table[i].key[0] = '\0';
-        table[i].access = 0;
+        am_cache_entry_t *e = am_cache_entry_ptr(mod_cfg, table, i);
+        e->key[0] = '\0';
+        e->access = 0;
     }
 }
 
@@ -59,8 +78,8 @@ am_cache_entry_t *am_cache_lock(server_rec *s,
                                 const char *key)
 {
     am_mod_cfg_rec *mod_cfg;
-    am_cache_entry_t *table;
-    int i;
+    void *table;
+    apr_size_t i;
     int rv;
     char buffer[512];
 
@@ -96,20 +115,21 @@ am_cache_entry_t *am_cache_lock(server_rec *s,
 
 
     for(i = 0; i < mod_cfg->init_cache_size; i++) {
+        am_cache_entry_t *e = am_cache_entry_ptr(mod_cfg, table, i);
         const char *tablekey;
 
-        if (table[i].key[0] == '\0') {
+        if (e->key[0] == '\0') {
             /* This entry is empty. Skip it. */
             continue;
         }
 
         switch (type) {
         case AM_CACHE_SESSION:
-            tablekey = table[i].key;
+            tablekey = e->key;
             break;
         case AM_CACHE_NAMEID:
             /* tablekey may be NULL */
-            tablekey = am_cache_env_fetch_first(&table[i], "NAME_ID");
+            tablekey = am_cache_env_fetch_first(e, "NAME_ID");
             break;
         default:
             tablekey = NULL;
@@ -121,9 +141,9 @@ am_cache_entry_t *am_cache_lock(server_rec *s,
 
         if(strcmp(tablekey, key) == 0) {
             /* We found the entry. */
-            if(table[i].expires > apr_time_now()) {
+            if(e->expires > apr_time_now()) {
                 /* And it hasn't expired. */
-                return &table[i];
+                return e;
             }
         }
     }
