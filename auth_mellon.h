@@ -329,6 +329,7 @@ void am_cookie_set(request_rec *r, const char *id);
 void am_cookie_delete(request_rec *r);
 
 
+void am_cache_init(am_mod_cfg_rec *mod_cfg);
 am_cache_entry_t *am_cache_lock(server_rec *s, 
                                 am_cache_key_t type, const char *key);
 const char *am_cache_entry_get_string(am_cache_entry_t *e,

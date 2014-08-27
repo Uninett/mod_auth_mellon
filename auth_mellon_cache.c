@@ -21,6 +21,26 @@
 
 #include "auth_mellon.h"
 
+/* Initialize the session table.
+ *
+ * Parameters:
+ *  am_mod_cfg_rec *mod_cfg  The module configuration.
+ *
+ * Returns:
+ *  Nothing.
+ */
+void am_cache_init(am_mod_cfg_rec *mod_cfg)
+{
+    am_cache_entry_t *table;
+    int i;
+    /* Initialize the session table. */
+    table = apr_shm_baseaddr_get(mod_cfg->cache);
+    for (i = 0; i < mod_cfg->init_cache_size; i++) {
+        table[i].key[0] = '\0';
+        table[i].access = 0;
+    }
+}
+
 /* This function locks the session table and locates a session entry.
  * Unlocks the table and returns NULL if the entry wasn't found.
  * If a entry was found, then you _must_ unlock it with am_cache_unlock
