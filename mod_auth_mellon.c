@@ -188,7 +188,17 @@ static void register_hooks(apr_pool_t *p)
     ap_hook_check_user_id(am_check_uid, NULL, NULL, APR_HOOK_MIDDLE);
     ap_hook_post_config(am_global_init, NULL, NULL, APR_HOOK_MIDDLE);
     ap_hook_child_init(am_child_init, NULL, NULL, APR_HOOK_MIDDLE);
-    ap_hook_handler(am_handler, NULL, NULL, APR_HOOK_MIDDLE);
+
+    /* Add the hook to handle requests to the mod_auth_mellon endpoint.
+     *
+     * This is APR_HOOK_FIRST because we do not expect nor require users
+     * to add a SetHandler option for the endpoint. Instead, simply
+     * setting MellonEndpointPath should be enough.
+     *
+     * Therefore this hook must run before any handler that may check
+     * r->handler and decide that it is the only handler for this URL.
+     */
+    ap_hook_handler(am_handler, NULL, NULL, APR_HOOK_FIRST);
     return;
 }
 
