@@ -278,7 +278,7 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
 {
     am_cache_entry_t *t;
     am_mod_cfg_rec *mod_cfg;
-    am_cache_entry_t *table;
+    void *table;
     apr_time_t current_time;
     int i;
     apr_time_t age;
@@ -313,7 +313,7 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
      * initalize it to the first entry in the table to simplify the
      * following code (saves test for t == NULL).
      */
-    t = &table[0];
+    t = am_cache_entry_ptr(mod_cfg, table, 0);;
 
     /* Iterate over the session table. Update 't' to match the "best"
      * entry (the least recently used). 't' will point a free entry
@@ -321,25 +321,26 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
      * used entry.
      */
     for(i = 0; i < mod_cfg->init_cache_size; i++) {
-        if(table[i].key[0] == '\0') {
+        am_cache_entry_t *e = am_cache_entry_ptr(mod_cfg, table, i);
+        if (e->key[0] == '\0') {
             /* This entry is free. Update 't' to this entry
              * and exit loop.
              */
-            t = &table[i];
+            t = e;
             break;
         }
 
-        if(table[i].expires <= current_time) {
+        if (e->expires <= current_time) {
             /* This entry is expired, and is therefore free.
              * Update 't' and exit loop.
              */
-            t = &table[i];
+            t = e;
             break;
         }
 
-        if(table[i].access < t->access) {
+        if (e->access < t->access) {
             /* This entry is older than 't' - update 't'. */
-            t = &table[i];
+            t = e;
         }
     }
 
