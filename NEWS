@@ -1,3 +1,15 @@
+Version 0.9.1
+---------------------------------------------------------------------------
+
+* Bugfixes:
+
+  * Fix session offset calculation that prevented us from having
+    active sessions at once.
+
+  * Run mod_auth_mellon request handler before most other handlers,
+    so that other handlers cannot block it by accident.
+
+
 Version 0.9.0
 ---------------------------------------------------------------------------
 
