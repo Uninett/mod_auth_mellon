@@ -313,7 +313,7 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
      * initalize it to the first entry in the table to simplify the
      * following code (saves test for t == NULL).
      */
-    t = am_cache_entry_ptr(mod_cfg, table, 0);;
+    t = am_cache_entry_ptr(mod_cfg, table, 0);
 
     /* Iterate over the session table. Update 't' to match the "best"
      * entry (the least recently used). 't' will point a free entry
