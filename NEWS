@@ -1,3 +1,19 @@
+Version 0.8.1
+---------------------------------------------------------------------------
+
+This is a security release with fixes backported from version 0.9.1.
+
+It turned out that session overflow bugs fixes in version 0.9.0 and
+0.9.1 can lead to information disclosure, where data from one session
+is leaked to another session. Depending on how this data is used by the
+web application, this may lead to data from one session being disclosed
+to an user in a different session. (CVE-2014-8566)
+
+In addition to the information disclosure, this release contains some
+fixes for logout processing, where logout requests would crash the
+Apache web server. (CVE-2014-8567)
+
+
 Version 0.8.0
 ---------------------------------------------------------------------------
 

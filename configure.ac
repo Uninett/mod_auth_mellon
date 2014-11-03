@@ -1,4 +1,4 @@
-AC_INIT([mod_auth_mellon],[0.8.0],[olav.morken@uninett.no])
+AC_INIT([mod_auth_mellon],[0.8.1],[olav.morken@uninett.no])
 
 # We require support for C99.
 AC_PROG_CC_C99
