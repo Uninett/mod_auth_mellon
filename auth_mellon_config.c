@@ -70,6 +70,12 @@ static const apr_size_t post_size = 1024 * 1024 * 1024;
  */
 static const int post_count = 100;
 
+/* whether to merge env. vars or not
+ * the MellonMergeEnvVars configuration directive if you change this.
+ */
+static const int default_merge_env_vars = -1;
+
+
 /* This function handles configuration directives which set a 
  * multivalued string slot in the module configuration (the destination
  * strucure is a hash).
@@ -1218,6 +1224,13 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Whether we should replay POST requests that trigger authentication. Default is off."
         ),
+    AP_INIT_FLAG(
+        "MellonMergeEnvVars",
+        ap_set_flag_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, merge_env_vars),
+        OR_AUTHCFG,
+        "Whether to merge environement variables multi-values or not. Default is off."
+        ),
     {NULL}
 };
 
@@ -1273,6 +1286,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
 
     dir->varname = default_cookie_name;
     dir->secure = default_secure_cookie;
+    dir->merge_env_vars = default_merge_env_vars;
     dir->cond = apr_array_make(p, 0, sizeof(am_cond_t));
     dir->cookie_domain = NULL;
     dir->cookie_path = NULL;
@@ -1392,6 +1406,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->secure = (add_cfg->secure != default_secure_cookie ?
                         add_cfg->secure :
                         base_cfg->secure);
+
+    new_cfg->merge_env_vars = (add_cfg->merge_env_vars != default_merge_env_vars ?
+                               add_cfg->merge_env_vars :
+                               base_cfg->merge_env_vars);
 
     new_cfg->cookie_domain = (add_cfg->cookie_domain != NULL ?
                         add_cfg->cookie_domain :

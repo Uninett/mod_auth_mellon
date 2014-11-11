@@ -521,6 +521,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
     const char *varname;
     const char *varname_prefix;
     const char *value;
+    const char *prefixed_varname;
     int *count;
     int status;
 
@@ -581,6 +582,8 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
             }
         }
 
+        prefixed_varname = apr_pstrcat(r->pool, varname_prefix, varname, NULL);
+
         /* Find the number of times this variable has been set. */
         count = apr_hash_get(counters, varname, APR_HASH_KEY_STRING);
         if(count == NULL) {
@@ -591,18 +594,32 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
             apr_hash_set(counters, varname, APR_HASH_KEY_STRING, count);
 
             /* Add the variable without a suffix. */
-            apr_table_set(r->subprocess_env,
-                          apr_pstrcat(r->pool, varname_prefix, varname, NULL),
-                          value);
+            apr_table_set(r->subprocess_env,prefixed_varname,value);
         }
 
-        /* Add the variable with a suffix indicating how many times it has
-         * been added before.
-         */
-        apr_table_set(r->subprocess_env,
-                      apr_psprintf(r->pool, "%s%s_%d", varname_prefix, varname, *count),
-                      value);
+        if (d->merge_env_vars != 1) {
+         
+            /* Add the variable with a suffix indicating how many times it has
+             * been added before.
+             */
+            apr_table_set(r->subprocess_env,
+                          apr_psprintf(r->pool, "%s_%d", prefixed_varname, *count),
+                          value);
 
+        } else if (*count > 0) {
+
+            /*
+             * Merge multiple values, separating with ";" 
+             * this makes auth_mellon work same way mod_shib is:
+             * https://wiki.shibboleth.net/confluence/display/SHIB2/NativeSPAttributeAccess
+             */
+             apr_table_set(r->subprocess_env,
+                           prefixed_varname,
+                           apr_pstrcat(r->pool, 
+                                       apr_table_get(r->subprocess_env,prefixed_varname),
+                                       ";", value, NULL));
+        }
+          
         /* Increase the count. */
         ++(*count);
     }
