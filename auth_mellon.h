@@ -73,7 +73,7 @@
 /* Size definitions for the session cache.
  */
 #define AM_CACHE_KEYSIZE 120
-#define AM_CACHE_ENVSIZE 128
+#define AM_CACHE_ENVSIZE 2048
 #define AM_CACHE_USERSIZE 512
 #define AM_CACHE_DEFAULT_ENTRY_SIZE 196608
 #define AM_CACHE_MIN_ENTRY_SIZE 65536
