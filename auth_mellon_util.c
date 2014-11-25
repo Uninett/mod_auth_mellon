@@ -300,16 +300,20 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
          */
         for (j = 0; (j < session->size) && !match; j++) {
             const char *varname = NULL;
+            am_envattr_conf_t *envattr_conf = NULL;
 
             /*
              * if MAP flag is set, check for remapped 
              * attribute name with mellonSetEnv
              */
-            if (ce->flags & AM_COND_FLAG_MAP)
-                varname = apr_hash_get(dir_cfg->envattr, 
-                                       am_cache_entry_get_string(session,
-                                                    &session->env[j].varname),
-                                       APR_HASH_KEY_STRING);
+            if (ce->flags & AM_COND_FLAG_MAP) {
+                envattr_conf =  (am_envattr_conf_t *)apr_hash_get(dir_cfg->envattr, 
+                                         am_cache_entry_get_string(session,&session->env[j].varname),
+                                         APR_HASH_KEY_STRING);
+                                                    
+                if (envattr_conf != NULL)
+                    varname = envattr_conf->name;
+            }
 
             /*
              * Otherwise or if not found, use the attribute name
