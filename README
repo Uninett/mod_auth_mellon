@@ -232,6 +232,13 @@ MellonPostCount 100
         # Default. None set.
         MellonSetEnvNoPrefix "DISPLAY_NAME" "displayName"
 
+        # MellonMergeEnvVars merges multiple values of environement variables
+        # set using MellonSetEnv into single variable:
+        # ie: MYENV_VAR => val1;val2;val3 instead of default behaviour of:
+        #     MYENV_VAR_0 => val1, MYENV_VAR_1 => val2 ... etc.
+        # Default: MellonMergeEnvVars Off
+        MellonMergeEnvVars On
+
         # If MellonSessionDump is set, then the SAML session will be
         # available in the MELLON_SESSION environment variable
         MellonSessionDump Off
@@ -590,6 +597,15 @@ MELLON_<name>, and once named <MELLON_<name>_0.
 In the case of multivalued attributes MELLON_<name> will contain the first
 value.
 
+NOTE: 
+
+if MellonMergeEnvVars is set to On multiple values of attributes 
+will be stored in single environement variable, separated by ";" 
+
+MELLON_<name> -> "value1;value2;value3[;valueX]"
+
+and variables MELLON_<name>_0, MELLON_<name>_1, MELLON_<name>_2 will 
+not be created.
 
 The following code is a simple php-script which prints out all the
 variables:
