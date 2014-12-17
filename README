@@ -530,7 +530,7 @@ The following is an example of metadata for the example configuration:
 
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <EntityDescriptor
-    entityID="examlpe.com"
+    entityID="https://example.com"
     xmlns="urn:oasis:names:tc:SAML:2.0:metadata">
   <SPSSODescriptor
       AuthnRequestsSigned="false"
@@ -551,7 +551,7 @@ The following is an example of metadata for the example configuration:
 </EntityDescriptor>
 
 
-You should update entityID="example.com" and the two Location attributes.
+You should update entityID="https://example.com" and the two Location attributes.
 Note that '/secret/endpoint' in the two Location attributes matches the
 path set in MellonEndpointPath.
 
