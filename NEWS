@@ -1,3 +1,22 @@
+Version 0.10.0
+---------------------------------------------------------------------------
+
+* Make sure that we fail in the unlikely case where OpenSSL is not able
+  to provide us with a secure session id.
+
+* Increase the number of key-value pairs in the session to 2048.
+
+* Add MellonMergeEnvVars-option to store multi-valued attributes in
+  a single environment variable, separated with ';'.
+
+* Bugfixes:
+
+  * Fix the [MAP] option for MellonCond.
+
+  * Fix cookie deletion for the session cookie. (Logout is not dependent
+    on the cookie being deleted, so this only fixes the cookie showing
+    up after the session is deleted.)
+
 Version 0.9.1
 ---------------------------------------------------------------------------
 
