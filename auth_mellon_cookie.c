@@ -219,19 +219,20 @@ void am_cookie_set(request_rec *r, const char *id)
 void am_cookie_delete(request_rec *r)
 {
     const char *name;
+    const char *cookie_params;
     char *cookie;
 
     name = am_cookie_name(r);
+    cookie_params = am_cookie_params(r);
 
 
     /* Format a cookie. To delete a cookie we set the expires-timestamp
      * to the past.
      */
     cookie = apr_psprintf(r->pool, "%s=NULL;"
-                          " version=1;"
                           " expires=Thu, 01-Jan-1970 00:00:00 GMT;"
-                          " path=/",
-                          name);
+                          " %s",
+                          name, cookie_params);
 
     apr_table_addn(r->err_headers_out, "Set-Cookie", cookie);
 }
