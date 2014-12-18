@@ -41,6 +41,38 @@ static const char *am_cookie_name(request_rec *r)
 }
 
 
+/* Calculate the cookie parameters.
+ *
+ * Parameters:
+ *  request_rec *r       The request we should set the cookie in.
+ *
+ * Returns:
+ *  The cookie parameters as a string.
+ */
+static const char *am_cookie_params(request_rec *r)
+{
+    int secure_cookie;
+    const char *cookie_domain = ap_get_server_name(r);
+    const char *cookie_path = "/";
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+
+    if (cfg->cookie_domain) {
+        cookie_domain = cfg->cookie_domain;
+    }
+
+    if (cfg->cookie_path) {
+        cookie_path = cfg->cookie_path;
+    }
+
+    secure_cookie = cfg->secure;
+
+    return apr_psprintf(r->pool,
+                        "Version=1; Path=%s; Domain=%s%s;",
+                        cookie_path, cookie_domain,
+                        secure_cookie ? "; HttpOnly; secure" : "");
+}
+
+
 /* This functions finds the value of our cookie.
  *
  * Parameters:
@@ -149,30 +181,16 @@ const char *am_cookie_get(request_rec *r)
 void am_cookie_set(request_rec *r, const char *id)
 {
     const char *name;
+    const char *cookie_params;
     char *cookie;
-    int secure_cookie;
-    const char *cookie_domain = ap_get_server_name(r);
-    const char *cookie_path = "/";
-    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
 
     if (id == NULL)
         return;
 
-    if (cfg->cookie_domain) {
-        cookie_domain = cfg->cookie_domain;
-    }
-
-    if (cfg->cookie_path) {
-        cookie_path = cfg->cookie_path;
-    }
-
-    secure_cookie = cfg->secure;
     name = am_cookie_name(r);
+    cookie_params = am_cookie_params(r);
 
-    cookie = apr_psprintf(r->pool,
-                         "%s=%s; Version=1; Path=%s; Domain=%s%s;",
-                         name, id, cookie_path, cookie_domain,
-                         secure_cookie ? "; HttpOnly; secure" : "");
+    cookie = apr_psprintf(r->pool, "%s=%s; %s", name, id, cookie_params);
     ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, r->server,
                  "cookie_set: %s", cookie);
 
