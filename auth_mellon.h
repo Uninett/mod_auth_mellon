@@ -244,7 +244,7 @@ typedef struct am_dir_cfg_rec {
 } am_dir_cfg_rec;
 
 typedef struct am_cache_storage_t {
-    apr_uintptr_t ptr;
+    apr_size_t ptr;
 } am_cache_storage_t;
 
 typedef struct am_cache_env_t {
