@@ -1667,14 +1667,26 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
                     continue;
                 }
 
-                /* Verify that this is a LassoMiscTextNode object. */
-                if(!LASSO_IS_MISC_TEXT_NODE(value->any->data)) {
+                /* Verify there is only one node */
+                if (value->any->next != NULL) {
+                    char *dump = lasso_node_dump(LASSO_NODE(value));
                     ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                                  "AttributeValue element contained an "
-                                  " element which wasn't a text node.");
+                                  "AttributeValue element contained more "
+                                  "than one node: %s", dump);
+                    g_free(dump);
                     continue;
                 }
-
+                /* Verify that this is a LassoMiscTextNode object. */
+                if(!LASSO_IS_MISC_TEXT_NODE(value->any->data) ||
+                   !LASSO_MISC_TEXT_NODE(value->any->data)->text_child) {
+                    char *dump = lasso_node_dump(LASSO_NODE(value));
+                    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                                  "AttributeValue element contained an "
+                                  " element which wasn't a text node: %s",
+                                  dump);
+                    g_free(dump);
+                    continue;
+                }
                 value_text = LASSO_MISC_TEXT_NODE(value->any->data);
 
 
