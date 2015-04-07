@@ -1,0 +1,21 @@
+Source: libapache2-mod-auth-mellon
+Section: web
+Priority: extra
+Maintainer: Olav Morken <olavmrk@gmail.com>
+Build-Depends: debhelper (>= 5), autotools-dev, apache2-prefork-dev (>= 2.0.55), libcurl3-dev, liblasso3-dev (>= 2.1.0)
+Standards-Version: 3.7.2
+
+Package: libapache2-mod-auth-mellon
+Architecture: any
+Depends: openssl, apache2.2-common, libcurl3, liblasso3 (>= 2.1.0)
+Description: A SAML 2.0 authentication module for Apache
+ mod-auth-mellon is an Apache module which enables you to authenticate
+ users of a web site against a SAML 2.0 enabled IdP.
+ After installing this package, you should run "a2enmon auth_mellon". See
+ /usr/share/doc/libapache2-mod-auth-mellon/README.gz for configuration
+ information.
+
+Package: libapache2-mod-auth-mellon-dbg
+Architecture: any
+Depends: libapache2-mod-auth-mellon (=${Source-Version})
+Description: Debug symbols for libapache2-mod-auth-mellon.

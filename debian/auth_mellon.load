@@ -1,0 +1,1 @@
+LoadModule auth_mellon_module /usr/lib/apache2/modules/mod_auth_mellon.so

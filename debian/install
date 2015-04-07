@@ -1,0 +1,3 @@
+.libs/mod_auth_mellon.so usr/lib/apache2/modules
+debian/auth_mellon.load /etc/apache2/mods-available
+debian/auth_mellon.conf /etc/apache2/mods-available
