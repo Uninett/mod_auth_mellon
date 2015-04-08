@@ -1592,7 +1592,9 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
     LassoSaml2Attribute *attribute;
     GList *value_itr;
     LassoSaml2AttributeValue *value;
-    LassoMiscTextNode *value_text;
+    GList *any_itr;
+    char *content;
+    char *dump;
     int ret;
 
     dir_cfg = am_get_dir_cfg(r);
@@ -1649,6 +1651,7 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
                 value_itr != NULL;
                 value_itr = g_list_next(value_itr)) {
 
+
                 value = value_itr->data;
                 if (!LASSO_IS_SAML2_ATTRIBUTE_VALUE(value)) {
                     ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
@@ -1667,20 +1670,29 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
                     continue;
                 }
 
-                /* Verify that this is a LassoMiscTextNode object. */
-                if(!LASSO_IS_MISC_TEXT_NODE(value->any->data)) {
-                    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                                  "AttributeValue element contained an "
-                                  " element which wasn't a text node.");
-                    continue;
+                content = "";
+                for (any_itr = g_list_first(value->any);
+                     any_itr != NULL;
+                     any_itr = g_list_next(any_itr)) {
+                        /* Verify that this is a LassoNode object. */
+                        if(!LASSO_NODE(any_itr->data)) {
+                            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                                          "AttributeValue element contained an "
+                                          " element which wasn't a Node.");
+                            continue;
+                        }
+                        dump = lasso_node_dump(LASSO_NODE(any_itr->data));
+                        if (!dump) {
+                            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                                          "AttributeValue content dump failed.");
+                            continue;
+                        }
+                        /* Use the request pool, no need to free results */
+                        content = apr_pstrcat(r->pool, content, dump, NULL);
+                        g_free(dump);
                 }
-
-                value_text = LASSO_MISC_TEXT_NODE(value->any->data);
-
-
                 /* Decode and save the attribute. */
-                ret = am_store_attribute(r, session, attribute->Name,
-                                         value_text->content);
+                ret = am_store_attribute(r, session, attribute->Name, content);
                 if(ret != OK) {
                     return ret;
                 }
