@@ -239,6 +239,12 @@ MellonPostCount 100
         # Default: MellonMergeEnvVars Off
         MellonMergeEnvVars On
 
+        # MellonEnvVarsIndexStart specifies if environement variables for
+        # multi-valued attributes should start indexing from 0 or 1
+        # The syntax is 'MellonEnvVarsIndexStart <0|1>'.
+        # Default: MellonEnvVarsIndexStart 0
+        MellonEnvVarsIndexStart 1
+
         # If MellonSessionDump is set, then the SAML session will be
         # available in the MELLON_SESSION environment variable
         MellonSessionDump Off
