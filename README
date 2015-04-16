@@ -236,8 +236,11 @@ MellonPostCount 100
         # set using MellonSetEnv into single variable:
         # ie: MYENV_VAR => val1;val2;val3 instead of default behaviour of:
         #     MYENV_VAR_0 => val1, MYENV_VAR_1 => val2 ... etc.
+        # Second optional parameter specifies the separator, to override the
+        # default semicolon.
         # Default: MellonMergeEnvVars Off
         MellonMergeEnvVars On
+        MellonMergeEnvVars On ":"
 
         # MellonEnvVarsIndexStart specifies if environement variables for
         # multi-valued attributes should start indexing from 0 or 1

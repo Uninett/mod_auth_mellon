@@ -1,4 +1,7 @@
 
+* MellonMergeEnvVars On now accepts second optional parameter, the
+  separator to be used instead of the default ';'.
+
 * Add option MellonEnvVarsSetCount to specify if the number of values
   for any attribute should also be stored in environment variable
   suffixed _N.

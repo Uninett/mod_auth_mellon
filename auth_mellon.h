@@ -175,7 +175,7 @@ typedef struct am_dir_cfg_rec {
 
     const char *varname;
     int secure;
-    int merge_env_vars;
+    const char *merge_env_vars;
     int env_vars_index_start;
     int env_vars_count_in_n;
     const char *cookie_domain;
