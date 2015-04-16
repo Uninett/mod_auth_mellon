@@ -590,7 +590,11 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
 
             /* This is the first time. Create a counter for this variable. */
             count = apr_palloc(r->pool, sizeof(int));
-            *count = 0;
+            if (d->env_vars_index_start > -1) {
+                *count = d->env_vars_index_start;
+            } else {
+                *count = 0;
+            }
             apr_hash_set(counters, varname, APR_HASH_KEY_STRING, count);
 
             /* Add the variable without a suffix. */

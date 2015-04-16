@@ -1,3 +1,9 @@
+
+
+* Add option MellonEnvVarsIndexStart to specify if environment variables
+  for multi-valued attributes should start indexing with 0 (default) or
+  with 1.
+
 Version 0.10.0
 ---------------------------------------------------------------------------
 
