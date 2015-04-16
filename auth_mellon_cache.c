@@ -590,11 +590,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
 
             /* This is the first time. Create a counter for this variable. */
             count = apr_palloc(r->pool, sizeof(int));
-            if (d->env_vars_index_start > -1) {
-                *count = d->env_vars_index_start;
-            } else {
-                *count = 0;
-            }
+            *count = 0;
             apr_hash_set(counters, varname, APR_HASH_KEY_STRING, count);
 
             /* Add the variable without a suffix. */
@@ -607,7 +603,10 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
              * been added before.
              */
             apr_table_set(r->subprocess_env,
-                          apr_psprintf(r->pool, "%s_%d", prefixed_varname, *count),
+                          apr_psprintf(r->pool, "%s_%d", prefixed_varname,
+                              (d->env_vars_index_start > -1
+                                  ? *count + d->env_vars_index_start
+                                  : *count)),
                           value);
 
         } else if (*count > 0) {
@@ -626,6 +625,12 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
           
         /* Increase the count. */
         ++(*count);
+
+        if (d->env_vars_count_in_n > 0) {
+             apr_table_set(r->subprocess_env,
+                           apr_pstrcat(r->pool, prefixed_varname, "_N", NULL),
+                           apr_itoa(r->pool, *count));
+        }
     }
 
     if (!am_cache_entry_slot_is_empty(&t->user)) {

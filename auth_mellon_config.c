@@ -80,6 +80,11 @@ static const int default_merge_env_vars = -1;
  */
 static const int default_env_vars_index_start = -1;
 
+/* whether to also populate env. var _N with number of values
+ * the MellonEnvVarsSetCount configuration directive if you change this.
+ */
+static const int default_env_vars_count_in_n = -1;
+
 
 /* This function handles configuration directives which set a 
  * multivalued string slot in the module configuration (the destination
@@ -1243,6 +1248,13 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Start indexing environment variables for multivalues with 0 or 1. Default is 0."
         ),
+    AP_INIT_FLAG(
+        "MellonEnvVarsSetCount",
+        ap_set_flag_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, env_vars_count_in_n),
+        OR_AUTHCFG,
+        "Whether to also populate environment variable suffixed _N with number of values. Default is off."
+        ),
     {NULL}
 };
 
@@ -1300,6 +1312,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->secure = default_secure_cookie;
     dir->merge_env_vars = default_merge_env_vars;
     dir->env_vars_index_start = default_env_vars_index_start;
+    dir->env_vars_count_in_n = default_env_vars_count_in_n;
     dir->cond = apr_array_make(p, 0, sizeof(am_cond_t));
     dir->cookie_domain = NULL;
     dir->cookie_path = NULL;
@@ -1427,6 +1440,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->env_vars_index_start = (add_cfg->env_vars_index_start != default_env_vars_index_start ?
                                add_cfg->env_vars_index_start :
                                base_cfg->env_vars_index_start);
+
+    new_cfg->env_vars_count_in_n = (add_cfg->env_vars_count_in_n != default_env_vars_count_in_n ?
+                               add_cfg->env_vars_count_in_n :
+                               base_cfg->env_vars_count_in_n);
 
     new_cfg->cookie_domain = (add_cfg->cookie_domain != NULL ?
                         add_cfg->cookie_domain :

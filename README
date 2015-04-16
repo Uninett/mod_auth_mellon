@@ -245,6 +245,16 @@ MellonPostCount 100
         # Default: MellonEnvVarsIndexStart 0
         MellonEnvVarsIndexStart 1
 
+        # MellonEnvVarsSetCount specifies if number of values for any given
+        # attribute should also be stored in variable suffixed _N.
+        # ie: if user is member of two groups, the following will be set:
+        #     MELLON__groups=group1
+        #     MELLON__groups_0=group1
+        #     MELLON__groups_1=group2
+        #     MELLON__groups_N=2
+        # Default: MellonEnvVarsIndexStart Off
+        MellonEnvVarsIndexStart On
+
         # If MellonSessionDump is set, then the SAML session will be
         # available in the MELLON_SESSION environment variable
         MellonSessionDump Off

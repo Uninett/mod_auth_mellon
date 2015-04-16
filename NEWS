@@ -1,4 +1,7 @@
 
+* Add option MellonEnvVarsSetCount to specify if the number of values
+  for any attribute should also be stored in environment variable
+  suffixed _N.
 
 * Add option MellonEnvVarsIndexStart to specify if environment variables
   for multi-valued attributes should start indexing with 0 (default) or
