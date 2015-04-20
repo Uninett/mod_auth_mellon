@@ -73,7 +73,7 @@ static const int post_count = 100;
 /* whether to merge env. vars or not
  * the MellonMergeEnvVars configuration directive if you change this.
  */
-static const int default_merge_env_vars = -1;
+static const char *default_merge_env_vars = NULL;
 
 /* for env. vars with multiple values, the index start
  * the MellonEnvVarsIndexStart configuration directive if you change this.
@@ -860,6 +860,52 @@ static const char *am_set_do_not_verify_logout_signature(cmd_parms *cmd,
 #endif
 }
 
+/* This function handles the MellonMergeEnvVars configuration directive,
+ * it sets merge_env_vars to nonempty separator (default semicolon),
+ * or empty string to denote no merging.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *  const char *flag     On/Off flag
+ *  const char *sep      Optional separator, should be only present with On
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_merge_env_vars(cmd_parms *cmd,
+                                          void *struct_ptr,
+                                          const char *flag,
+                                          const char *sep)
+{
+    am_dir_cfg_rec *d = (am_dir_cfg_rec *)struct_ptr;
+    apr_pool_t *p= cmd->pool;
+    if (strcasecmp(flag, "on") == 0) {
+        if (sep && *sep) {
+            /*
+             * TAKE12 will not give us the second argument if it is
+             * empty string so we cannot complain about it, we will just
+             * silently use semicolon
+             */
+            d->merge_env_vars = apr_pstrdup(p, sep);
+        } else {
+            d->merge_env_vars = ";";
+        }
+    } else if (strcasecmp(flag, "off") == 0) {
+        if (sep) {
+            return apr_pstrcat(cmd->pool, cmd->cmd->name,
+                " separator should not be used with Off", NULL);
+        }
+        d->merge_env_vars = "";
+    } else {
+        return apr_pstrcat(cmd->pool, cmd->cmd->name,
+            " first parameer must be On or Off", NULL);
+    }
+    return NULL;
+}
+
 /* This array contains all the configuration directive which are handled
  * by auth_mellon.
  */    
@@ -1234,12 +1280,14 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Whether we should replay POST requests that trigger authentication. Default is off."
         ),
-    AP_INIT_FLAG(
+    AP_INIT_TAKE12(
         "MellonMergeEnvVars",
-        ap_set_flag_slot,
-        (void *)APR_OFFSETOF(am_dir_cfg_rec, merge_env_vars),
+        am_set_merge_env_vars,
+        NULL,
         OR_AUTHCFG,
         "Whether to merge environement variables multi-values or not. Default is off."
+        "When first parameter is on, optional second parameter is the separator, "
+        "defaulting to semicolon."
         ),
     AP_INIT_TAKE1(
         "MellonEnvVarsIndexStart",

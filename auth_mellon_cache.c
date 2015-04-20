@@ -597,7 +597,11 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
             apr_table_set(r->subprocess_env,prefixed_varname,value);
         }
 
-        if (d->merge_env_vars != 1) {
+        /* Check if merging of environment variables is disabled.
+         * This is either if it is NULL (default value if not configured
+         * by user) or an empty string (if specifically disabled by the user).
+         * /
+        if (d->merge_env_vars == NULL || *d->merge_env_vars == '\0') {
          
             /* Add the variable with a suffix indicating how many times it has
              * been added before.
@@ -612,7 +616,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
         } else if (*count > 0) {
 
             /*
-             * Merge multiple values, separating with ";" 
+             * Merge multiple values, separating by default with ";"
              * this makes auth_mellon work same way mod_shib is:
              * https://wiki.shibboleth.net/confluence/display/SHIB2/NativeSPAttributeAccess
              */
@@ -620,7 +624,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
                            prefixed_varname,
                            apr_pstrcat(r->pool, 
                                        apr_table_get(r->subprocess_env,prefixed_varname),
-                                       ";", value, NULL));
+                                       d->merge_env_vars, value, NULL));
         }
           
         /* Increase the count. */
