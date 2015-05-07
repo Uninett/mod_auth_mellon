@@ -600,7 +600,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
         /* Check if merging of environment variables is disabled.
          * This is either if it is NULL (default value if not configured
          * by user) or an empty string (if specifically disabled by the user).
-         * /
+         */
         if (d->merge_env_vars == NULL || *d->merge_env_vars == '\0') {
          
             /* Add the variable with a suffix indicating how many times it has
