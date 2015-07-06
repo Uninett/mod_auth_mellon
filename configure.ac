@@ -53,6 +53,8 @@ AC_CHECK_LIB(lasso, lasso_server_load_metadata,
              LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_lasso_server_load_metadata")
 AC_CHECK_LIB(lasso, lasso_profile_set_signature_verify_hint,
              LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_lasso_profile_set_signature_verify_hint")
+AC_CHECK_LIB(lasso, lasso_ecp_request_new,
+             LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_ECP")
 LIBS=$saved_LIBS;
 AC_SUBST(LASSO_CFLAGS)
 AC_SUBST(LASSO_LIBS)
@@ -71,6 +73,17 @@ AC_SUBST(OPENSSL_LIBS)
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.12])
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
+
+# Test to see if we can include lasso/utils.h
+# AC_CHECK_HEADER won't work correctly unless we specifiy the include directories
+# found in the LASSO_CFLAGS. Save and restore CFLAGS and CPPFLAGS.
+saved_CFLAGS=$CFLAGS
+saved_CPPFLAGS=$CPPFLAGS
+CFLAGS="$CFLAGS $pkg_cv_LASSO_CFLAGS"
+CPPFLAGS="$CPPFLAGS $pkg_cv_LASSO_CFLAGS"
+AC_CHECK_HEADER([lasso/utils.h], LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_LASSO_UTILS_H")
+CFLAGS=$saved_CFLAGS
+CPPFLAGS=$saved_CPPFLAGS
 
 
 # Create Makefile from Makefile.in

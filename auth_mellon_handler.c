@@ -23,6 +23,16 @@
 #include "auth_mellon.h"
 
 
+/*
+ * Note:
+ *
+ * Information on PAOS ECP vs. Web SSO flow processing can be found in
+ * the ECP.rst file.
+ */
+
+#define MEDIA_TYPE_PAOS "application/vnd.paos+xml"
+
+
 #ifdef HAVE_lasso_server_new_from_buffers
 #  define SERVER_NEW lasso_server_new_from_buffers
 #else /* HAVE_lasso_server_new_from_buffers */
@@ -197,11 +207,15 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
      index=\"1\"\n\
      Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact\"\n\
      Location=\"%sartifactResponse\" />\n\
+   <AssertionConsumerService\n\
+     index=\"2\"\n\
+     Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:PAOS\"\n\
+     Location=\"%spaosResponse\" />\n\
  </SPSSODescriptor>\n\
  %s\n\
 </EntityDescriptor>",
       sp_entity_id, cfg->sp_entity_id ? "" : "metadata", 
-      cert, url, url, url, url, am_optional_metadata(p, r));
+      cert, url, url, url, url, url, am_optional_metadata(p, r));
 }
 #endif /* HAVE_lasso_server_new_from_buffers */
 
@@ -1768,12 +1782,14 @@ static int am_validate_authn_context_class_ref(request_rec *r,
  *                       the request url. This parameter is urlencoded, and
  *                       this function will urldecode it in-place. Therefore it
  *                       must be possible to overwrite the data.
+ *  is_paos              If true then flow is PAOS ECP.
  *
  * Returns:
  *  A HTTP status code which should be returned to the client.
  */
 static int am_handle_reply_common(request_rec *r, LassoLogin *login,
-                                  char *relay_state, char *saml_response)
+                                  char *relay_state, char *saml_response,
+                                  bool is_paos)
 {
     char *url;
     char *chr;
@@ -1858,25 +1874,27 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     in_response_to = response->parent.InResponseTo;
 
 
-    if(in_response_to != NULL) {
-        /* This is SP-initiated login. Check that we have a cookie. */
-        if(am_cookie_get(r) == NULL) {
-            /* Missing cookie. */
-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                          "User has disabled cookies, or has lost"
-                          " the cookie before returning from the SAML2"
-                          " login server.");
-            if(dir_cfg->no_cookie_error_page != NULL) {
-                apr_table_setn(r->headers_out, "Location",
-                               dir_cfg->no_cookie_error_page);
-                lasso_login_destroy(login);
-                return HTTP_SEE_OTHER;
-            } else {
-                /* Return 400 Bad Request when the user hasn't set a
-                 * no-cookie error page.
-                 */
-                lasso_login_destroy(login);
-                return HTTP_BAD_REQUEST;
+    if (!is_paos) {
+        if(in_response_to != NULL) {
+            /* This is SP-initiated login. Check that we have a cookie. */
+            if(am_cookie_get(r) == NULL) {
+                /* Missing cookie. */
+                ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                              "User has disabled cookies, or has lost"
+                              " the cookie before returning from the SAML2"
+                              " login server.");
+                if(dir_cfg->no_cookie_error_page != NULL) {
+                    apr_table_setn(r->headers_out, "Location",
+                                   dir_cfg->no_cookie_error_page);
+                    lasso_login_destroy(login);
+                    return HTTP_SEE_OTHER;
+                } else {
+                    /* Return 400 Bad Request when the user hasn't set a
+                     * no-cookie error page.
+                     */
+                    lasso_login_destroy(login);
+                    return HTTP_BAD_REQUEST;
+                }
             }
         }
     }
@@ -2080,9 +2098,95 @@ static int am_handle_post_reply(request_rec *r)
                                                "RelayState");
 
     /* Finish handling the reply with the common handler. */
-    return am_handle_reply_common(r, login, relay_state, saml_response);
+    return am_handle_reply_common(r, login, relay_state, saml_response, false);
 }
 
+
+/* This function handles responses to login requests received with the
+ * PAOS binding.
+ *
+ * Parameters:
+ *  request_rec *r       The request we received.
+ *
+ * Returns:
+ *  HTTP_SEE_OTHER on success, or an error on failure.
+ */
+static int am_handle_paos_reply(request_rec *r)
+{
+    int rc;
+    char *post_data;
+    LassoServer *server;
+    LassoLogin *login;
+    char *relay_state = NULL;
+    int i, err;
+
+    /* Make sure that this is a POST request. */
+    if(r->method_number != M_POST) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Expected POST request for paosResponse endpoint."
+                      " Got a %s request instead.", r->method);
+
+        /* According to the documentation for request_rec, a handler which
+         * doesn't handle a request method, should set r->allowed to the
+         * methods it handles, and return DECLINED.
+         * However, the default handler handles GET-requests, so for GET
+         * requests the handler should return HTTP_METHOD_NOT_ALLOWED.
+         */
+        r->allowed = M_POST;
+
+        if(r->method_number == M_GET) {
+            return HTTP_METHOD_NOT_ALLOWED;
+        } else {
+            return DECLINED;
+        }
+    }
+
+    /* Read POST-data. */
+    rc = am_read_post_data(r, &post_data, NULL);
+    if (rc != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+                      "Error reading POST data.");
+        return rc;
+    }
+
+    server = am_get_lasso_server(r);
+    if(server == NULL) {
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    login = lasso_login_new(server);
+    if (login == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Failed to initialize LassoLogin object.");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* Process login response. */
+    rc = lasso_login_process_paos_response_msg(login, post_data);
+    if (rc != 0) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Error processing ECP authn response."
+                      " Lasso error: [%i] %s", rc, lasso_strerror(rc));
+
+        lasso_login_destroy(login);
+        err = HTTP_BAD_REQUEST;
+        for (i = 0; auth_mellon_errormap[i].lasso_error != 0; i++) {
+            if (auth_mellon_errormap[i].lasso_error == rc) {
+                err = auth_mellon_errormap[i].http_error;
+                break;
+            }
+        }
+        return err;
+    }
+
+    /* Extract RelayState parameter. */
+    if (LASSO_PROFILE(login)->msg_relayState) {
+        relay_state = apr_pstrdup(r->pool, LASSO_PROFILE(login)->msg_relayState);
+    }
+
+    /* Finish handling the reply with the common handler. */
+    return am_handle_reply_common(r, login, relay_state, post_data, true);
+}
 
 /* This function handles responses to login requests which use the
  * HTTP-Artifact binding.
@@ -2216,7 +2320,7 @@ static int am_handle_artifact_reply(request_rec *r)
     }
 
     /* Finish handling the reply with the common handler. */
-    return am_handle_reply_common(r, login, relay_state, "");
+    return am_handle_reply_common(r, login, relay_state, "", false);
 }
 
 
@@ -2541,9 +2645,7 @@ static int am_handle_metadata(request_rec *r)
 }
 
 
-/* Send AuthnRequest using HTTP-Redirect binding.
- *
- * Note that this method frees the LassoLogin object.
+/* Use Lasso Login to set the HTTP content & headers for HTTP-Redirect binding.
  *
  * Parameters:
  *  request_rec *r
@@ -2552,7 +2654,7 @@ static int am_handle_metadata(request_rec *r)
  * Returns:
  *  HTTP_SEE_OTHER on success, or an error on failure.
  */
-static int am_send_authn_request_redirect(request_rec *r, LassoLogin *login)
+static int am_set_authn_request_redirect_content(request_rec *r, LassoLogin *login)
 {
     char *redirect_to;
 
@@ -2574,15 +2676,11 @@ static int am_send_authn_request_redirect(request_rec *r, LassoLogin *login)
     }
     apr_table_setn(r->headers_out, "Location", redirect_to);
 
-    lasso_login_destroy(login);
-
     /* We don't want to include POST data (in case this was a POST request). */
     return HTTP_SEE_OTHER;
 }
 
-/* Send AuthnRequest using HTTP-POST binding.
- *
- * Note that this method frees the LassoLogin object.
+/* Use Lasso Login to set the HTTP content & headers for HTTP-POST binding.
  *
  * Parameters:
  *  request_rec *r         The request we are processing.
@@ -2591,7 +2689,7 @@ static int am_send_authn_request_redirect(request_rec *r, LassoLogin *login)
  * Returns:
  *  OK on success, or an error on failure.
  */
-static int am_send_authn_request_post(request_rec *r, LassoLogin *login)
+static int am_set_authn_request_post_content(request_rec *r, LassoLogin *login)
 {
     char *url;
     char *message;
@@ -2601,8 +2699,6 @@ static int am_send_authn_request_post(request_rec *r, LassoLogin *login)
     url = am_htmlencode(r, LASSO_PROFILE(login)->msg_url);
     message = am_htmlencode(r, LASSO_PROFILE(login)->msg_body);
     relay_state = am_htmlencode(r, LASSO_PROFILE(login)->msg_relayState);
-
-    lasso_login_destroy(login);
 
     output = apr_psprintf(r->pool,
       "<!DOCTYPE html>\n"
@@ -2632,70 +2728,76 @@ static int am_send_authn_request_post(request_rec *r, LassoLogin *login)
     return OK;
 }
 
-/* Create and send an authentication request.
+/* Use Lasso Login to set the HTTP content & headers for PAOS binding.
  *
  * Parameters:
  *  request_rec *r         The request we are processing.
- *  const char *idp        The entityID of the IdP.
- *  const char *return_to  The URL we should redirect to when receiving the request.
- *  int is_passive         Whether to send a passive request.
+ *  LassoLogin *login      The login message.
  *
  * Returns:
- *  HTTP response code indicating success or failure.
+ *  OK on success, or an error on failure.
  */
-static int am_send_authn_request(request_rec *r, const char *idp,
-                           const char *return_to, int is_passive)
+static int am_set_authn_request_paos_content(request_rec *r, LassoLogin *login)
 {
-    LassoServer *server;
-    LassoProvider *provider;
-    LassoLogin *login;
-    LassoSamlp2AuthnRequest *request;
-    LassoHttpMethod http_method;
-    char *sso_url;
+    apr_table_setn(r->headers_out, "Content-Type", MEDIA_TYPE_PAOS);
+    ap_rputs(LASSO_PROFILE(login)->msg_body, r);
+
+    return OK;
+}
+
+/*
+ * Create and initialize LassoLogin object
+ *
+ * This function creates a LassoLogin object and initializes it to the
+ * greatest extent possible to allow it to be shared by multiple
+ * callers. There are two return values. The function return is an
+ * error code, the login_return parameter is a pointer in which to
+ * receive the LassoLogin object. The caller MUST free the returned
+ * login object using lasso_login_destroy() in all cases (even when
+ * this function returns an error), the only execption is if the
+ * returned LassoLogin is NULL.
+ *
+ * Parameters:
+ *  r                The request we are processing.
+ *  login_return     The returned LassoLogin object (caller must free)
+ *  idp              The provider id of remote Idp
+ *                   [optional, may be NULL]
+ *  http_method      Specifies the SAML profile to use
+ *  destination_url  If the idp parameter is non-NULL this should be
+ *                   the URL of the IdP endpoint the message is being sent to
+ *                   [optional, may be NULL]
+ *  assertion_consumer_service_url
+ *                   The URL of this SP's endpoint which will receive the
+ *                   SAML assertion
+ *  return_to_url    Used to initialize the RelayState value
+ *  is_passive       The SAML IsPassive flag
+ *
+ * Returns:
+ *  OK on success, HTTP error code otherwise
+ *
+ */
+static int am_init_authn_request_common(request_rec *r,
+                                        LassoLogin **login_return,
+                                        const char *idp,
+                                        LassoHttpMethod http_method,
+                                        const char *destination_url,
+                                        const char *assertion_consumer_service_url,
+                                        const char *return_to_url,
+                                        int is_passive)
+{
     gint ret;
     am_dir_cfg_rec *dir_cfg;
-    char *acs_url;
+    LassoServer *server;
+    LassoLogin *login;
+    LassoSamlp2AuthnRequest *request;
+    const char *sp_name;
+
+    *login_return = NULL;
 
     dir_cfg = am_get_dir_cfg(r);
 
-    /* Add cookie for cookie test. We know that we should have
-     * a valid cookie when we return from the IdP after SP-initiated
-     * login.
-     */
-    am_cookie_set(r, "cookietest");
-
-
     server = am_get_lasso_server(r);
-    if(server == NULL) {
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
-
-    /* Find our IdP. */
-    provider = lasso_server_get_provider(server, idp);
-    if (provider == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Could not find metadata for the IdP \"%s\".",
-                      idp);
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
-
-    /* Determine what binding and endpoint we should use when
-     * sending the request.
-     */
-    http_method = LASSO_HTTP_METHOD_REDIRECT;
-    sso_url = lasso_provider_get_metadata_one(
-        provider, "SingleSignOnService HTTP-Redirect");
-    if (sso_url == NULL) {
-        /* HTTP-Redirect unsupported - try HTTP-POST. */
-        http_method = LASSO_HTTP_METHOD_POST;
-        sso_url = lasso_provider_get_metadata_one(
-            provider, "SingleSignOnService HTTP-POST");
-    }
-    if (sso_url == NULL) {
-        /* Both HTTP-Redirect and HTTP-POST unsupported - give up. */
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Could not find a supported SingleSignOnService endpoint"
-                      " for the IdP \"%s\".", idp);
+    if (server == NULL) {
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
@@ -2703,34 +2805,56 @@ static int am_send_authn_request(request_rec *r, const char *idp,
     if(login == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
 		      "Error creating LassoLogin object from LassoServer.");
-        g_free(sso_url);
 	return HTTP_INTERNAL_SERVER_ERROR;
     }
+    *login_return = login;
 
     ret = lasso_login_init_authn_request(login, idp, http_method);
     if(ret != 0) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error creating login request."
                       " Lasso error: [%i] %s", ret, lasso_strerror(ret));
-        g_free(sso_url);
-	lasso_login_destroy(login);
 	return HTTP_INTERNAL_SERVER_ERROR;
     }
 
     request = LASSO_SAMLP2_AUTHN_REQUEST(LASSO_PROFILE(login)->request);
-    if(request->NameIDPolicy == NULL) {
+    if (request->NameIDPolicy == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error creating login request. Please verify the "
                       "MellonSPMetadataFile directive.");
-        g_free(sso_url);
-        lasso_login_destroy(login);
         return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /*
+     * Make sure the Destination attribute is set to the IdP
+     * SingleSignOnService endpoint. This is required for
+     * Shibboleth 2 interoperability, and older versions of
+     * lasso (at least up to 2.2.91) did not do it.
+     */
+    if (destination_url &&
+        LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination == NULL) {
+        lasso_assign_string(LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination,
+                            destination_url);
+    }
+
+    if (assertion_consumer_service_url) {
+        lasso_assign_string(request->AssertionConsumerServiceURL,
+                            assertion_consumer_service_url);
+        /* Can't set request->ProtocolBinding (which is usually set along side
+         * AssertionConsumerServiceURL) as there is no immediate function
+         * like lasso_provider_get_assertion_consumer_service_url to get them.
+         * So leave that empty for now, it is not strictly required */
     }
 
     request->ForceAuthn = FALSE;
     request->IsPassive = is_passive;
-
     request->NameIDPolicy->AllowCreate = TRUE;
+
+    sp_name = am_get_config_langstring(dir_cfg->sp_org_display_name, NULL);
+    if (sp_name) {
+        lasso_assign_string(request->ProviderName, sp_name);
+    }
+
 
     LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Consent
       = g_strdup(LASSO_SAML2_CONSENT_IMPLICIT);
@@ -2757,56 +2881,228 @@ static int am_send_authn_request(request_rec *r, const char *idp,
         }
     }
 
-    /*
-     * Make sure the Destination attribute is set to the IdP
-     * SingleSignOnService endpoint. This is required for
-     * Shibboleth 2 interoperability, and older versions of
-     * lasso (at least up to 2.2.91) did not do it.
-     */
-    if (LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination == NULL) {
-        LASSO_SAMLP2_REQUEST_ABSTRACT(request)->Destination = g_strdup(sso_url);
-    }
-
-    /* sso_url no longer needed. */
-    g_free(sso_url);
-
-    /* Some IdPs insist they want to see an AttributeConsumerServiceURL
-     * attribute in the authentication request, so try to add one if the
-     * metadata contains one */
-    acs_url = lasso_provider_get_assertion_consumer_service_url(
-        LASSO_PROVIDER(server), NULL);
-    if (acs_url) {
-        request->AssertionConsumerServiceURL = g_strdup(acs_url);
-        /* Can't set request->ProtocolBinding (which is usually set along side
-         * AssertionConsumerServiceURL) as there is no immediate function
-         * like lasso_provider_get_assertion_consumer_service_url to get them.
-         * So leave that empty for now, it is not strictly required */
-    }
-
-    LASSO_PROFILE(login)->msg_relayState = g_strdup(return_to);
+    LASSO_PROFILE(login)->msg_relayState = g_strdup(return_to_url);
 
     ret = lasso_login_build_authn_request_msg(login);
     if(ret != 0) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error building login request."
                       " Lasso error: [%i] %s", ret, lasso_strerror(ret));
-	lasso_login_destroy(login);
 	return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    /* Time to actually send the authentication request. */
-    switch (http_method) {
+    return OK;
+}
+
+/* Use Lasso Login to set the HTTP content & headers for selected binding.
+ *
+ * Parameters:
+ *  request_rec *r         The request we are processing.
+ *  LassoLogin *login      The login message.
+ *
+ * Returns:
+ *  HTTP response code
+ */
+static int am_set_authn_request_content(request_rec *r, LassoLogin *login)
+
+{
+    switch (login->http_method) {
     case LASSO_HTTP_METHOD_REDIRECT:
-        return am_send_authn_request_redirect(r, login);
+        return am_set_authn_request_redirect_content(r, login);
     case LASSO_HTTP_METHOD_POST:
-        return am_send_authn_request_post(r, login);
+        return am_set_authn_request_post_content(r, login);
+    case LASSO_HTTP_METHOD_PAOS:
+        return am_set_authn_request_paos_content(r, login);
     default:
         /* We should never get here. */
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Unsupported http_method.");
-        lasso_login_destroy(login);
         return HTTP_INTERNAL_SERVER_ERROR;
     }
+}
+
+#ifdef HAVE_ECP
+/* Build an IDPList whose members have an endpoint supporing
+ * the protocol_type and http_method.
+ */
+static LassoNode *
+am_get_idp_list(const LassoServer *server, LassoMdProtocolType protocol_type, LassoHttpMethod http_method)
+{
+    GList *idp_entity_ids = NULL;
+    GList *entity_id = NULL;
+    GList *idp_entries = NULL;
+    LassoSamlp2IDPList *idp_list;
+    LassoSamlp2IDPEntry *idp_entry;
+
+    idp_list = LASSO_SAMLP2_IDP_LIST(lasso_samlp2_idp_list_new());
+
+    idp_entity_ids =
+        lasso_server_get_filtered_provider_list(server,
+                                                LASSO_PROVIDER_ROLE_IDP,
+                                                protocol_type, http_method);
+
+    for (entity_id = g_list_first(idp_entity_ids); entity_id != NULL;
+         entity_id = g_list_next(entity_id)) {
+        idp_entry = LASSO_SAMLP2_IDP_ENTRY(lasso_samlp2_idp_entry_new());
+        idp_entry->ProviderID = g_strdup(entity_id->data);
+        idp_entry->Name = NULL; /* FIXME: Where do we get this? */
+        idp_entry->Loc = NULL; /* FIXME: Where do we get this? */
+
+        idp_entries = g_list_append(idp_entries, idp_entry);
+    }
+    lasso_release_list_of_strings(idp_entity_ids);
+
+    idp_list->IDPEntry = idp_entries;
+    return LASSO_NODE(idp_list);
+}
+
+/* Send AuthnRequest using PAOS binding.
+ *
+ * Parameters:
+ *  request_rec *r
+ *
+ * Returns:
+ *  OK on success, or an error on failure.
+ */
+static int am_send_paos_authn_request(request_rec *r)
+{
+    gint ret;
+    am_dir_cfg_rec *dir_cfg;
+    LassoServer *server;
+    LassoLogin *login;
+    const char *relay_state = NULL;
+    char *assertion_consumer_service_url;
+    int is_passive;
+
+    dir_cfg = am_get_dir_cfg(r);
+
+    server = am_get_lasso_server(r);
+    if(server == NULL) {
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    ret = am_get_is_passive(r, &is_passive);
+    if (ret != OK) return ret;
+
+    relay_state = am_reconstruct_url(r);
+
+    assertion_consumer_service_url =
+        am_get_assertion_consumer_service_by_binding(LASSO_PROVIDER(server),
+                                                     "PASO");
+
+    ret = am_init_authn_request_common(r, &login,
+                                       NULL, LASSO_HTTP_METHOD_PAOS, NULL,
+                                       assertion_consumer_service_url,
+                                       relay_state, is_passive);
+    g_free(assertion_consumer_service_url);
+
+    if (ret != OK) {
+        if (login) {
+            lasso_login_destroy(login);
+        }
+        return ret;
+    }
+
+    if (dir_cfg->ecp_send_idplist) {
+        lasso_profile_set_idp_list(LASSO_PROFILE(login),
+                                   am_get_idp_list(LASSO_PROFILE(login)->server,
+                                                   LASSO_MD_PROTOCOL_TYPE_SINGLE_SIGN_ON,
+                                                   LASSO_HTTP_METHOD_SOAP));
+    }
+
+    ret = am_set_authn_request_content(r, login);
+    lasso_login_destroy(login);
+
+    return ret;
+}
+#endif /* HAVE_ECP */
+
+/* Create and send an authentication request.
+ *
+ * Parameters:
+ *  request_rec *r         The request we are processing.
+ *  const char *idp        The entityID of the IdP.
+ *  const char *return_to  The URL we should redirect to when receiving the request.
+ *  int is_passive         Whether to send a passive request.
+ *
+ * Returns:
+ *  HTTP response code indicating success or failure.
+ */
+static int am_send_login_authn_request(request_rec *r, const char *idp,
+                                 const char *return_to_url,
+                                 int is_passive)
+{
+    int ret;
+    LassoServer *server;
+    LassoProvider *provider;
+    LassoHttpMethod http_method;
+    char *destination_url;
+    char *assertion_consumer_service_url;
+    LassoLogin *login;
+
+    /* Add cookie for cookie test. We know that we should have
+     * a valid cookie when we return from the IdP after SP-initiated
+     * login.
+     */
+    am_cookie_set(r, "cookietest");
+
+    server = am_get_lasso_server(r);
+    if(server == NULL) {
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* Find our IdP. */
+    provider = lasso_server_get_provider(server, idp);
+    if (provider == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Could not find metadata for the IdP \"%s\".",
+                      idp);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* Determine what binding and endpoint we should use when
+     * sending the request.
+     */
+    http_method = LASSO_HTTP_METHOD_REDIRECT;
+    destination_url = lasso_provider_get_metadata_one(
+        provider, "SingleSignOnService HTTP-Redirect");
+    if (destination_url == NULL) {
+        /* HTTP-Redirect unsupported - try HTTP-POST. */
+        http_method = LASSO_HTTP_METHOD_POST;
+        destination_url = lasso_provider_get_metadata_one(
+            provider, "SingleSignOnService HTTP-POST");
+    }
+    if (destination_url == NULL) {
+        /* Both HTTP-Redirect and HTTP-POST unsupported - give up. */
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Could not find a supported SingleSignOnService endpoint"
+                      " for the IdP \"%s\".", idp);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    assertion_consumer_service_url =
+        lasso_provider_get_assertion_consumer_service_url(
+            LASSO_PROVIDER(server), NULL);
+
+    ret = am_init_authn_request_common(r, &login, idp, http_method,
+                                       destination_url,
+                                       assertion_consumer_service_url,
+                                       return_to_url, is_passive);
+
+    g_free(destination_url);
+    g_free(assertion_consumer_service_url);
+
+    if (ret != OK) {
+        if (login) {
+            lasso_login_destroy(login);
+        }
+        return ret;
+    }
+
+    ret = am_set_authn_request_content(r, login);
+    lasso_login_destroy(login);
+
+    return ret;
 }
 
 
@@ -2844,7 +3140,7 @@ static int am_handle_auth(request_rec *r)
             relay_state = return_url;
     }
 
-    return am_send_authn_request(r, am_get_idp(r), relay_state, FALSE);
+    return am_send_login_authn_request(r, am_get_idp(r), relay_state, FALSE);
 }
 
 /* This function handles requests to the login handler.
@@ -2861,7 +3157,6 @@ static int am_handle_login(request_rec *r)
     char *idp_param;
     const char *idp;
     char *return_to;
-    char *is_passive_str;
     int is_passive;
     int ret;
 
@@ -2889,25 +3184,8 @@ static int am_handle_login(request_rec *r)
         }
     }
 
-    is_passive_str = am_extract_query_parameter(r->pool, r->args, "IsPassive");
-    if(is_passive_str != NULL) {
-        ret = am_urldecode((char*)is_passive_str);
-        if(ret != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                          "Error urldecoding IsPassive parameter.");
-            return ret;
-        }
-        if(!strcmp(is_passive_str, "true")) {
-            is_passive = TRUE;
-        } else if(!strcmp(is_passive_str, "false")) {
-            is_passive = FALSE;
-        } else {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                          "Invalid value for IsPassive parameter - must be \"true\" or \"false\".");
-            return HTTP_BAD_REQUEST;
-        }
-    } else {
-        is_passive = FALSE;
+    if ((ret = am_get_is_passive(r, &is_passive)) != OK) {
+        return ret;
     }
 
     if(idp_param != NULL) {
@@ -2925,7 +3203,7 @@ static int am_handle_login(request_rec *r)
         idp = am_get_idp(r);
     }
 
-    return am_send_authn_request(r, idp, return_to, is_passive);
+    return am_send_login_authn_request(r, idp, return_to, is_passive);
 }
 
 /* This function probes an URL (HTTP GET)
@@ -3112,7 +3390,32 @@ static int am_handle_probe_discovery(request_rec *r) {
 int am_handler(request_rec *r)
 {
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+#ifdef HAVE_ECP
+    am_req_cfg_rec *req_cfg = am_get_req_cfg(r);
+#endif /* HAVE_ECP */
     const char *endpoint;
+
+    /*
+     * Normally this content handler is used to dispatch to the SAML
+     * endpoints implmented by mod_auth_mellon. SAML endpoint dispatch
+     * occurs when the URI begins with the SAML endpoint path.
+     *
+     * However, this handler is also responsible for generating ECP
+     * authn requests, in this case the URL will be a protected
+     * resource we're doing authtentication for. Early in the request
+     * processing pipeline we detected we were doing ECP authn and set
+     * a flag on the request. Here we test for that flag and if true
+     * respond with the ECP PAOS authn request.
+     *
+     * If the request is neither for a SAML endpoint nor one that
+     * requires generating an ECP authn we decline handling the request.
+     */
+
+#ifdef HAVE_ECP
+    if (req_cfg->ecp_authn_req) { /* Are we doing ECP? */
+        return am_send_paos_authn_request(r);
+    }
+#endif /* HAVE_ECP */
 
     /* Check if this is a request for one of our endpoints. We check if
      * the uri starts with the path set with the MellonEndpointPath
@@ -3130,6 +3433,8 @@ int am_handler(request_rec *r)
         return am_handle_post_reply(r);
     } else if(!strcmp(endpoint, "artifactResponse")) {
         return am_handle_artifact_reply(r);
+    } else if(!strcmp(endpoint, "paosResponse")) {
+        return am_handle_paos_reply(r);
     } else if(!strcmp(endpoint, "auth")) {
         return am_handle_auth(r);
     } else if(!strcmp(endpoint, "logout")
@@ -3205,6 +3510,13 @@ int am_auth_mellon_user(request_rec *r)
     am_dir_cfg_rec *dir = am_get_dir_cfg(r);
     int return_code = HTTP_UNAUTHORIZED;
     am_cache_entry_t *session;
+#ifdef HAVE_ECP
+    const char *accept_header = NULL;
+    const char *paos_header = NULL;
+    bool have_paos_media_type = false;
+    bool valid_paos_header = false;
+    bool is_paos = false;
+#endif /* HAVE_ECP */
 
     /* check if we are a subrequest.  if we are, then just return OK
      * without any checking since these cannot be injected (heh). */
@@ -3229,6 +3541,45 @@ int am_auth_mellon_user(request_rec *r)
         return OK;
     }
 
+#ifdef HAVE_ECP
+    /*
+     * Is the client ECP capable? Test for PAOS media type in Accept header
+     * and presence of valid PAOS header.
+     */
+    accept_header = apr_table_get(r->headers_in, "Accept");
+    paos_header = apr_table_get(r->headers_in, "PAOS");
+    if (accept_header) {
+        if (am_header_has_media_type(r, accept_header, MEDIA_TYPE_PAOS)) {
+            have_paos_media_type = true;
+        }
+    }
+    if (paos_header) {
+        if (am_validate_paos_header(r, paos_header)) {
+            valid_paos_header = true;
+        }
+    }
+    if (have_paos_media_type) {
+        if (valid_paos_header) {
+            is_paos = true;
+        } else {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "request supplied PAOS media type in Accept header "
+                          "but omitted valid PAOS header");
+        }
+    } else {
+        if (valid_paos_header) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "request supplied valid PAOS header "
+                          "but omitted PAOS media type in Accept header");
+        }
+    }
+    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                  "have_paos_media_type=%s valid_paos_header=%s is_paos=%s",
+                  have_paos_media_type ? "True" : "False",
+                  valid_paos_header ? "True" : "False",
+                  is_paos ? "True" : "False");
+#endif /* HAVE_ECP */
+
     /* Get the session of this request. */
     session = am_get_request_session(r);
 
@@ -3244,8 +3595,30 @@ int am_auth_mellon_user(request_rec *r)
                 am_release_request_session(r, session);
             }
 
+#ifdef HAVE_ECP
+            /*
+             * If PAOS set a flag on the request indicating we're
+             * doing ECP and allow the request to proceed through the
+             * request handlers until we reach am_handler which then
+             * checks the flag and if True initiates an ECP transaction.
+             * See am_check_uid for detailed explanation.
+             */
+            if (is_paos) {
+                am_req_cfg_rec *req_cfg;
+
+                req_cfg = am_get_req_cfg(r);
+                req_cfg->ecp_authn_req = true;
+
+                return OK;
+
+            } else {
+                /* Send the user to the authentication page on the IdP. */
+                return am_start_auth(r);
+            }
+#else /* HAVE_ECP */
             /* Send the user to the authentication page on the IdP. */
             return am_start_auth(r);
+#endif /* HAVE_ECP */
         }
 
         /* Verify that the user has access to this resource. */
@@ -3301,6 +3674,7 @@ int am_auth_mellon_user(request_rec *r)
 int am_check_uid(request_rec *r)
 {
     am_dir_cfg_rec *dir = am_get_dir_cfg(r);
+    am_req_cfg_rec *req_cfg = am_get_req_cfg(r);
     am_cache_entry_t *session;
     int return_code = HTTP_UNAUTHORIZED;
 
@@ -3309,12 +3683,52 @@ int am_check_uid(request_rec *r)
     if (r->main)
         return OK;
 
+#ifdef HAVE_ECP
+    if (req_cfg->ecp_authn_req) {
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                      "am_check_uid is performing ECP authn request flow");
+        /*
+         * Normally when a protected resource requires authentication
+         * the request processing pipeline is exited early by
+         * responding with either a 401 or a redirect. But the flow
+         * for ECP is different, there will be a successful response
+         * (200) but instead of the response body containing the
+         * protected resource it will contain a SAML AuthnRequest
+         * with the Content-Type indicating it's PAOS ECP.
+         *
+         * In order to return a 200 Success with a PAOS body we have
+         * to reach the handler stage of the request processing
+         * pipeline. But this is a protected resource and we won't
+         * reach the handler stage unless authn and authz are
+         * satisfied. Therefore we lie and return results which
+         * indicate authn and authz are satisfied. This is OK because
+         * we're not actually going to respond with the protected
+         * resource, instead we'll be responsing with a SAML request.
+         *
+         * Apache's internal request logic
+         * (ap_process_request_internal) requires that after a
+         * successful return from the check_user_id authentication
+         * hook the r->user value be non-NULL. This makes sense
+         * because authentication establishes who the authenticated
+         * principal is. But with ECP flow there is no authenticated
+         * user at this point, we're just faking successful
+         * authentication in order to reach the handler stage. To get
+         * around this problem we set r-user to the empty string to
+         * keep Apache happy, otherwise it would throw an
+         * error. mod_shibboleth does the same thing.
+         */
+        r->user = "";
+        return OK;
+    }
+#endif /* HAVE_ECP */
+
     /* Check if this is a request for one of our endpoints. We check if
      * the uri starts with the path set with the MellonEndpointPath
      * configuration directive.
      */
     if(strstr(r->uri, dir->endpoint_path) == r->uri) {
         /* No access control on our internal endpoints. */
+        r->user = "";           /* see above explanation */
         return OK;
     }
 

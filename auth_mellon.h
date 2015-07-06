@@ -35,6 +35,7 @@
 #include <lasso/xml/saml-2.0/saml2_authn_statement.h>
 #include <lasso/xml/saml-2.0/saml2_audience_restriction.h>
 #include <lasso/xml/misc_text_node.h>
+#include "lasso_compat.h"
 
 /* The following are redefined in ap_config_auto.h */
 #undef PACKAGE_BUGREPORT
@@ -90,6 +91,8 @@
 #define am_get_mod_cfg(s) (am_get_srv_cfg((s)))->mc
 
 #define am_get_dir_cfg(r) (am_dir_cfg_rec *)ap_get_module_config((r)->per_dir_config, &auth_mellon_module)
+
+#define am_get_req_cfg(r) (am_req_cfg_rec *)ap_get_module_config((r)->request_config, &auth_mellon_module)
 
 
 typedef struct am_mod_cfg_rec {
@@ -243,7 +246,17 @@ typedef struct am_dir_cfg_rec {
 
     /* Cached lasso server object. */
     LassoServer *server;
+
+    /* Whether to send an ECP client a list of IdP's */
+    int ecp_send_idplist;
 } am_dir_cfg_rec;
+
+typedef struct am_req_cfg_rec {
+    char *cookie_value;
+#ifdef HAVE_ECP
+    bool ecp_authn_req;
+#endif /* HAVE_ECP */
+} am_req_cfg_rec;
 
 typedef struct am_cache_storage_t {
     apr_size_t ptr;
@@ -394,7 +407,12 @@ const char *am_get_mime_header(request_rec *r, const char *m, const char *h);
 const char *am_get_mime_body(request_rec *r, const char *mime);
 char *am_get_service_url(request_rec *r, 
                          LassoProfile *profile, char *service_name);
-
+bool am_validate_paos_header(request_rec *r, const char *header);
+bool am_header_has_media_type(request_rec *r, const char *header,
+                              const char *media_type);
+const char *am_get_config_langstring(apr_hash_t *h, const char *lang);
+int am_get_is_passive(request_rec *r, int *is_passive);
+char *am_get_assertion_consumer_service_by_binding(LassoProvider *provider, const char *binding);
 
 int am_auth_mellon_user(request_rec *r);
 int am_check_uid(request_rec *r);

@@ -83,6 +83,7 @@ static const char *am_cookie_params(request_rec *r)
  */
 const char *am_cookie_get(request_rec *r)
 {
+    am_req_cfg_rec *req_cfg;
     const char *name;
     const char *value;
     const char *cookie;
@@ -96,8 +97,8 @@ const char *am_cookie_get(request_rec *r)
     }
 
     /* Check if we have added a note on the current request. */
-    value = (const char *)ap_get_module_config(r->request_config,
-                                               &auth_mellon_module);
+    req_cfg = am_get_req_cfg(r);
+    value = req_cfg->cookie_value;
     if(value != NULL) {
         return value;
     }
@@ -180,6 +181,7 @@ const char *am_cookie_get(request_rec *r)
  */
 void am_cookie_set(request_rec *r, const char *id)
 {
+    am_req_cfg_rec *req_cfg;
     const char *name;
     const char *cookie_params;
     char *cookie;
@@ -202,8 +204,8 @@ void am_cookie_set(request_rec *r, const char *id)
     /* Add a note on the current request, to allow us to retrieve this
      * cookie in the current request.
      */
-    ap_set_module_config(r->request_config, &auth_mellon_module,
-                         apr_pstrdup(r->pool, id));
+    req_cfg = am_get_req_cfg(r);
+    req_cfg->cookie_value = apr_pstrdup(r->pool, id);
 }
 
 
