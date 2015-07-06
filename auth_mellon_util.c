@@ -1506,3 +1506,377 @@ am_get_service_url(request_rec *r, LassoProfile *profile, char *service_name)
 
     return url;
 }
+
+/* Thus function checks if an HTTP PAOS header is valid.
+ *
+ * A PAOS header must be composed of 2 values seperated by a semicolon.
+ *
+ * The first value must be a version declaration in the form ver="xxx"
+ * (note the version string must be in double quotes).
+ *
+ * The second value must be the ECP service.
+ * (note the service string must be in double quotes).
+ *
+ * Parameters:
+ *  request_rec *r         The request
+ *  const char *header     The PAOS header value
+ *
+ * Returns:
+ *   true if the PAOS header is valid, false otherwise
+ *
+ */
+#define PAOS_VERSION_TOKEN "ver=\"" LASSO_PAOS_HREF "\""
+#define ECP_SERVICE_TOKEN  "\"" LASSO_ECP_HREF "\""
+bool am_validate_paos_header(request_rec *r, const char *header)
+{
+    bool result = false;
+    char **semicolon_tokens = NULL;
+    char *token = NULL;
+    guint len;
+
+    if (header == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                     "invalid PAOS header, NULL");
+        goto cleanup;
+    }
+
+    /* Split the header on the semicolon character */
+    semicolon_tokens = g_strsplit(header, ";", 0);
+
+    /* There must be exactly two tokens after splitting */
+    len = g_strv_length(semicolon_tokens);
+    if (len != 2) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                     "invalid PAOS header, "
+                     "expected 2 tokens seperated by semicolon, header=\"%s\"",
+                     header);
+        goto cleanup;
+    }
+
+    /* Validate the first token as the PAOS version */
+    token = g_strstrip(semicolon_tokens[0]);
+    if (!g_str_equal(token, PAOS_VERSION_TOKEN)) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                     "invalid PAOS header, "
+                     "expected first token to be \"%s\", "
+                     "but found \"%s\" in header=\"%s\"",
+                     PAOS_VERSION_TOKEN, token, header);
+        goto cleanup;
+    }
+
+    /* Validate the second token as the ECP service */
+    token = g_strstrip(semicolon_tokens[1]);
+    if (!g_str_equal(token, ECP_SERVICE_TOKEN)) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                     "invalid PAOS header, "
+                     "expected second token to be \"%s\", "
+                     "but found \"%s\" in header=\"%s\"",
+                     ECP_SERVICE_TOKEN, token, header);
+        goto cleanup;
+    }
+
+    /* No problems, we're good */
+    result = true;
+
+ cleanup:
+    g_strfreev(semicolon_tokens);
+    return result;
+}
+#undef PAOS_VERSION_TOKEN
+#undef ECP_SERVICE_TOKEN
+
+/* This function checks if Accept header has a media type
+ *
+ * Given an Accept header value like this:
+ *
+ * "text/html,application/xhtml+xml,application/xml;q=0.9"
+ *
+ * Parse the string and find name of each media type, ignore any parameters
+ * bound to the name. Test to see if the name matches the input media_type.
+ *
+ * Parameters:
+ *  request_rec *r         The request
+ *  const char *header     The header value
+ *  const char *media_type media type header value to check (case insensitive)
+ *
+ * Returns:
+ *   true if media type is in header, false otherwise
+ */
+bool am_header_has_media_type(request_rec *r, const char *header, const char *media_type)
+{
+    bool result = false;
+    char **comma_tokens = NULL;
+    char **media_ranges = NULL;
+    char *media_range = NULL;
+
+    if (header == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                     "invalid Accept header, NULL");
+        goto cleanup;
+    }
+
+    /*
+     * Split the header into a list of media_range tokens seperated by
+     * a comma and iterate over the list.
+     */
+    comma_tokens = g_strsplit(header, ",", 0);
+    for (media_ranges = comma_tokens, media_range = *media_ranges;
+         media_range;
+         media_range = *(++media_ranges)) {
+        char **semicolon_tokens = NULL;
+        char *name = NULL;
+
+        /*
+         * Split the media_range into a name and parameters, each
+         * separated by a semicolon. The first element in the list is
+         * the media_type name, subsequent params are optional and ignored.
+         */
+        media_range = g_strstrip(media_range);
+        semicolon_tokens = g_strsplit(media_range, ";", 0);
+
+        /*
+         * Does the media_type match our required media_type?
+         * If so clean up and return success.
+         */
+        name = g_strstrip(semicolon_tokens[0]);
+        if (name && g_str_equal(name, media_type)) {
+            result = true;
+            g_strfreev(semicolon_tokens);
+            goto cleanup;
+        }
+        g_strfreev(semicolon_tokens);
+    }
+
+ cleanup:
+    g_strfreev(comma_tokens);
+    return result;
+}
+
+/*
+ * Lookup a config string in a specific language.  If lang is NULL and
+ * the config string had been defined without a language qualifier
+ * return the unqualified value.  If not found NULL is returned.
+ */
+const char *am_get_config_langstring(apr_hash_t *h, const char *lang)
+{
+    char *string;
+
+    if (lang == NULL) {
+        lang = "";
+    }
+
+    string = (char *)apr_hash_get(h, lang, APR_HASH_KEY_STRING);
+
+    return string;
+}
+
+/*
+ * Get the value of boolean query parameter.
+ *
+ * Parameters:
+ *  request_rec *r         The request
+ *  const char *name       The name of the query parameter
+ *  int *return_value      The address of the variable to receive
+ *                         the boolean value
+ *  int default_value      The value returned if parameter is absent or
+ *                          in event of an error
+ *
+ * Returns:
+ *   OK on success, HTTP error otherwise
+ *
+ * Looks for the named parameter in the query parameters, if found
+ * parses the value which must be one of:
+ *
+ *   * true
+ *   * false
+ *
+ * If value cannot be parsed HTTP_BAD_REQUEST is returned.
+ *
+ * If not found, or if there is an error, the returned value is set to
+ * default_value.
+ */
+
+int am_get_boolean_query_parameter(request_rec *r, const char *name,
+                                   int *return_value, int default_value)
+{
+    char *value_str;
+    int ret = OK;
+
+    *return_value = default_value;
+
+    value_str = am_extract_query_parameter(r->pool, r->args, name);
+    if (value_str != NULL) {
+        ret = am_urldecode(value_str);
+        if (ret != OK) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Error urldecoding \"%s\" boolean query parameter, "
+                          "value=\"%s\"", name, value_str);
+            return ret;
+        }
+        if(!strcmp(value_str, "true")) {
+            *return_value = TRUE;
+        } else if(!strcmp(value_str, "false")) {
+            *return_value = FALSE;
+        } else {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Invalid value for \"%s\" boolean query parameter, "
+                          "value=\"%s\"", name, value_str);
+            ret = HTTP_BAD_REQUEST;
+        }
+    }
+
+    return ret;
+}
+
+/*
+ * Get the URL of the AssertionConsumerServer having specific protocol
+ * binding.
+ *
+ * Parameters:
+ *  LassoProvider *provider The provider whose endpoints will be scanned.
+ *  const char *binding     The required binding short name.
+ *
+ * Returns:
+ *   The endpoint URL or NULL if not found. Must be freed with g_free().
+ *
+ * Lasso does not provide a public API to select a provider endpoint
+ * by binding. The best we can do is iterate over a list of endpoint
+ * descriptors and select a matching descriptor.
+ *
+ * Lasso does not document the format of these descriptor names but
+ * essentially a descriptor is a space separated concatenation of the
+ * endpoint properties. For SAML2 one can assume it is the endpoint
+ * type, optionally followed by the protocol binding name, optionally
+ * followd by the index (if the endpoint type is indexed). If the
+ * endpoint is a response location then "ResponseLocation" will be
+ * appended as the final token. For example here is a list of
+ * descriptors returned for a service provider (note they are
+ * unordered).
+ *
+ *    "AssertionConsumerService HTTP-POST 0"
+ *    "AuthnRequestsSigned"
+ *    "AssertionConsumerService PAOS 2"
+ *    "SingleLogoutService HTTP-Redirect"
+ *    "SingleLogoutService SOAP"
+ *    "AssertionConsumerService HTTP-Artifact 1"
+ *    "NameIDFormat"
+ *    "SingleLogoutService HTTP-POST ResponseLocation"
+ *
+ * The possible binding names are:
+ *
+ *    "SOAP"
+ *    "HTTP-Redirect"
+ *    "HTTP-POST"
+ *    "HTTP-Artifact"
+ *    "PAOS"
+ *    "URI"
+ *
+ * We know the AssertionConsumerService is indexed. If there is more
+ * than one endpoint with the required binding we select the one with
+ * the lowest index assuming it is preferred.
+ */
+
+char *am_get_assertion_consumer_service_by_binding(LassoProvider *provider, const char *binding)
+{
+    GList *descriptors;
+    char *url;
+    char *selected_descriptor;
+    char *descriptor;
+    char **tokens;
+    guint n_tokens;
+    GList *i;
+    char *endptr;
+    long descriptor_index, min_index;
+
+    url = NULL;
+    selected_descriptor = NULL;
+    min_index = LONG_MAX;
+
+    /* The descriptor list is unordered */
+    descriptors = lasso_provider_get_metadata_keys_for_role(provider,
+                                                            LASSO_PROVIDER_ROLE_SP);
+
+    for (i = g_list_first(descriptors), tokens=NULL;
+         i;
+         i = g_list_next(i), g_strfreev(tokens)) {
+
+        descriptor = i->data;
+        descriptor_index = LONG_MAX;
+
+        /*
+         * Split the descriptor into tokens, only consider descriptors
+         * which have at least 3 tokens and whose first token is
+         * AssertionConsumerService
+         */
+
+        tokens = g_strsplit(descriptor, " ", 0);
+        n_tokens = g_strv_length(tokens);
+
+        if (n_tokens < 3) continue;
+
+        if (!g_str_equal(tokens[0], "AssertionConsumerService")) continue;
+        if (!g_str_equal(tokens[1], binding)) continue;
+
+        descriptor_index = strtol(tokens[2], &endptr, 10);
+        if (tokens[2] == endptr) continue; /* could not parse int */
+
+        if (descriptor_index < min_index) {
+            selected_descriptor = descriptor;
+            min_index = descriptor_index;
+        }
+    }
+
+    if (selected_descriptor) {
+        url = lasso_provider_get_metadata_one(provider, selected_descriptor);
+    }
+
+    lasso_release_list_of_strings(descriptors);
+
+    return url;
+}
+
+#ifdef HAVE_ECP
+bool am_is_paos_request(request_rec *r)
+{
+    const char *accept_header = NULL;
+    const char *paos_header = NULL;
+    bool have_paos_media_type = false;
+    bool valid_paos_header = false;
+    bool is_paos = false;
+
+    accept_header = apr_table_get(r->headers_in, "Accept");
+    paos_header = apr_table_get(r->headers_in, "PAOS");
+    if (accept_header) {
+        if (am_header_has_media_type(r, accept_header, MEDIA_TYPE_PAOS)) {
+            have_paos_media_type = true;
+        }
+    }
+    if (paos_header) {
+        if (am_validate_paos_header(r, paos_header)) {
+            valid_paos_header = true;
+        }
+    }
+    if (have_paos_media_type) {
+        if (valid_paos_header) {
+            is_paos = true;
+        } else {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "request supplied PAOS media type in Accept header "
+                          "but omitted valid PAOS header");
+        }
+    } else {
+        if (valid_paos_header) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "request supplied valid PAOS header "
+                          "but omitted PAOS media type in Accept header");
+        }
+    }
+    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                  "have_paos_media_type=%s valid_paos_header=%s is_paos=%s",
+                  have_paos_media_type ? "True" : "False",
+                  valid_paos_header ? "True" : "False",
+                  is_paos ? "True" : "False");
+
+    return is_paos;
+}
+#endif /* HAVE_ECP */

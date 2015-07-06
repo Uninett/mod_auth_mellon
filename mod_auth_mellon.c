@@ -182,12 +182,30 @@ static void am_child_init(apr_pool_t *p, server_rec *s)
 }
 
 
+static int am_create_request(request_rec *r)
+{
+    am_req_cfg_rec *req_cfg;
+
+    req_cfg = apr_pcalloc(r->pool, sizeof(am_req_cfg_rec));
+
+    req_cfg->cookie_value = NULL;
+#ifdef HAVE_ECP
+    req_cfg->ecp_authn_req = false;
+#endif /* HAVE_ECP */
+
+    ap_set_module_config(r->request_config, &auth_mellon_module, req_cfg);
+
+    return OK;
+}
+
+
 static void register_hooks(apr_pool_t *p)
 {
     ap_hook_access_checker(am_auth_mellon_user, NULL, NULL, APR_HOOK_MIDDLE);
     ap_hook_check_user_id(am_check_uid, NULL, NULL, APR_HOOK_MIDDLE);
     ap_hook_post_config(am_global_init, NULL, NULL, APR_HOOK_MIDDLE);
     ap_hook_child_init(am_child_init, NULL, NULL, APR_HOOK_MIDDLE);
+    ap_hook_create_request(am_create_request, NULL, NULL, APR_HOOK_MIDDLE);
 
     /* Add the hook to handle requests to the mod_auth_mellon endpoint.
      *

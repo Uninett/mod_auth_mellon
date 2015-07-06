@@ -85,7 +85,6 @@ static const int default_env_vars_index_start = -1;
  */
 static const int default_env_vars_count_in_n = -1;
 
-
 /* This function handles configuration directives which set a 
  * multivalued string slot in the module configuration (the destination
  * strucure is a hash).
@@ -1289,6 +1288,13 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Whether to also populate environment variable suffixed _N with number of values. Default is off."
         ),
+    AP_INIT_FLAG(
+        "MellonECPSendIDPList",
+        ap_set_flag_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, ecp_send_idplist),
+        OR_AUTHCFG,
+        "Whether to send an ECP client a list of IdP's. Default is off."
+        ),
     {NULL}
 };
 
@@ -1385,6 +1391,8 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->subject_confirmation_data_address_check = inherit_subject_confirmation_data_address_check;
     dir->do_not_verify_logout_signature = apr_hash_make(p);
     dir->post_replay = inherit_post_replay;
+
+    dir->ecp_send_idplist = inherit_ecp_send_idplist;
 
     return dir;
 }
@@ -1614,6 +1622,8 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->subject_confirmation_data_address_check =
         CFG_MERGE(add_cfg, base_cfg, subject_confirmation_data_address_check);
     new_cfg->post_replay = CFG_MERGE(add_cfg, base_cfg, post_replay);
+
+    new_cfg->ecp_send_idplist = CFG_MERGE(add_cfg, base_cfg, ecp_send_idplist);
 
     return new_cfg;
 }
