@@ -1702,7 +1702,7 @@ int am_get_boolean_query_parameter(request_rec *r, const char *name,
 
     value_str = am_extract_query_parameter(r->pool, r->args, name);
     if (value_str != NULL) {
-        ret = am_urldecode((char*)value_str);
+        ret = am_urldecode(value_str);
         if (ret != OK) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "Error urldecoding \"%s\" boolean query parameter, "
