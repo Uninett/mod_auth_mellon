@@ -2981,7 +2981,7 @@ static int am_send_paos_authn_request(request_rec *r)
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    ret = am_get_is_passive(r, &is_passive);
+    ret = am_get_boolean_query_parameter(r, "IsPassive", &is_passive, FALSE);
     if (ret != OK) return ret;
 
     relay_state = am_reconstruct_url(r);
@@ -3184,7 +3184,8 @@ static int am_handle_login(request_rec *r)
         }
     }
 
-    if ((ret = am_get_is_passive(r, &is_passive)) != OK) {
+    ret = am_get_boolean_query_parameter(r, "IsPassive", &is_passive, FALSE);
+    if (ret != OK) {
         return ret;
     }
 

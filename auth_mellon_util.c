@@ -1670,45 +1670,58 @@ const char *am_get_config_langstring(apr_hash_t *h, const char *lang)
 }
 
 /*
- * Get the value of the isPassive flag.
+ * Get the value of boolean query parameter.
  *
  * Parameters:
  *  request_rec *r         The request
- *  int *is_passive        The return location of the flag
+ *  const char *name       The name of the query parameter
+ *  int *return_value      The address of the variable to receive 
+ *                         the boolean value
+ *  int default_value      The value returned if parameter is absent or
+ *                          in event of an error
  *
  * Returns:
  *   OK on success, HTTP error otherwise
  *
- * Looks for the IsPassive value in the query parameters, if found
- * parses the value which must be either "true" or "false".
+ * Looks for the named parameter in the query parameters, if found
+ * parses the value which must be one of:
+ * 
+ *   * true
+ *   * false 
  *
- * If not found returned flag defaults to FALSE.
+ * If value cannot be parsed HTTP_BAD_REQUEST is returned.
+ *
+ * If not found, or if there is an error, the returned value is set to
+ * default_value.
  */
 
-int am_get_is_passive(request_rec *r, int *is_passive)
+int am_get_boolean_query_parameter(request_rec *r, const char *name,
+                                   int *return_value, int default_value)
 {
-    char *is_passive_str;
+    char *value_str;
     int ret = OK;
+    
+    *return_value = default_value;
 
-    is_passive_str = am_extract_query_parameter(r->pool, r->args, "IsPassive");
-    if(is_passive_str != NULL) {
-        ret = am_urldecode((char*)is_passive_str);
-        if(ret != OK) {
+    value_str = am_extract_query_parameter(r->pool, r->args, name);
+    if (value_str != NULL) {
+        ret = am_urldecode((char*)value_str);
+        if (ret != OK) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                          "Error urldecoding IsPassive parameter.");
+                          "Error urldecoding \"%s\" boolean query parameter, "
+                          "value=\"%s\"", name, value_str);
             return ret;
         }
-        if(!strcmp(is_passive_str, "true")) {
-            *is_passive = TRUE;
-        } else if(!strcmp(is_passive_str, "false")) {
-            *is_passive = FALSE;
+        if(!strcmp(value_str, "true")) {
+            *return_value = TRUE;
+        } else if(!strcmp(value_str, "false")) {
+            *return_value = FALSE;
         } else {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                          "Invalid value for IsPassive parameter - must be \"true\" or \"false\".");
-            return HTTP_BAD_REQUEST;
+                          "Invalid value for \"%s\" boolean query parameter, "
+                          "value=\"%s\"", name, value_str);
+            ret = HTTP_BAD_REQUEST;
         }
-    } else {
-        *is_passive = FALSE;
     }
 
     return ret;

@@ -411,7 +411,8 @@ bool am_validate_paos_header(request_rec *r, const char *header);
 bool am_header_has_media_type(request_rec *r, const char *header,
                               const char *media_type);
 const char *am_get_config_langstring(apr_hash_t *h, const char *lang);
-int am_get_is_passive(request_rec *r, int *is_passive);
+int am_get_boolean_query_parameter(request_rec *r, const char *name,
+                                   int *return_value, int default_value);
 char *am_get_assertion_consumer_service_by_binding(LassoProvider *provider, const char *binding);
 
 int am_auth_mellon_user(request_rec *r);
