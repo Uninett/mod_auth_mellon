@@ -30,9 +30,6 @@
  * the ECP.rst file.
  */
 
-#define MEDIA_TYPE_PAOS "application/vnd.paos+xml"
-
-
 #ifdef HAVE_lasso_server_new_from_buffers
 #  define SERVER_NEW lasso_server_new_from_buffers
 #else /* HAVE_lasso_server_new_from_buffers */
@@ -3511,13 +3508,6 @@ int am_auth_mellon_user(request_rec *r)
     am_dir_cfg_rec *dir = am_get_dir_cfg(r);
     int return_code = HTTP_UNAUTHORIZED;
     am_cache_entry_t *session;
-#ifdef HAVE_ECP
-    const char *accept_header = NULL;
-    const char *paos_header = NULL;
-    bool have_paos_media_type = false;
-    bool valid_paos_header = false;
-    bool is_paos = false;
-#endif /* HAVE_ECP */
 
     /* check if we are a subrequest.  if we are, then just return OK
      * without any checking since these cannot be injected (heh). */
@@ -3542,45 +3532,6 @@ int am_auth_mellon_user(request_rec *r)
         return OK;
     }
 
-#ifdef HAVE_ECP
-    /*
-     * Is the client ECP capable? Test for PAOS media type in Accept header
-     * and presence of valid PAOS header.
-     */
-    accept_header = apr_table_get(r->headers_in, "Accept");
-    paos_header = apr_table_get(r->headers_in, "PAOS");
-    if (accept_header) {
-        if (am_header_has_media_type(r, accept_header, MEDIA_TYPE_PAOS)) {
-            have_paos_media_type = true;
-        }
-    }
-    if (paos_header) {
-        if (am_validate_paos_header(r, paos_header)) {
-            valid_paos_header = true;
-        }
-    }
-    if (have_paos_media_type) {
-        if (valid_paos_header) {
-            is_paos = true;
-        } else {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                          "request supplied PAOS media type in Accept header "
-                          "but omitted valid PAOS header");
-        }
-    } else {
-        if (valid_paos_header) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                          "request supplied valid PAOS header "
-                          "but omitted PAOS media type in Accept header");
-        }
-    }
-    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                  "have_paos_media_type=%s valid_paos_header=%s is_paos=%s",
-                  have_paos_media_type ? "True" : "False",
-                  valid_paos_header ? "True" : "False",
-                  is_paos ? "True" : "False");
-#endif /* HAVE_ECP */
-
     /* Get the session of this request. */
     session = am_get_request_session(r);
 
@@ -3604,7 +3555,8 @@ int am_auth_mellon_user(request_rec *r)
              * checks the flag and if True initiates an ECP transaction.
              * See am_check_uid for detailed explanation.
              */
-            if (is_paos) {
+
+            if (am_is_paos_request(r)) {
                 am_req_cfg_rec *req_cfg;
 
                 req_cfg = am_get_req_cfg(r);

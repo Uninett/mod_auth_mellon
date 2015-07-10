@@ -85,6 +85,7 @@
  */
 #define AM_ID_LENGTH 32
 
+#define MEDIA_TYPE_PAOS "application/vnd.paos+xml"
 
 #define am_get_srv_cfg(s) (am_srv_cfg_rec *)ap_get_module_config((s)->module_config, &auth_mellon_module)
 
@@ -414,6 +415,10 @@ const char *am_get_config_langstring(apr_hash_t *h, const char *lang);
 int am_get_boolean_query_parameter(request_rec *r, const char *name,
                                    int *return_value, int default_value);
 char *am_get_assertion_consumer_service_by_binding(LassoProvider *provider, const char *binding);
+
+#ifdef HAVE_ECP
+bool am_is_paos_request(request_rec *r);
+#endif /* HAVE_ECP */
 
 int am_auth_mellon_user(request_rec *r);
 int am_check_uid(request_rec *r);
