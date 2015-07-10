@@ -1577,9 +1577,6 @@ bool am_validate_paos_header(request_rec *r, const char *header)
  cleanup:
     g_strfreev(semicolon_tokens);
     return result;
-
-
-    return false;
 }
 #undef PAOS_VERSION_TOKEN
 #undef ECP_SERVICE_TOKEN
