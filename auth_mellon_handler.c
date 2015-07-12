@@ -3000,7 +3000,7 @@ static int am_send_paos_authn_request(request_rec *r)
         return ret;
     }
 
-    if (dir_cfg->ecp_send_idplist) {
+    if (CFG_VALUE(dir_cfg, ecp_send_idplist)) {
         lasso_profile_set_idp_list(LASSO_PROFILE(login),
                                    am_get_idp_list(LASSO_PROFILE(login)->server,
                                                    LASSO_MD_PROTOCOL_TYPE_SINGLE_SIGN_ON,

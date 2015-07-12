@@ -335,6 +335,10 @@ static const int inherit_subject_confirmation_data_address_check = -1;
 static const int default_post_replay = 0;
 static const int inherit_post_replay = -1;
 
+/* Whether to send an ECP client a list of IdP's */
+static const int default_ecp_send_idplist = 0;
+static const int inherit_ecp_send_idplist = -1;
+
 
 void *auth_mellon_dir_config(apr_pool_t *p, char *d);
 void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add);
