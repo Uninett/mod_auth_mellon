@@ -2971,7 +2971,7 @@ static int am_send_paos_authn_request(request_rec *r)
     LassoLogin *login;
     const char *relay_state = NULL;
     char *assertion_consumer_service_url;
-    int is_passive;
+    int is_passive = FALSE;
 
     dir_cfg = am_get_dir_cfg(r);
 
@@ -2979,9 +2979,6 @@ static int am_send_paos_authn_request(request_rec *r)
     if(server == NULL) {
         return HTTP_INTERNAL_SERVER_ERROR;
     }
-
-    ret = am_get_boolean_query_parameter(r, "IsPassive", &is_passive, FALSE);
-    if (ret != OK) return ret;
 
     relay_state = am_reconstruct_url(r);
 
@@ -3022,7 +3019,7 @@ static int am_send_paos_authn_request(request_rec *r)
  *  request_rec *r         The request we are processing.
  *  const char *idp        The entityID of the IdP.
  *  const char *return_to  The URL we should redirect to when receiving the request.
- *  int is_passive         Whether to send a passive request.
+ *  int is_passive         The value of the IsPassive flag in <AuthnRequest>
  *
  * Returns:
  *  HTTP response code indicating success or failure.
