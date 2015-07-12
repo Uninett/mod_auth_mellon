@@ -67,7 +67,7 @@ How does mod_auth_mellon recognize a request is from an ECP client?
 In Step 1. when the ECP client issues the HTTP Request to the SP it
 **MUST** include `application/vnd.paos+xml` as a mime type in the HTTP
 `Accept` header field and include an HTTP `PAOS` header specifying a
-minimum PAOS version of `urn:liberty:paos:2003-08` and an ECP service
+PAOS version of `urn:liberty:paos:2003-08` and an ECP service
 declaration of `urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp` [2]_,
 for example::
 
