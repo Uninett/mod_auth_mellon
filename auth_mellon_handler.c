@@ -2985,7 +2985,7 @@ static int am_send_paos_authn_request(request_rec *r)
 
     assertion_consumer_service_url =
         am_get_assertion_consumer_service_by_binding(LASSO_PROVIDER(server),
-                                                     "PASO");
+                                                     "PAOS");
 
     ret = am_init_authn_request_common(r, &login,
                                        NULL, LASSO_HTTP_METHOD_PAOS, NULL,
