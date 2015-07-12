@@ -2942,8 +2942,10 @@ am_get_idp_list(const LassoServer *server, LassoMdProtocolType protocol_type, La
          entity_id = g_list_next(entity_id)) {
         idp_entry = LASSO_SAMLP2_IDP_ENTRY(lasso_samlp2_idp_entry_new());
         idp_entry->ProviderID = g_strdup(entity_id->data);
-        idp_entry->Name = NULL; /* FIXME: Where do we get this? */
-        idp_entry->Loc = NULL; /* FIXME: Where do we get this? */
+
+        /* RFE: we should have a mechanism to obtain these values */
+        idp_entry->Name = NULL; 
+        idp_entry->Loc = NULL;
 
         idp_entries = g_list_append(idp_entries, idp_entry);
     }
