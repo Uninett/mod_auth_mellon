@@ -1449,125 +1449,6 @@ static void am_handle_session_expire(request_rec *r, am_cache_entry_t *session,
     }
 }
 
-
-/* This function is for decoding and storing attributes with the feide
- * encoding. It takes in an attribute name and a value. The value is split
- * into multiple values. We base64 decode these values, and store them in the
- * session data.
- *
- * Parameters:
- *  request_rec *r              The current request.
- *  am_cache_entry_t *session   The current session.
- *  const char *name            Name of the attribute.
- *  const char *value           The value(s) of the attribute.
- *
- * Returns:
- *  OK on success or an error from am_cache_env_append(...) if it was unable
- *  to store the attribute.
- */
-static int am_store_attribute_feide(request_rec *r, am_cache_entry_t *session,
-                                    const char *name, const char *value)
-{
-    char *edit_value;
-    char *start; 
-    char *next;
-    int len;
-    int ret;
-
-    /* We need to be able to change the value. */
-    edit_value = apr_pstrdup(r->pool, value);
-
-    for(start = edit_value; start != NULL; start = next) {
-        /* The values are separated by '_'. */
-        next = strchr(start, '_');
-
-        if(next != NULL) {
-            /* Insert null-terminator after current value. */
-            *next = '\0';
-
-            /* The next value begins at next+1. */
-            next++;
-        }
-
-        /* Now start points to the current value, which we have
-         * null-terminated. next points to the next value, or NULL if
-         * this is the last value.
-         */
-
-        /* base64-decode current value.
-         * From looking at the source of apr_base64_decode_binary, it
-         * appears to be safe to use in-place.
-         */
-        len = apr_base64_decode_binary((unsigned char *)start, start);
-
-        /* Add null-terminator at end of string. */
-        start[len] = '\0';
-
-
-        /* Store current name-value-pair. */
-        ret = am_cache_env_append(session, name, start);
-        if(ret != OK) {
-            return ret;
-        }
-    }
-
-    return OK;
-}
-
-
-/* This function is for storing attributes without any encoding. We just store
- * the attribute as it is.
- *
- * Parameters:
- *  request_rec *r              The current request.
- *  am_cache_entry_t *session   The current session.
- *  const char *name            The name of the attribute.
- *  const char *value           The value of the attribute.
- *
- * Returns:
- *  OK on success or an error from am_cache_env_append(...) if it failed.
- */
-static int am_store_attribute_none(request_rec *r, am_cache_entry_t *session,
-                                   const char *name, const char *value)
-{
-    /* Store current name-value-pair. */
-    return am_cache_env_append(session, name, value);
-}
-
-
-/* This function passes a name-value pair to the decoder selected by the
- * MellonDecoder configuration option. The decoder will decode the value
- * and store it in the session data.
- *
- * Parameters:
- *  request_rec *r              The current request.
- *  am_cache_entry_t *session   The current session.
- *  const char *name            The name of the attribute.
- *  const char *value           The value of the attribute.
- *
- * Returns:
- *  OK on success or an error from the attribute decoder if it failed.
- */
-static int am_store_attribute(request_rec *r, am_cache_entry_t *session,
-                              const char *name, const char *value)
-{
-    am_dir_cfg_rec *dir_cfg;
-
-    dir_cfg = am_get_dir_cfg(r);
-
-    switch(dir_cfg->decoder) {
-    case am_decoder_none:
-        return am_store_attribute_none(r, session, name, value);
-
-    case am_decoder_feide:
-        return am_store_attribute_feide(r, session, name, value);
-
-    default:
-        return am_store_attribute_none(r, session, name, value);
-    }
-}
-
-
 /* Add all the attributes from an assertion to the session data for the
  * current user.
  *
@@ -1692,7 +1573,7 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
                         g_free(dump);
                 }
                 /* Decode and save the attribute. */
-                ret = am_store_attribute(r, session, attribute->Name, content);
+                ret = am_cache_env_append(session, attribute->Name, content);
                 if(ret != OK) {
                     return ret;
                 }

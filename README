@@ -169,18 +169,8 @@ MellonPostCount 100
         # Default: MellonEnable "off"
         MellonEnable "auth"
 
-        # MellonDecoder is used to select which decoder mod_auth_mellon
-        # will use when decoding attribute values.
-        # There are two possible values: "none" and "feide". "none" is the
-        # default.
-        # They have the following meanings:
-        #   "none":  mod_auth_mellon will store the attribute as it is
-        #            received from the IdP. This is the default behaviour.
-        #   "feide": *DEPRECATED* Feide used to transmit attributes with a
-        #            special encoding. That is no longer necessary, and
-        #            this decoder should therefore no longer be used.
-        # Default: MellonDecoder "none"
-        MellonDecoder "none"
+        # MellonDecoder is an obsolete option which is a no-op but is
+        # still accepted for backwards compatibility.
 
         # MellonVariable is used to select the name of the cookie which
         # mod_auth_mellon should use to remember the session id. If you
@@ -604,11 +594,6 @@ variables will be MELLON_<attribute name>. If you have specified a
 different name with the MellonSetEnv or MellonSetEnvNoPrefix configuration
 directive, then that name will be used instead. In the case of MellonSetEnv,
 the name will still be prefixed by 'MELLON_'.
-
-The value of the attribute will be base64 decoded.
-
-mod_auth_mellon supports multivalued attributes with the following format:
-<base64 encoded value>_<base64 encoded value>_<base 64 encoded value>...
 
 If an attribute has multiple values, then they will be stored as
 MELLON_<name>_0, MELLON_<name>_1, MELLON_<name>_2, ...
