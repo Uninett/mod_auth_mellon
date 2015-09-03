@@ -3087,10 +3087,12 @@ int am_auth_mellon_user(request_rec *r)
     int return_code = HTTP_UNAUTHORIZED;
     am_cache_entry_t *session;
 
-    /* check if we are a subrequest.  if we are, then just return OK
-     * without any checking since these cannot be injected (heh). */
-    if (r->main)
+    if (r->main) {
+        /* We are a subrequest. Trust the main request to have
+         * performed the authentication.
+         */
         return OK;
+    }
 
     /* Check that the user has enabled authentication for this directory. */
     if(dir->enable_mellon == am_enable_off
@@ -3185,10 +3187,18 @@ int am_check_uid(request_rec *r)
     am_cache_entry_t *session;
     int return_code = HTTP_UNAUTHORIZED;
 
-    /* check if we are a subrequest.  if we are, then just return OK
-     * without any checking since these cannot be injected (heh). */
-    if (r->main)
+    if (r->main) {
+        /* We are a subrequest. Trust the main request to have
+         * performed the authentication.
+         */
+        if (r->main->user) {
+            /* Make sure that the username from the main request is
+             * available in the subrequest.
+             */
+            r->user = apr_pstrdup(r->pool, r->main->user);
+        }
         return OK;
+    }
 
     /* Check if this is a request for one of our endpoints. We check if
      * the uri starts with the path set with the MellonEndpointPath
