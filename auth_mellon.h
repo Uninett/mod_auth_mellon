@@ -127,12 +127,6 @@ typedef enum {
 } am_enable_t;
 
 typedef enum {
-    am_decoder_default,
-    am_decoder_none,
-    am_decoder_feide,
-} am_decoder_t;
-
-typedef enum {
     AM_COND_FLAG_NULL = 0x000, /* No flags */
     AM_COND_FLAG_OR   = 0x001, /* Or with  next condition */
     AM_COND_FLAG_NOT  = 0x002, /* Negate this condition */
@@ -167,11 +161,6 @@ typedef struct am_dir_cfg_rec {
     /* enable_mellon is used to enable auth_mellon for a location.
      */
     am_enable_t enable_mellon;
-
-    /* The decoder attribute is used to specify which decoder we should use
-     * when parsing attributes.
-     */
-    am_decoder_t decoder;
 
     const char *varname;
     int secure;

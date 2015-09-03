@@ -441,8 +441,8 @@ static const char *am_set_enable_slot(cmd_parms *cmd,
 }
 
 
-/* This function handles the MellonDecoder configuration directive.
- * This directive can be set to "none" or "feide".
+/* This function handles the obsolete MellonDecoder configuration directive.
+ * It is a no-op.
  *
  * Parameters:
  *  cmd_parms *cmd       The command structure for this configuration
@@ -452,22 +452,12 @@ static const char *am_set_enable_slot(cmd_parms *cmd,
  *                       directive in the configuraion file.
  *
  * Returns:
- *  NULL on success or an error string if the argument is wrong.
+ *  NULL
  */
 static const char *am_set_decoder_slot(cmd_parms *cmd,
                                        void *struct_ptr,
                                        const char *arg)
 {
-    am_dir_cfg_rec *d = (am_dir_cfg_rec *)struct_ptr;
-
-    if(!strcasecmp(arg, "none")) {
-        d->decoder = am_decoder_none;
-    } else if(!strcasecmp(arg, "feide")) {
-        d->decoder = am_decoder_feide;
-    } else {
-        return "MellonDecoder must be 'none' or 'feide'";
-    }
-
     return NULL;
 }
 
@@ -991,11 +981,7 @@ const command_rec auth_mellon_commands[] = {
         am_set_decoder_slot,
         NULL,
         OR_AUTHCFG,
-        "Select which decoder mod_auth_mellon should use to decode attribute"
-        " values. This option can be se to either 'none' or 'feide'. 'none'"
-        " is the default, and will store the attributes as they are received"
-        " from the IdP. 'feide' is for decoding base64-encoded values which"
-        " are separated by a underscore."
+        "Obsolete option, now a no-op for backwards compatibility."
         ),
     AP_INIT_TAKE1(
         "MellonVariable",
@@ -1354,8 +1340,6 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
 
     dir->enable_mellon = am_enable_default;
 
-    dir->decoder = am_decoder_default;
-
     dir->varname = default_cookie_name;
     dir->secure = default_secure_cookie;
     dir->merge_env_vars = default_merge_env_vars;
@@ -1465,11 +1449,6 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->enable_mellon = (add_cfg->enable_mellon != am_enable_default ?
                               add_cfg->enable_mellon :
                               base_cfg->enable_mellon);
-
-
-    new_cfg->decoder = (add_cfg->decoder != am_decoder_default ?
-                        add_cfg->decoder :
-                        base_cfg->decoder);
 
 
     new_cfg->varname = (add_cfg->varname != default_cookie_name ?
