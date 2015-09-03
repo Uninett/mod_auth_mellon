@@ -80,6 +80,8 @@ apxs2 -q LIBEXECDIR
 This will print the path where Apache stores modules. mod_auth_mellon.so
 will be stored in that directory.
 
+You will also need to make sure that Apache's authn_core module is also
+enabled. Most likely you also want authz_user to be abled.
 
 After you have added the LoadModule directive, you must add configuration
 for mod_auth_mellon. The following is an example configuration:
@@ -139,7 +141,9 @@ MellonPostCount 100
 <Location /secret>
 
         # These are standard Apache apache configuration directives.
-        # See http://httpd.apache.org/docs/2.2/mod/core.html for information
+        # You must have enabled Apache's authn_core and authz_user modules.
+        # See http://httpd.apache.org/docs/2.4/mod/mod_authn_core.html and
+        # http://httpd.apache.org/docs/2.4/mod/mod_authz_user.html
         # about them.
         Require valid-user
         AuthType "Mellon"
@@ -784,6 +788,15 @@ For Apache 2.4 exists shorter notation:
   Header always unset Cache-Control expr=%{CONTENT_TYPE}==image/png
 
 Editing, appanding, overwriting headers is possible in other cases.
+
+===========================================================================
+ Support
+===========================================================================
+
+There's a mailing list for discussion and support.
+
+To subscribe: https://postlister.uninett.no/sympa/subscribe/modmellon
+List archives: https://postlister.uninett.no/sympa/arc/modmellon
 
 ===========================================================================
  Contributors
