@@ -1,3 +1,11 @@
+Version 0.11.0
+---------------------------------------------------------------------------
+
+* The MellonDecode option has been disabled. It was used to decode
+  attributes in a Feide-specific encoding that is no longer used.
+
+* Set max-age=0 in Cache-Control header, to ensure that all browsers
+  verifies the data on each request.
 
 * MellonMergeEnvVars On now accepts second optional parameter, the
   separator to be used instead of the default ';'.
@@ -9,6 +17,11 @@
 * Add option MellonEnvVarsIndexStart to specify if environment variables
   for multi-valued attributes should start indexing with 0 (default) or
   with 1.
+
+* Bugfixes:
+
+  * Fix error about missing authentication with DirectoryIndex in
+    Apache 2.4.
 
 Version 0.10.0
 ---------------------------------------------------------------------------
