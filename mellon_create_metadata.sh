@@ -36,7 +36,7 @@ fi
 HOST="$(echo "$BASEURL" | sed 's#^[a-z]*://\([^/]*\).*#\1#')"
 BASEURL="$(echo "$BASEURL" | sed 's#/$##')"
 
-OUTFILE="$(echo "$ENTITYID" | sed 's/[^A-Za-z.]/_/g' | sed 's/__*/_/g')"
+OUTFILE="$(echo "$ENTITYID" | sed 's/[^0-9A-Za-z.]/_/g' | sed 's/__*/_/g')"
 echo "Output files:"
 echo "Private key:               $OUTFILE.key"
 echo "Certificate:               $OUTFILE.cert"
