@@ -11,11 +11,13 @@ SRC=mod_auth_mellon.c \
 DISTFILES=$(SRC) \
 	auth_mellon.h \
 	auth_mellon_compat.h \
+	lasso_compat.h \
 	configure \
 	configure.ac \
 	Makefile.in \
 	autogen.sh \
 	README \
+	ECP.rst \
 	COPYING \
 	NEWS
 

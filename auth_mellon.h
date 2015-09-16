@@ -35,6 +35,7 @@
 #include <lasso/xml/saml-2.0/saml2_authn_statement.h>
 #include <lasso/xml/saml-2.0/saml2_audience_restriction.h>
 #include <lasso/xml/misc_text_node.h>
+#include "lasso_compat.h"
 
 /* The following are redefined in ap_config_auto.h */
 #undef PACKAGE_BUGREPORT
@@ -84,12 +85,15 @@
  */
 #define AM_ID_LENGTH 32
 
+#define MEDIA_TYPE_PAOS "application/vnd.paos+xml"
 
 #define am_get_srv_cfg(s) (am_srv_cfg_rec *)ap_get_module_config((s)->module_config, &auth_mellon_module)
 
 #define am_get_mod_cfg(s) (am_get_srv_cfg((s)))->mc
 
 #define am_get_dir_cfg(r) (am_dir_cfg_rec *)ap_get_module_config((r)->per_dir_config, &auth_mellon_module)
+
+#define am_get_req_cfg(r) (am_req_cfg_rec *)ap_get_module_config((r)->request_config, &auth_mellon_module)
 
 
 typedef struct am_mod_cfg_rec {
@@ -232,7 +236,17 @@ typedef struct am_dir_cfg_rec {
 
     /* Cached lasso server object. */
     LassoServer *server;
+
+    /* Whether to send an ECP client a list of IdP's */
+    int ecp_send_idplist;
 } am_dir_cfg_rec;
+
+typedef struct am_req_cfg_rec {
+    char *cookie_value;
+#ifdef HAVE_ECP
+    bool ecp_authn_req;
+#endif /* HAVE_ECP */
+} am_req_cfg_rec;
 
 typedef struct am_cache_storage_t {
     apr_size_t ptr;
@@ -310,6 +324,10 @@ static const int inherit_subject_confirmation_data_address_check = -1;
 static const int default_post_replay = 0;
 static const int inherit_post_replay = -1;
 
+/* Whether to send an ECP client a list of IdP's */
+static const int default_ecp_send_idplist = 0;
+static const int inherit_ecp_send_idplist = -1;
+
 
 void *auth_mellon_dir_config(apr_pool_t *p, char *d);
 void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add);
@@ -383,7 +401,17 @@ const char *am_get_mime_header(request_rec *r, const char *m, const char *h);
 const char *am_get_mime_body(request_rec *r, const char *mime);
 char *am_get_service_url(request_rec *r, 
                          LassoProfile *profile, char *service_name);
+bool am_validate_paos_header(request_rec *r, const char *header);
+bool am_header_has_media_type(request_rec *r, const char *header,
+                              const char *media_type);
+const char *am_get_config_langstring(apr_hash_t *h, const char *lang);
+int am_get_boolean_query_parameter(request_rec *r, const char *name,
+                                   int *return_value, int default_value);
+char *am_get_assertion_consumer_service_by_binding(LassoProvider *provider, const char *binding);
 
+#ifdef HAVE_ECP
+bool am_is_paos_request(request_rec *r);
+#endif /* HAVE_ECP */
 
 int am_auth_mellon_user(request_rec *r);
 int am_check_uid(request_rec *r);
