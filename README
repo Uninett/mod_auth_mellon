@@ -3,7 +3,7 @@
 ===========================================================================
 
 mod_auth_mellon is a authentication module for apache. It authenticates
-the user against a SAML 2.0 IdP, and and grants access to directories
+the user against a SAML 2.0 IdP, and grants access to directories
 depending on attributes received from the IdP.
 
 
@@ -81,7 +81,7 @@ This will print the path where Apache stores modules. mod_auth_mellon.so
 will be stored in that directory.
 
 You will also need to make sure that Apache's authn_core module is also
-enabled. Most likely you also want authz_user to be abled.
+enabled. Most likely you also want authz_user to be enabled.
 
 After you have added the LoadModule directive, you must add configuration
 for mod_auth_mellon. The following is an example configuration:
