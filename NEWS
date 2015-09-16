@@ -1,6 +1,8 @@
 Version 0.11.0
 ---------------------------------------------------------------------------
 
+* Add SAML 2.0 ECP support.
+
 * The MellonDecode option has been disabled. It was used to decode
   attributes in a Feide-specific encoding that is no longer used.
 
