@@ -1270,7 +1270,7 @@ const command_rec auth_mellon_commands[] = {
         am_set_merge_env_vars,
         NULL,
         OR_AUTHCFG,
-        "Whether to merge environement variables multi-values or not. Default is off."
+        "Whether to merge environment variables multi-values or not. Default is off."
         "When first parameter is on, optional second parameter is the separator, "
         "defaulting to semicolon."
         ),

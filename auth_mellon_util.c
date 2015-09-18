@@ -1509,7 +1509,7 @@ am_get_service_url(request_rec *r, LassoProfile *profile, char *service_name)
 
 /* Thus function checks if an HTTP PAOS header is valid.
  *
- * A PAOS header must be composed of 2 values seperated by a semicolon.
+ * A PAOS header must be composed of 2 values separated by a semicolon.
  *
  * The first value must be a version declaration in the form ver="xxx"
  * (note the version string must be in double quotes).
@@ -1548,7 +1548,7 @@ bool am_validate_paos_header(request_rec *r, const char *header)
     if (len != 2) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                      "invalid PAOS header, "
-                     "expected 2 tokens seperated by semicolon, header=\"%s\"",
+                     "expected 2 tokens separated by semicolon, header=\"%s\"",
                      header);
         goto cleanup;
     }
@@ -1616,7 +1616,7 @@ bool am_header_has_media_type(request_rec *r, const char *header, const char *me
     }
 
     /*
-     * Split the header into a list of media_range tokens seperated by
+     * Split the header into a list of media_range tokens separated by
      * a comma and iterate over the list.
      */
     comma_tokens = g_strsplit(header, ",", 0);
