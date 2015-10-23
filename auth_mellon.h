@@ -241,10 +241,19 @@ typedef struct am_dir_cfg_rec {
     int ecp_send_idplist;
 } am_dir_cfg_rec;
 
+/* Bitmask for PAOS service options */
+typedef enum {
+    ECP_SERVICE_OPTION_CHANNEL_BINDING = 1,
+    ECP_SERVICE_OPTION_HOLDER_OF_KEY = 2,
+    ECP_SERVICE_OPTION_WANT_AUTHN_SIGNED = 4,
+    ECP_SERVICE_OPTION_DELEGATION = 8,
+} ECPServiceOptions;
+
 typedef struct am_req_cfg_rec {
     char *cookie_value;
 #ifdef HAVE_ECP
     bool ecp_authn_req;
+    ECPServiceOptions ecp_service_options;
 #endif /* HAVE_ECP */
 } am_req_cfg_rec;
 
@@ -401,7 +410,8 @@ const char *am_get_mime_header(request_rec *r, const char *m, const char *h);
 const char *am_get_mime_body(request_rec *r, const char *mime);
 char *am_get_service_url(request_rec *r, 
                          LassoProfile *profile, char *service_name);
-bool am_validate_paos_header(request_rec *r, const char *header);
+char *am_strip_whitespace_and_quotes(char *str);
+bool am_validate_paos_header(request_rec *r, const char *header, ECPServiceOptions *options_return);
 bool am_header_has_media_type(request_rec *r, const char *header,
                               const char *media_type);
 const char *am_get_config_langstring(apr_hash_t *h, const char *lang);
@@ -409,7 +419,10 @@ int am_get_boolean_query_parameter(request_rec *r, const char *name,
                                    int *return_value, int default_value);
 char *am_get_assertion_consumer_service_by_binding(LassoProvider *provider, const char *binding);
 
+char *am_str_join(apr_pool_t *pool, char **strings, const char *separator);
+
 #ifdef HAVE_ECP
+char *am_ecp_service_options_str(apr_pool_t *pool, ECPServiceOptions options);
 bool am_is_paos_request(request_rec *r);
 #endif /* HAVE_ECP */
 
