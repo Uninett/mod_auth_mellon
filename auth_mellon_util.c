@@ -1,7 +1,7 @@
 /*
  *
  *   auth_mellon_util.c: an authentication apache module
- *   Copyright � 2003-2007 UNINETT (http://www.uninett.no/)
+ *   Copyright © 2003-2007 UNINETT (http://www.uninett.no/)
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -62,9 +62,9 @@ char *am_reconstruct_url(request_rec *r)
  * Returns:
  *  An array of collected backreference strings
  */
-const apr_array_header_t *am_cond_backrefs(request_rec *r, 
-                                           const am_cond_t *ce, 
-                                           const char *value, 
+const apr_array_header_t *am_cond_backrefs(request_rec *r,
+                                           const am_cond_t *ce,
+                                           const char *value,
                                            const ap_regmatch_t *regmatch)
 {
     apr_array_header_t *backrefs;
@@ -92,7 +92,7 @@ const apr_array_header_t *am_cond_backrefs(request_rec *r,
     return (const apr_array_header_t *)backrefs;
 }
 
-/* This function clones an am_cond_t and substitute value to 
+/* This function clones an am_cond_t and substitute value to
  * match (both regexp and string) with backreferences from
  * a previous regex match.
  *
@@ -104,7 +104,7 @@ const apr_array_header_t *am_cond_backrefs(request_rec *r,
  * Returns:
  *  The cloned am_cond_t
  */
-const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce, 
+const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
                                    const apr_array_header_t *backrefs)
 {
     am_cond_t *c;
@@ -117,7 +117,7 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
     c = (am_cond_t *)apr_pmemdup(r->pool, ce, sizeof(*ce));
     c->str = outstr;
     last = 0;
-    
+
     for (i = strcspn(instr, "%"); i < inlen; i += strcspn(instr + i, "%")) {
         const char *fstr;
         const char *ns;
@@ -127,13 +127,13 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
         apr_size_t pad;
         apr_size_t nslen;
 
-        /* 
+        /*
          * Make sure we got a %
          */
 	assert(instr[i] == '%');
 
         /*
-         * Copy the format string in fstr. It can be a single 
+         * Copy the format string in fstr. It can be a single
          * digit (e.g.: %1) , or a curly-brace enclosed text
          * (e.g.: %{12})
          */
@@ -160,7 +160,7 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
 
         /*
          * Try to extract a namespace (ns) and a name, e.g: %{ENV:foo}
-         */ 
+         */
         fstr = apr_pstrndup(r->pool, fstr, flen);
         if ((nslen = strcspn(fstr, ":")) != flen) {
             ns = apr_pstrndup(r->pool, fstr, nslen);
@@ -178,7 +178,7 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
              */
             int d = (int)apr_atoi64(fstr);
 
-            if ((d >= 0) && (d < backrefs->nelts)) 
+            if ((d >= 0) && (d < backrefs->nelts))
                 value = ((const char **)(backrefs->elts))[d];
 
         } else if ((*ns == '\0') && (strcmp(fstr, "%") == 0)) {
@@ -202,11 +202,11 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
             value = "";
 
         /*
-         * Concatenate the value with leading text, and * keep track 
+         * Concatenate the value with leading text, and * keep track
          * of the last location we copied in source string
          */
         outstr = apr_pstrcat(r->pool, outstr,
-                             apr_pstrndup(r->pool, instr + last, i - last), 
+                             apr_pstrndup(r->pool, instr + last, i - last),
                              value, NULL);
         last = i + flen + pad;
 
@@ -220,7 +220,7 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
      * Copy text remaining after the last format string.
      */
     outstr = apr_pstrcat(r->pool, outstr,
-                         apr_pstrndup(r->pool, instr + last, i - last), 
+                         apr_pstrndup(r->pool, instr + last, i - last),
                          NULL);
 
     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
@@ -232,10 +232,10 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
      */
     if (ce->flags & AM_COND_FLAG_REG) {
         int regex_flags = AP_REG_EXTENDED|AP_REG_NOSUB;
- 
+
         if (ce->flags & AM_COND_FLAG_NC)
             regex_flags |= AP_REG_ICASE;
- 
+
         c->regex = ap_pregcomp(r->pool, outstr, regex_flags);
         if (c->regex == NULL) {
              ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
@@ -280,9 +280,9 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
         if (ce->flags & AM_COND_FLAG_IGN)
             continue;
 
-        /* 
+        /*
          * We matched a [OR] rule, skip the next rules
-         * until we have one without [OR]. 
+         * until we have one without [OR].
          */
         if (skip_or) {
             if (!(ce->flags & AM_COND_FLAG_OR))
@@ -293,9 +293,9 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
                            ce->directive);
             continue;
         }
-        
-        /* 
-         * look for a match on each value for this attribute, 
+
+        /*
+         * look for a match on each value for this attribute,
          * stop on first match.
          */
         for (j = 0; (j < session->size) && !match; j++) {
@@ -303,14 +303,14 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
             am_envattr_conf_t *envattr_conf = NULL;
 
             /*
-             * if MAP flag is set, check for remapped 
+             * if MAP flag is set, check for remapped
              * attribute name with mellonSetEnv
              */
             if (ce->flags & AM_COND_FLAG_MAP) {
-                envattr_conf =  (am_envattr_conf_t *)apr_hash_get(dir_cfg->envattr, 
+                envattr_conf =  (am_envattr_conf_t *)apr_hash_get(dir_cfg->envattr,
                                          am_cache_entry_get_string(session,&session->env[j].varname),
                                          APR_HASH_KEY_STRING);
-                                                    
+
                 if (envattr_conf != NULL)
                     varname = envattr_conf->name;
             }
@@ -322,7 +322,7 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
             if (varname == NULL)
                 varname = am_cache_entry_get_string(session,
                                                     &session->env[j].varname);
-                      
+
             if (strcmp(varname, ce->varname) != 0)
                     continue;
 
@@ -335,9 +335,9 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
                 ce = am_cond_substitue(r, ce, backrefs);
 
             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                          "Evaluate %s vs \"%s\"", 
+                          "Evaluate %s vs \"%s\"",
                           ce->directive, value);
-    
+
             if (value == NULL) {
                  match = 0;          /* can not happen */
 
@@ -345,7 +345,7 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
                  int nsub = ce->regex->re_nsub + 1;
                  ap_regmatch_t *regmatch;
 
-                 regmatch = (ap_regmatch_t *)apr_palloc(r->pool, 
+                 regmatch = (ap_regmatch_t *)apr_palloc(r->pool,
                             nsub * sizeof(*regmatch));
 
                  match = !ap_regexec(ce->regex, value, nsub, regmatch, 0);
@@ -388,7 +388,7 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
 
         /*
          * Match on [OR] condition means we skip until a rule
-         * without [OR], 
+         * without [OR],
          */
         if (match && (ce->flags & AM_COND_FLAG_OR))
             skip_or = 1;
@@ -428,7 +428,7 @@ void am_set_cache_control_headers(request_rec *r)
  *
  * The data is stored in a buffer allocated from the request pool.
  * After successful operation *data contains a pointer to the data and
- * *length contains the length of the data. 
+ * *length contains the length of the data.
  * The data will always be null-terminated.
  *
  * Parameters:
@@ -886,7 +886,7 @@ char *am_generate_id(request_rec *r)
  * Returns:
  *  The directory part of path
  */
-const char *am_filepath_dirname(apr_pool_t *p, const char *path) 
+const char *am_filepath_dirname(apr_pool_t *p, const char *path)
 {
     char *cp;
 
@@ -898,7 +898,7 @@ const char *am_filepath_dirname(apr_pool_t *p, const char *path)
     if (((cp = strrchr(path, (int)'/')) == NULL) &&
         ((cp = strrchr(path, (int)'\\')) == NULL))
             return ".";
-   
+
     return apr_pstrndup(p, path, cp - path);
 }
 
@@ -982,7 +982,7 @@ int am_postdir_cleanup(request_rec *r)
     expire_before = apr_time_now() - mod_cfg->post_ttl * APR_USEC_PER_SEC;
 
     /*
-     * Open our POST directory or create it. 
+     * Open our POST directory or create it.
      */
     rv = apr_dir_open(&postdir, mod_cfg->post_dir, r->pool);
     if (rv != 0) {
@@ -1008,7 +1008,7 @@ int am_postdir_cleanup(request_rec *r)
 
         if (afi.ctime < expire_before) {
             fname = apr_psprintf(r->pool, "%s/%s", mod_cfg->post_dir, afi.name);
-            (void)apr_file_remove(fname , r->pool); 
+            (void)apr_file_remove(fname , r->pool);
         } else {
             count++;
         }
@@ -1017,7 +1017,7 @@ int am_postdir_cleanup(request_rec *r)
     (void)apr_dir_close(postdir);
 
     if (count >= mod_cfg->post_count) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Too many saved POST sessions. "
                       "Increase MellonPostCount directive.");
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -1026,7 +1026,7 @@ int am_postdir_cleanup(request_rec *r)
     return OK;
 }
 
-/* 
+/*
  * HTML-encode a string
  *
  * Parameters:
@@ -1126,9 +1126,9 @@ int am_save_post(request_rec *r, const char **relay_state)
     content_type = apr_table_get(r->headers_in, "Content-Type");
     if (content_type == NULL) {
         content_type = "urlencoded";
-        charset = NULL; 
+        charset = NULL;
     } else {
-        if (am_has_header(r, content_type, 
+        if (am_has_header(r, content_type,
             "application/x-www-form-urlencoded")) {
             content_type = "urlencoded";
 
@@ -1137,13 +1137,13 @@ int am_save_post(request_rec *r, const char **relay_state)
             content_type = "multipart";
 
         } else {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "Unknown POST Content-Type \"%s\"", content_type);
             return HTTP_INTERNAL_SERVER_ERROR;
         }
 
         charset = am_get_header_attr(r, content_type, NULL, "charset");
-    }     
+    }
 
     mod_cfg = am_get_mod_cfg(r->server);
 
@@ -1155,23 +1155,23 @@ int am_save_post(request_rec *r, const char **relay_state)
     psf_name = apr_psprintf(r->pool, "%s/%s", mod_cfg->post_dir, psf_id);
 
     if (apr_file_open(&psf, psf_name,
-                      APR_WRITE|APR_CREATE|APR_BINARY, 
+                      APR_WRITE|APR_CREATE|APR_BINARY,
                       APR_FPROT_UREAD|APR_FPROT_UWRITE,
                       r->pool) != OK) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "cannot create POST session file");
         return HTTP_INTERNAL_SERVER_ERROR;
-    } 
+    }
 
     if (am_read_post_data(r, &post_data, &post_data_len) != OK) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "cannot read POST data");
         (void)apr_file_close(psf);
         return HTTP_INTERNAL_SERVER_ERROR;
-    } 
+    }
 
     if (post_data_len > mod_cfg->post_size) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
-                      "POST data size %" APR_SIZE_T_FMT 
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "POST data size %" APR_SIZE_T_FMT
                       " exceeds maximum %" APR_SIZE_T_FMT ". "
                       "Increase MellonPostSize directive.",
                       post_data_len, mod_cfg->post_size);
@@ -1181,13 +1181,13 @@ int am_save_post(request_rec *r, const char **relay_state)
 
     written = post_data_len;
     if ((apr_file_write(psf, post_data, &written) != OK) ||
-        (written != post_data_len)) { 
+        (written != post_data_len)) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "cannot write to POST session file");
             (void)apr_file_close(psf);
             return HTTP_INTERNAL_SERVER_ERROR;
-    } 
-    
+    }
+
     if (apr_file_close(psf) != OK) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "cannot close POST session file");
@@ -1195,15 +1195,15 @@ int am_save_post(request_rec *r, const char **relay_state)
     }
 
     if (charset != NULL)
-        charset = apr_psprintf(r->pool, "&charset=%s", 
+        charset = apr_psprintf(r->pool, "&charset=%s",
                                am_urlencode(r->pool, charset));
-    else 
+    else
         charset = "";
 
-    *relay_state = apr_psprintf(r->pool, 
+    *relay_state = apr_psprintf(r->pool,
                                 "%srepost?id=%s&ReturnTo=%s&enctype=%s%s",
                                 am_get_endpoint_url(r), psf_id,
-                                am_urlencode(r->pool, *relay_state), 
+                                am_urlencode(r->pool, *relay_state),
                                 content_type, charset);
 
     return OK;
@@ -1235,7 +1235,7 @@ const char *am_strip_cr(request_rec *r, const char *str)
     }
 
     output[i++] = '\0';
-    
+
     return (const char *)output;
 }
 
@@ -1272,7 +1272,7 @@ const char *am_add_cr(request_rec *r, const char *str)
     }
 
     output[i++] = '\0';
-    
+
     return (const char *)output;
 }
 
@@ -1338,14 +1338,14 @@ void am_strip_blank(const char **s)
  * Returns:
  *  The header value, or NULL on failure.
  */
-const char *am_get_mime_header(request_rec *r, const char *m, const char *h) 
+const char *am_get_mime_header(request_rec *r, const char *m, const char *h)
 {
     const char *line;
     char *l1;
     const char *value;
     char *l2;
 
-    for (line = am_xstrtok(r, m, "\n", &l1); line && *line; 
+    for (line = am_xstrtok(r, m, "\n", &l1); line && *line;
          line = am_xstrtok(r, NULL, "\n", &l1)) {
 
         am_strip_blank(&line);
@@ -1360,7 +1360,7 @@ const char *am_get_mime_header(request_rec *r, const char *m, const char *h)
    return NULL;
 }
 
-/* This function extracts an attribute from a header 
+/* This function extracts an attribute from a header
  *
  * Parameters:
  *  request_rec *r        The request
@@ -1374,21 +1374,21 @@ const char *am_get_mime_header(request_rec *r, const char *m, const char *h)
  *   useful for testing v.
  */
 const char *am_get_header_attr(request_rec *r, const char *h,
-                               const char *v, const char *a) 
+                               const char *v, const char *a)
 {
     const char *value;
     const char *attr;
     char *l1;
     const char *attr_value = NULL;
 
-    /* Looking for 
-     * header-value; item_name="item_value"\n 
+    /* Looking for
+     * header-value; item_name="item_value"\n
      */
     if ((value = am_xstrtok(r, h, ";", &l1)) == NULL)
         return NULL;
     am_strip_blank(&value);
 
-    /* If a header value was provided, check it */ 
+    /* If a header value was provided, check it */
     if ((v != NULL) && (strcasecmp(value, v) != 0))
         return NULL;
 
@@ -1402,17 +1402,17 @@ const char *am_get_header_attr(request_rec *r, const char *h,
 
         am_strip_blank(&attr);
 
-        attr_name = am_xstrtok(r, attr, "=", &l2); 
+        attr_name = am_xstrtok(r, attr, "=", &l2);
         if ((attr_name != NULL) && (strcasecmp(attr_name, a) == 0)) {
             if ((attr_value = am_xstrtok(r, NULL, "=", &l2)) != NULL)
                 am_strip_blank(&attr_value);
             break;
         }
     }
-  
+
     /* Remove leading and trailing quotes */
     if (attr_value != NULL) {
-        apr_size_t len; 
+        apr_size_t len;
 
         len = strlen(attr_value);
         if ((len > 1) && (attr_value[len - 1] == '\"'))
@@ -1420,7 +1420,7 @@ const char *am_get_header_attr(request_rec *r, const char *h,
         if (attr_value[0] == '\"')
             attr_value++;
     }
-    
+
     return attr_value;
 }
 
@@ -1448,7 +1448,7 @@ int am_has_header(request_rec *r, const char *h, const char *v)
  * Returns:
  *  The MIME section body, or NULL on failure.
  */
-const char *am_get_mime_body(request_rec *r, const char *mime) 
+const char *am_get_mime_body(request_rec *r, const char *mime)
 {
     const char lflf[] = "\n\n";
     const char *body;
@@ -1463,7 +1463,7 @@ const char *am_get_mime_body(request_rec *r, const char *mime)
 
     /* Strip tralling \n */
     if ((body_len = strlen(body)) >= 1) {
-        if (body[body_len - 1] == '\n') 
+        if (body[body_len - 1] == '\n')
             body = apr_pstrmemdup(r->pool, body, body_len - 1);
     }
 
@@ -1487,7 +1487,7 @@ am_get_service_url(request_rec *r, LassoProfile *profile, char *service_name)
     LassoProvider *provider;
     gchar *url;
 
-    provider = lasso_server_get_provider(profile->server, 
+    provider = lasso_server_get_provider(profile->server,
                                          profile->remote_providerID);
     if (LASSO_IS_PROVIDER(provider) == FALSE) {
         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
@@ -1507,32 +1507,104 @@ am_get_service_url(request_rec *r, LassoProfile *profile, char *service_name)
     return url;
 }
 
-/* Thus function checks if an HTTP PAOS header is valid.
+/* Removes leading & trailing whitespace and beginning & ending double quotes
  *
- * A PAOS header must be composed of 2 values seperated by a semicolon.
+ * Operates in place by modifying string.
  *
- * The first value must be a version declaration in the form ver="xxx"
- * (note the version string must be in double quotes).
+ * Returns pointer to modified string.
  *
- * The second value must be the ECP service.
- * (note the service string must be in double quotes).
+ * Example: " \"foo\"\n" -> "foo"
+ */
+
+char *
+am_strip_whitespace_and_quotes(char *str)
+{
+    char *begin, *end;
+
+    /* Skip leading whitespace */
+    for (begin = str; *begin && isspace(*begin); begin++);
+
+    /* Find end of string */
+    for (end = begin; *end; end++);
+
+    /* Skip trailing whitespace */
+    for (end = end > begin ? end-1 : end; end > begin && isspace(*end); end--);
+
+    /* Nuke beginning & ending quotes */
+    if (end > begin && *begin == '"' && *end == '"') {
+        begin++;
+        end--;
+    }
+
+    /* Null terminate */
+    if (end > begin) {
+        end[1] = 0;
+    }
+
+    return begin;
+}
+
+/* This function checks if an HTTP PAOS header is valid and
+ * returns any service options which may have been specified.
+ *
+ * A PAOS header is composed of a mandatory PAOS version and service
+ * values. A semicolon separates the version from the service values.
+ *
+ * Service values are delimited by semicolons, and options are
+ * comma-delimited from the service value and each other.
+ *
+ * The PAOS version must be in the form ver="xxx" (note the version
+ * string must be in double quotes).
+ *
+ * The ECP service must be specified, it MAY be followed by optional
+ * comma seperated options, all values must be in double quotes.
+ *
+ * ECP Service
+ *   "urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp"
+ *
+ * Recognized Options:
+ *
+ * Support for channel bindings
+ *  urn:oasis:names:tc:SAML:protocol:ext:channel-binding
+ *
+ • Support for Holder-of-Key subject confirmation
+ *   urn:oasis:names:tc:SAML:2.0:cm:holder-of-key
+ *
+ * Request for signed SAML request
+ *   urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp:2.0:WantAuthnRequestsSigned
+ *
+ * Request to delegate credentials to the service provider
+ *   urn:oasis:names:tc:SAML:2.0:conditions:delegation
+ *
+ *
+ * Example PAOS HTP header::
+ *
+ *   PAOS: ver="urn:liberty:paos:2003-08";
+ *     "urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp",
+ *     "urn:oasis:names:tc:SAML:protocol:ext:channel-binding",
+ *     "urn:oasis:names:tc:SAML:2.0:cm:holder-of-key"
  *
  * Parameters:
- *  request_rec *r         The request
- *  const char *header     The PAOS header value
+ *  request_rec *r              The request
+ *  const char *header          The PAOS header value
+ *  ECPServiceOptions *options_return
+ *                              Pointer to location to receive options,
+ *                              may be NULL. Bitmask of option flags.
  *
  * Returns:
- *   true if the PAOS header is valid, false otherwise
+ *   true if the PAOS header is valid, false otherwise. If options is non-NULL
+ *   then the set of option flags is returned there.
  *
  */
-#define PAOS_VERSION_TOKEN "ver=\"" LASSO_PAOS_HREF "\""
-#define ECP_SERVICE_TOKEN  "\"" LASSO_ECP_HREF "\""
-bool am_validate_paos_header(request_rec *r, const char *header)
+bool am_validate_paos_header(request_rec *r, const char *header,
+                             ECPServiceOptions *options_return)
 {
     bool result = false;
     char **semicolon_tokens = NULL;
+    char **service_tokens = NULL;
     char *token = NULL;
-    guint len;
+    guint len, i;
+    ECPServiceOptions options = 0;
 
     if (header == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
@@ -1540,7 +1612,11 @@ bool am_validate_paos_header(request_rec *r, const char *header)
         goto cleanup;
     }
 
-    /* Split the header on the semicolon character */
+    /*
+     * Split the header on the semicolon character.
+     * There should be 2 items, the first is the version delclaration
+     * and the second is the service and it's options.
+     */
     semicolon_tokens = g_strsplit(header, ";", 0);
 
     /* There must be exactly two tokens after splitting */
@@ -1554,25 +1630,67 @@ bool am_validate_paos_header(request_rec *r, const char *header)
     }
 
     /* Validate the first token as the PAOS version */
+    bool version_valid = false;
     token = g_strstrip(semicolon_tokens[0]);
-    if (!g_str_equal(token, PAOS_VERSION_TOKEN)) {
+    if (g_str_has_prefix(token, "ver=")) {
+        token += 4;
+        token = am_strip_whitespace_and_quotes(token);
+        if (g_str_equal(token, LASSO_PAOS_HREF)) {
+            version_valid = true;
+        }
+    }
+    if (!version_valid) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                     "invalid PAOS header, "
-                     "expected first token to be \"%s\", "
-                     "but found \"%s\" in header=\"%s\"",
-                     PAOS_VERSION_TOKEN, token, header);
+                      "invalid PAOS header, "
+                      "expected first token to be ver=\"%s\", "
+                      "but found \"%s\" in header=\"%s\"",
+                      LASSO_PAOS_HREF, token, header);
         goto cleanup;
     }
 
-    /* Validate the second token as the ECP service */
-    token = g_strstrip(semicolon_tokens[1]);
-    if (!g_str_equal(token, ECP_SERVICE_TOKEN)) {
+    /*
+     * Process the service tokens by splitting on the comma character.
+     */
+    service_tokens = g_strsplit(semicolon_tokens[1], ",", 0);
+
+    /* There must be at least 1 token after splitting */
+    len = g_strv_length(service_tokens);
+    if (len < 1) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                      "invalid PAOS header, "
-                     "expected second token to be \"%s\", "
-                     "but found \"%s\" in header=\"%s\"",
-                     ECP_SERVICE_TOKEN, token, header);
+                     "expected at least 1 service token, header=\"%s\"",
+                     header);
         goto cleanup;
+    }
+
+    /* Validate the first service token as the ECP service */
+    token = am_strip_whitespace_and_quotes(service_tokens[0]);
+    if (!g_str_equal(token, LASSO_ECP_HREF)) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                     "invalid PAOS header, "
+                     "expected first service token to be \"%s\", "
+                     "but found \"%s\" in header=\"%s\"",
+                     LASSO_ECP_HREF, token, header);
+        goto cleanup;
+    }
+
+    /* Gather options following the ECP service */
+    for (i = 1; i < len; i++) {
+        token = am_strip_whitespace_and_quotes(service_tokens[i]);
+
+        if (g_str_equal(token, LASSO_SAML_EXT_CHANNEL_BINDING)) {
+            options |= ECP_SERVICE_OPTION_CHANNEL_BINDING;
+        } else if (g_str_equal(token, LASSO_SAML2_CONFIRMATION_METHOD_HOLDER_OF_KEY)) {
+            options |= ECP_SERVICE_OPTION_HOLDER_OF_KEY;
+        } else if (g_str_equal(token, LASSO_SAML2_ECP_PROFILE_WANT_AUTHN_SIGNED)) {
+            options |= ECP_SERVICE_OPTION_WANT_AUTHN_SIGNED;
+        } else if (g_str_equal(token, LASSO_SAML2_CONDITIONS_DELEGATION)) {
+            options |= ECP_SERVICE_OPTION_DELEGATION;
+        } else {
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                          "Unknown PAOS service option = \"%s\"",
+                          token);
+        }
     }
 
     /* No problems, we're good */
@@ -1580,10 +1698,12 @@ bool am_validate_paos_header(request_rec *r, const char *header)
 
  cleanup:
     g_strfreev(semicolon_tokens);
+    g_strfreev(service_tokens);
+    if (options_return) {
+        *options_return = options;
+    }
     return result;
 }
-#undef PAOS_VERSION_TOKEN
-#undef ECP_SERVICE_TOKEN
 
 /* This function checks if Accept header has a media type
  *
@@ -1827,7 +1947,9 @@ char *am_get_assertion_consumer_service_by_binding(LassoProvider *provider, cons
     }
 
     if (selected_descriptor) {
-        url = lasso_provider_get_metadata_one(provider, selected_descriptor);
+        url = lasso_provider_get_metadata_one_for_role(provider,
+                                                       LASSO_PROVIDER_ROLE_SP,
+                                                       selected_descriptor);
     }
 
     lasso_release_list_of_strings(descriptors);
@@ -1835,7 +1957,130 @@ char *am_get_assertion_consumer_service_by_binding(LassoProvider *provider, cons
     return url;
 }
 
+/* Join array of strings with separator
+ *
+ * Parameters:
+ *  pool      memory allocation pool
+ *  strings   NULL terminated array of NULL terminated strings
+ *  separator string to insert between elements
+ *
+ * Example:
+ *  char *strings[] = {"one", "two", NULL};
+ *  am_str_join(pool, strings, ", ")
+ *
+ *  would return "one, two"
+ */
+
+char *am_str_join(apr_pool_t *pool, char **strings, const char *separator)
+{
+    char *str = NULL;
+    char *dst = NULL;
+    char **p;
+    apr_size_t i;
+    apr_size_t len;
+    apr_size_t alloc_len;
+    apr_size_t n_strings = 0;
+    apr_size_t total_string_len = 0;
+    apr_size_t separator_len = strlen(separator);
+
+    /*
+     * Iterate over string array, compute total number of characters
+     * and a count of how many strings
+     */
+    for (total_string_len = 0, n_strings = 0, p = strings; *p; p++) {
+        total_string_len += strlen(*p);
+        n_strings++;
+    }
+
+    /*
+     * The allocation length is the length of all the strings
+     * plus the length of all the separators plus 1 for null terminator
+     */
+    alloc_len = total_string_len +
+        (n_strings > 0 ? separator_len*(n_strings-1) : 0) + 1;
+
+    str = apr_palloc(pool, alloc_len);
+    for (i = 0, dst = str; i < n_strings; i++) {
+        /* If this is not the first string insert a separator */
+        if (i > 0) {
+            memcpy(dst, separator, separator_len);
+            dst += separator_len;
+        }
+        /* Copy the string */
+        len = strlen(strings[i]);
+        memcpy(dst, strings[i], len);
+        dst += len;
+
+    }
+    *dst++ = 0;                 /* NULL terminate */
+
+    return str;
+}
+
 #ifdef HAVE_ECP
+
+/* String representation of ECPServiceOptions bitmask
+ *
+ * ECPServiceOptions is a bitmask of flags. Return a comma separated string
+ * of all the flags. If any bit in the bitmask is unaccounted for an
+ * extra string will be appended of the form "(unknown bits = x)".
+ *
+ * Parameters:
+ *  pool    memory allocation pool
+ *  options bitmask of PAOS options
+ */
+char *am_ecp_service_options_str(apr_pool_t *pool, ECPServiceOptions options)
+{
+    int i = 0;
+    char *names[10];            /* Warning, increase this if flags are added,
+                                   must be n flags + 1 for NULL terminator */
+
+    if (options & ECP_SERVICE_OPTION_CHANNEL_BINDING) {
+        names[i++] = "channel-binding";
+        options &= ~ECP_SERVICE_OPTION_CHANNEL_BINDING;
+    }
+
+    if (options & ECP_SERVICE_OPTION_HOLDER_OF_KEY) {
+        names[i++] = "holder-of-key";
+        options &= ~ECP_SERVICE_OPTION_HOLDER_OF_KEY;
+    }
+
+    if (options & ECP_SERVICE_OPTION_WANT_AUTHN_SIGNED) {
+        names[i++] = "want-authn-signed";
+        options &= ~ECP_SERVICE_OPTION_WANT_AUTHN_SIGNED;
+    }
+
+    if (options & ECP_SERVICE_OPTION_DELEGATION) {
+        names[i++] = "delegation";
+        options &= ~ECP_SERVICE_OPTION_DELEGATION;
+    }
+
+    if (options) {
+        names[i++] = apr_psprintf(pool, "(unknown bits = %#x)", options);
+    }
+
+    names[i] = NULL;
+    return am_str_join(pool, names, ", ");
+}
+
+/* Determine if request is compatible with PAOS, decode headers
+ *
+ * To indicate support for the ECP profile, and the PAOS binding, the
+ * request MUST include the following HTTP header fields:
+ *
+ * 1. An Accept header indicating acceptance of the MIME type
+ *    "application/vnd.paos+xml"
+ *
+ * 2. A PAOS header specifying the PAOS version with a value, at minimum, of
+ *    "urn:liberty:paos:2003-08" and a supported service value of
+ *    "urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp". The service value MAY
+ *    contain option values.
+ *
+ * This function validates the Accept header the the PAOS header, if
+ * all condidtions are met it returns true, false otherwise. If the
+ * validation succeeds any ECP options specified along with the
+ * ECP service are parsed and stored in req_cfg->ecp_service_options
+ */
 bool am_is_paos_request(request_rec *r)
 {
     const char *accept_header = NULL;
@@ -1843,6 +2088,7 @@ bool am_is_paos_request(request_rec *r)
     bool have_paos_media_type = false;
     bool valid_paos_header = false;
     bool is_paos = false;
+    ECPServiceOptions ecp_service_options = 0;
 
     accept_header = apr_table_get(r->headers_in, "Accept");
     paos_header = apr_table_get(r->headers_in, "PAOS");
@@ -1852,7 +2098,7 @@ bool am_is_paos_request(request_rec *r)
         }
     }
     if (paos_header) {
-        if (am_validate_paos_header(r, paos_header)) {
+        if (am_validate_paos_header(r, paos_header, &ecp_service_options)) {
             valid_paos_header = true;
         }
     }
@@ -1872,10 +2118,19 @@ bool am_is_paos_request(request_rec *r)
         }
     }
     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                  "have_paos_media_type=%s valid_paos_header=%s is_paos=%s",
+                  "have_paos_media_type=%s valid_paos_header=%s is_paos=%s "
+                  "paos options=[%s]",
                   have_paos_media_type ? "True" : "False",
                   valid_paos_header ? "True" : "False",
-                  is_paos ? "True" : "False");
+                  is_paos ? "True" : "False",
+                  am_ecp_service_options_str(r->pool, ecp_service_options));
+
+    if (is_paos) {
+        am_req_cfg_rec *req_cfg;
+
+        req_cfg = am_get_req_cfg(r);
+        req_cfg->ecp_service_options = ecp_service_options;
+    }
 
     return is_paos;
 }
