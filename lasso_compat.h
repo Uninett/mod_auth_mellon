@@ -48,3 +48,15 @@
 
 
 #endif
+
+#ifndef LASSO_SAML2_ECP_PROFILE_WANT_AUTHN_SIGNED
+#define LASSO_SAML2_ECP_PROFILE_WANT_AUTHN_SIGNED "urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp:2.0:WantAuthnRequestsSigned"
+#endif
+
+#ifndef LASSO_SAML2_CONDITIONS_DELEGATION
+#define LASSO_SAML2_CONDITIONS_DELEGATION "urn:oasis:names:tc:SAML:2.0:conditions:delegation"
+#endif
+
+#ifndef LASSO_SAML_EXT_CHANNEL_BINDING
+#define LASSO_SAML_EXT_CHANNEL_BINDING "urn:oasis:names:tc:SAML:protocol:ext:channel-binding"
+#endif

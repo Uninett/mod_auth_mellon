@@ -79,6 +79,11 @@
 #define AM_CACHE_DEFAULT_ENTRY_SIZE 196608
 #define AM_CACHE_MIN_ENTRY_SIZE 65536
 
+/* Internal error codes */
+#define AM_ERROR_INVALID_PAOS_HEADER 1
+#define AM_ERROR_MISSING_PAOS_HEADER 2
+#define AM_ERROR_MISSING_PAOS_MEDIA_TYPE 3
+
 
 /* This is the length of the id we use (for session IDs and
  * replaying POST data).
@@ -241,10 +246,19 @@ typedef struct am_dir_cfg_rec {
     int ecp_send_idplist;
 } am_dir_cfg_rec;
 
+/* Bitmask for PAOS service options */
+typedef enum {
+    ECP_SERVICE_OPTION_CHANNEL_BINDING = 1,
+    ECP_SERVICE_OPTION_HOLDER_OF_KEY = 2,
+    ECP_SERVICE_OPTION_WANT_AUTHN_SIGNED = 4,
+    ECP_SERVICE_OPTION_DELEGATION = 8,
+} ECPServiceOptions;
+
 typedef struct am_req_cfg_rec {
     char *cookie_value;
 #ifdef HAVE_ECP
     bool ecp_authn_req;
+    ECPServiceOptions ecp_service_options;
 #endif /* HAVE_ECP */
 } am_req_cfg_rec;
 
@@ -401,7 +415,7 @@ const char *am_get_mime_header(request_rec *r, const char *m, const char *h);
 const char *am_get_mime_body(request_rec *r, const char *mime);
 char *am_get_service_url(request_rec *r, 
                          LassoProfile *profile, char *service_name);
-bool am_validate_paos_header(request_rec *r, const char *header);
+bool am_parse_paos_header(request_rec *r, const char *header, ECPServiceOptions *options_return);
 bool am_header_has_media_type(request_rec *r, const char *header,
                               const char *media_type);
 const char *am_get_config_langstring(apr_hash_t *h, const char *lang);
@@ -410,7 +424,8 @@ int am_get_boolean_query_parameter(request_rec *r, const char *name,
 char *am_get_assertion_consumer_service_by_binding(LassoProvider *provider, const char *binding);
 
 #ifdef HAVE_ECP
-bool am_is_paos_request(request_rec *r);
+char *am_ecp_service_options_str(apr_pool_t *pool, ECPServiceOptions options);
+bool am_is_paos_request(request_rec *r, int *error_code);
 #endif /* HAVE_ECP */
 
 int am_auth_mellon_user(request_rec *r);

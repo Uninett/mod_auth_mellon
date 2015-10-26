@@ -1,7 +1,7 @@
 /*
  *
  *   auth_mellon_util.c: an authentication apache module
- *   Copyright © 2003-2007 UNINETT (http://www.uninett.no/)
+ *   Copyright Â© 2003-2007 UNINETT (http://www.uninett.no/)
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -1507,83 +1507,474 @@ am_get_service_url(request_rec *r, LassoProfile *profile, char *service_name)
     return url;
 }
 
-/* Thus function checks if an HTTP PAOS header is valid.
- *
- * A PAOS header must be composed of 2 values separated by a semicolon.
- *
- * The first value must be a version declaration in the form ver="xxx"
- * (note the version string must be in double quotes).
- *
- * The second value must be the ECP service.
- * (note the service string must be in double quotes).
+/*------------------------ Begin Token Parsing Code --------------------------*/
+
+typedef enum {
+    TOKEN_WHITESPACE = 1,
+    TOKEN_SEMICOLON,
+    TOKEN_COMMA,
+    TOKEN_EQUAL,
+    TOKEN_IDENTIFIER,
+    TOKEN_DBL_QUOTE_STRING,
+} TokenType;
+
+typedef struct {
+    TokenType type;             /* The type of this token */
+    char *str;                  /* The string value of the token */
+    apr_size_t len;             /* The number of characters in the token */
+    apr_size_t offset;          /* The offset from the beginning of
+                                   the string to the start of the token */
+} Token;
+
+
+#ifdef DEBUG
+/* Return string representation of TokenType enumeration
  *
  * Parameters:
- *  request_rec *r         The request
- *  const char *header     The PAOS header value
+ *  token_type  A TokenType enumeration
+ * Returns:     String name of token_type
+ */
+static const char *
+token_type_str(TokenType token_type)
+{
+    switch(token_type) {
+    case TOKEN_WHITESPACE:       return "WHITESPACE";
+    case TOKEN_SEMICOLON:        return "SEMICOLON";
+    case TOKEN_COMMA:            return "COMMA";
+    case TOKEN_EQUAL:            return "EQUAL";
+    case TOKEN_IDENTIFIER:       return "IDENTIFIER";
+    case TOKEN_DBL_QUOTE_STRING: return "DBL_QUOTE_STRING";
+    default:                     return "unknown";
+    }
+}
+
+static void dump_tokens(request_rec *r, apr_array_header_t *tokens)
+{
+    apr_size_t i;
+    
+    for (i = 0; i < tokens->nelts; i++) {
+        Token token = APR_ARRAY_IDX(tokens, i, Token);
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                      "token[%2zd] %s \"%s\" offset=%lu len=%lu ", i,
+                      token_type_str(token.type), token.str,
+                      token.offset, token.len);
+    }
+}
+#endif
+
+
+/* Initialize token and add to list of tokens
+ *
+ * Utility to assist tokenize function.
+ *
+ * A token object is created and added to the end of the list of
+ * tokens. It is initialized with the type of token, a copy of the
+ * string, it's length, and it's offset from the beginning of the
+ * string where it was found.
+ *
+ * Tokens with special processing needs are also handled here.
+ *
+ * A double quoted string will:
+ *
+ * * Have it's delimiting quotes removed.
+ * * Will unescape escaped characters.
+ *
+ * Parameters:
+ *  tokens  Array of Token objects.
+ *  type    The type of the token (e.g. TokenType).
+ *  str     The string the token was parsed from, used to compute
+ *          the position of the token in the original string.
+ *  start   The first character in the token.
+ *  end     the last character in the token.
+ */
+static inline void
+push_token(apr_array_header_t *tokens, TokenType type, const char *str,
+           const char *start, const char *end)
+{
+    apr_size_t offset = start - str;
+    Token *token = apr_array_push(tokens);
+
+    if (type == TOKEN_DBL_QUOTE_STRING) {
+        /* do not include quotes in token value */
+        start++; end--;
+    }
+
+    token->type = type;
+    token->len = end - start;
+    token->offset = offset;
+    token->str = apr_pstrmemdup(tokens->pool, start, token->len);
+
+    if (type == TOKEN_DBL_QUOTE_STRING) {
+        /*
+         * The original HTTP 1.1 spec was ambiguous with respect to
+         * backslash quoting inside double quoted strings. This has since
+         * been resolved in this errata:
+         *
+         * http://greenbytes.de/tech/webdav/draft-ietf-httpbis-p1-messaging-16.html#rfc.section.3.2.3
+         *
+         * Which states:
+         *
+         * Recipients that process the value of the quoted-string MUST
+         * handle a quoted-pair as if it were replaced by the octet
+         * following the backslash.
+         *
+         * Senders SHOULD NOT escape octets in quoted-strings that do not
+         * require escaping (i.e., other than DQUOTE and the backslash
+         * octet).
+         */
+        char *p, *t;
+
+        for (p = token->str; *p; p++) {
+            if (p[0] == '\\' && p[1]) {
+                /*
+                 * Found backslash with following character.
+                 * Move rest of string down 1 character.
+                 */
+                for (t = p; *t; t++) {
+                    t[0] = t[1];
+                }
+                token->len--;
+            }
+        }
+    }
+}
+
+/* Break a string into a series of tokens
+ *
+ * Given a string return an array of tokens. If the string cannot be
+ * successfully parsed an error string is returned at the location
+ * specified by the error parameter, if error is NULL then the parsing
+ * was successful. If an error occured the returned array of tokens
+ * will include all tokens parsed up until where the unrecognized
+ * input occurred. The input str is never modified.
+ *
+ * Parameters:
+ *  pool              memory allocation pool
+ *  str               input string to be parsed.
+ *  ignore_whitespace if True whitespace tokens are not returned
+ *  error             location where error string is returned
+ *                    if NULL no error occurred
+ * Returns:           array of Token objects
+ */
+static apr_array_header_t *
+tokenize(apr_pool_t *pool, const char *str, bool ignore_whitespace,
+             char **error)
+{
+    apr_array_header_t *tokens = apr_array_make(pool, 10, sizeof(Token));
+    const char *p, *start;
+
+    *error = NULL;
+    p = start = str;
+    while(*p) {
+        if (apr_isspace(*p)) {  /* whitespace */
+            p++;
+            while(*p && apr_isspace(*p)) p++;
+            if (!ignore_whitespace) {
+                push_token(tokens, TOKEN_WHITESPACE, str, start, p);
+            }
+            start = p;
+        }
+        else if (apr_isalpha(*p)) { /* identifier: must begin with
+                                       alpha then any alphanumeric or
+                                       underscore */
+            p++;
+            while(*p && (apr_isalnum(*p) || *p == '_')) p++;
+            push_token(tokens, TOKEN_IDENTIFIER, str, start, p);
+            start = p;
+        }
+        else if (*p == '"') {   /* double quoted string */
+            p++;                /* step over double quote */
+            while(*p) {
+                if (*p == '\\') { /* backslash escape */
+                    p++;          /* step over backslash */
+                    if (*p) {
+                        p++;      /* step over escaped character */
+                    } else {
+                        break;    /* backslash at end of string, stop */
+                    }
+                }
+                if (*p == '\"') break; /* terminating quote delimiter */
+                p++;                   /* keep scanning */
+            }
+            if (*p != '\"') {
+                *error = apr_psprintf(pool,
+                                      "unterminated string begining at "
+                                      "position %lu in \"%s\"",
+                                      start-str, str);
+                break;
+            }
+            p++;
+            push_token(tokens, TOKEN_DBL_QUOTE_STRING, str, start, p);
+            start = p;
+        }
+        else if (*p == '=') {   /* equals */
+            p++;
+            push_token(tokens, TOKEN_EQUAL, str, start, p);
+            start = p;
+        }
+        else if (*p == ',') {   /* comma */
+            p++;
+            push_token(tokens, TOKEN_COMMA, str, start, p);
+            start = p;
+        }
+        else if (*p == ';') {   /* semicolon */
+            p++;
+            push_token(tokens, TOKEN_SEMICOLON, str, start, p);
+            start = p;
+        }
+        else {                  /* unrecognized token */
+            *error = apr_psprintf(pool,
+                                  "unknown token at "
+                                  "position %lu in string \"%s\"",
+                                  p-str, str);
+            break;
+        }
+    }
+
+    return tokens;
+}
+
+/* Test if the token is what we're looking for
+ *
+ * Given an index into the tokens array determine if the token type
+ * matches. If the value parameter is non-NULL then the token's value
+ * must also match. If the array index is beyond the last array item
+ * false is returned.
+ *
+ * Parameters:
+ *  tokens  Array of Token objects
+ *  index   Index used to select the Token object from the Tokens array.
+ *          If the index is beyond the last array item False is returned.
+ *  type    The token type which must match
+ *  value   If non-NULL then the token string value must be equal to this.
+ * Returns: True if the token matches, False otherwise.
+ */
+
+static bool
+is_token(apr_array_header_t *tokens, apr_size_t index, TokenType type, const char *value)
+{
+    if (index >= tokens->nelts) {
+        return false;
+    }
+
+    Token token = APR_ARRAY_IDX(tokens, index, Token);
+
+    if (token.type != type) {
+        return false;
+    }
+
+    if (value) {
+        if (!g_str_equal(token.str, value)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/*------------------------- End Token Parsing Code ---------------------------*/
+
+/* Return message describing position an error when parsing.
+ *
+ * When parsing we expect tokens to appear in a certain sequence.  We
+ * report the contents of the unexpected token and it's position in
+ * the string. However if the parsing error is due to the fact we've
+ * exhausted all tokens but are still expecting another token then our
+ * error message indicates we reached the end of the string.
+ *
+ * Parameters:
+ *  tokens  Array of Token objects.
+ *  index   Index in tokens array where bad token was found
+ */
+static inline const char *
+parse_error_msg(apr_array_header_t *tokens, apr_size_t index)
+{
+    if (index >= tokens->nelts) {
+        return "end of string";
+    }
+
+    return apr_psprintf(tokens->pool, "\"%s\" at position %lu",
+                        APR_ARRAY_IDX(tokens, index, Token).str,
+                        APR_ARRAY_IDX(tokens, index, Token).offset);
+}
+
+/* This function checks if an HTTP PAOS header is valid and
+ * returns any service options which may have been specified.
+ *
+ * A PAOS header is composed of a mandatory PAOS version and service
+ * values. A semicolon separates the version from the service values.
+ *
+ * Service values are delimited by semicolons, and options are
+ * comma-delimited from the service value and each other.
+ *
+ * The PAOS version must be in the form ver="xxx" (note the version
+ * string must be in double quotes).
+ *
+ * The ECP service must be specified, it MAY be followed by optional
+ * comma seperated options, all values must be in double quotes.
+ *
+ * ECP Service
+ *   "urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp"
+ *
+ * Recognized Options:
+ *
+ * Support for channel bindings
+ *  urn:oasis:names:tc:SAML:protocol:ext:channel-binding
+ *
+ * Support for Holder-of-Key subject confirmation
+ *   urn:oasis:names:tc:SAML:2.0:cm:holder-of-key
+ *
+ * Request for signed SAML request
+ *   urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp:2.0:WantAuthnRequestsSigned
+ *
+ * Request to delegate credentials to the service provider
+ *   urn:oasis:names:tc:SAML:2.0:conditions:delegation
+ *
+ *
+ * Example PAOS HTTP header::
+ *
+ *   PAOS: ver="urn:liberty:paos:2003-08";
+ *     "urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp",
+ *     "urn:oasis:names:tc:SAML:protocol:ext:channel-binding",
+ *     "urn:oasis:names:tc:SAML:2.0:cm:holder-of-key"
+ *
+ * Parameters:
+ *  request_rec *r              The request
+ *  const char *header          The PAOS header value
+ *  ECPServiceOptions *options_return
+ *                              Pointer to location to receive options,
+ *                              may be NULL. Bitmask of option flags.
  *
  * Returns:
- *   true if the PAOS header is valid, false otherwise
+ *   true if the PAOS header is valid, false otherwise. If options is non-NULL
+ *   then the set of option flags is returned there.
  *
  */
-#define PAOS_VERSION_TOKEN "ver=\"" LASSO_PAOS_HREF "\""
-#define ECP_SERVICE_TOKEN  "\"" LASSO_ECP_HREF "\""
-bool am_validate_paos_header(request_rec *r, const char *header)
+bool am_parse_paos_header(request_rec *r, const char *header,
+                             ECPServiceOptions *options_return)
 {
     bool result = false;
-    char **semicolon_tokens = NULL;
-    char *token = NULL;
-    guint len;
+    ECPServiceOptions options = 0;
+    apr_array_header_t *tokens;
+    apr_size_t i;
+    char *error;
 
-    if (header == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                     "invalid PAOS header, NULL");
+    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                  "PAOS header: \"%s\"", header);
+
+    tokens = tokenize(r->pool, header, true, &error);
+
+#ifdef DEBUG
+    dump_tokens(r, tokens);
+#endif
+
+    if (error) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "%s", error);
         goto cleanup;
     }
 
-    /* Split the header on the semicolon character */
-    semicolon_tokens = g_strsplit(header, ";", 0);
-
-    /* There must be exactly two tokens after splitting */
-    len = g_strv_length(semicolon_tokens);
-    if (len != 2) {
+    /* Header must begin with "ver=xxx" where xxx is paos version */
+    if (!is_token(tokens, 0, TOKEN_IDENTIFIER, "ver") ||
+        !is_token(tokens, 1, TOKEN_EQUAL, NULL) ||
+        !is_token(tokens, 2, TOKEN_DBL_QUOTE_STRING, LASSO_PAOS_HREF)) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                     "invalid PAOS header, "
-                     "expected 2 tokens separated by semicolon, header=\"%s\"",
-                     header);
+                      "invalid PAOS header, "
+                      "expected header to begin with ver=\"%s\", "
+                      "actual header=\"%s\"",
+                      LASSO_PAOS_HREF, header);
         goto cleanup;
     }
 
-    /* Validate the first token as the PAOS version */
-    token = g_strstrip(semicolon_tokens[0]);
-    if (!g_str_equal(token, PAOS_VERSION_TOKEN)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                     "invalid PAOS header, "
-                     "expected first token to be \"%s\", "
-                     "but found \"%s\" in header=\"%s\"",
-                     PAOS_VERSION_TOKEN, token, header);
-        goto cleanup;
-    }
-
-    /* Validate the second token as the ECP service */
-    token = g_strstrip(semicolon_tokens[1]);
-    if (!g_str_equal(token, ECP_SERVICE_TOKEN)) {
+    /* Next is the service value, separated from the version by a semicolon */
+    if (!is_token(tokens, 3, TOKEN_SEMICOLON, NULL)) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                      "invalid PAOS header, "
-                     "expected second token to be \"%s\", "
-                     "but found \"%s\" in header=\"%s\"",
-                     ECP_SERVICE_TOKEN, token, header);
+                     "expected semicolon after PAOS version "
+                     "but found %s in header=\"%s\"",
+                      parse_error_msg(tokens, 3),
+                      header);
         goto cleanup;
     }
 
-    /* No problems, we're good */
+    if (!is_token(tokens, 4, TOKEN_DBL_QUOTE_STRING, LASSO_ECP_HREF)) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "invalid PAOS header, "
+                      "expected service token to be \"%s\", "
+                      "but found %s in header=\"%s\"",
+                      LASSO_ECP_HREF,
+                      parse_error_msg(tokens, 4),
+                      header);
+        goto cleanup;
+    }
+
+    /* After the service value there may be optional flags separated by commas */
+
+    if (tokens->nelts == 5) {    /* no options */
+        result = true;
+        goto cleanup;
+    }
+
+    /* More tokens after the service value, must be options, iterate over them */
+    for (i = 5; i < tokens->nelts; i++) {
+        if (!is_token(tokens, i, TOKEN_COMMA, NULL)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "invalid PAOS header, "
+                          "expected comma after PAOS service "
+                          "but found %s in header=\"%s\"",
+                          parse_error_msg(tokens, i),
+                          header);
+            goto cleanup;
+        }
+
+        if (++i > tokens->nelts) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "invalid PAOS header, "
+                          "expected option after comma "
+                          "in header=\"%s\"",
+                          header);
+            goto cleanup;
+        }
+
+        Token token = APR_ARRAY_IDX(tokens, i, Token);
+
+        if (token.type != TOKEN_DBL_QUOTE_STRING) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "invalid PAOS header, "
+                          "expected quoted string after comma "
+                          "but found %s in header=\"%s\"",
+                          parse_error_msg(tokens, i),
+                          header);
+            goto cleanup;
+        }
+
+        /* Have an option string, convert it to a bit flag */
+        const char *value = token.str;
+
+        if (g_str_equal(value, LASSO_SAML_EXT_CHANNEL_BINDING)) {
+            options |= ECP_SERVICE_OPTION_CHANNEL_BINDING;
+        } else if (g_str_equal(value, LASSO_SAML2_CONFIRMATION_METHOD_HOLDER_OF_KEY)) {
+            options |= ECP_SERVICE_OPTION_HOLDER_OF_KEY;
+        } else if (g_str_equal(value, LASSO_SAML2_ECP_PROFILE_WANT_AUTHN_SIGNED)) {
+            options |= ECP_SERVICE_OPTION_WANT_AUTHN_SIGNED;
+        } else if (g_str_equal(value, LASSO_SAML2_CONDITIONS_DELEGATION)) {
+            options |= ECP_SERVICE_OPTION_DELEGATION;
+        } else {
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                          "Unknown PAOS service option = \"%s\"",
+                          value);
+            goto cleanup;
+        }
+    }
+
     result = true;
 
  cleanup:
-    g_strfreev(semicolon_tokens);
+    if (options_return) {
+        *options_return = options;
+    }
     return result;
+
 }
-#undef PAOS_VERSION_TOKEN
-#undef ECP_SERVICE_TOKEN
 
 /* This function checks if Accept header has a media type
  *
@@ -1837,15 +2228,88 @@ char *am_get_assertion_consumer_service_by_binding(LassoProvider *provider, cons
     return url;
 }
 
+
 #ifdef HAVE_ECP
-bool am_is_paos_request(request_rec *r)
+
+/* String representation of ECPServiceOptions bitmask
+ *
+ * ECPServiceOptions is a bitmask of flags. Return a comma separated string
+ * of all the flags. If any bit in the bitmask is unaccounted for an
+ * extra string will be appended of the form "(unknown bits = x)".
+ *
+ * Parameters:
+ *  pool    memory allocation pool
+ *  options bitmask of PAOS options
+ */
+char *am_ecp_service_options_str(apr_pool_t *pool, ECPServiceOptions options)
+{
+    apr_array_header_t *names = apr_array_make(pool, 4, sizeof(const char *));
+
+    if (options & ECP_SERVICE_OPTION_CHANNEL_BINDING) {
+        APR_ARRAY_PUSH(names, const char *) = "channel-binding";
+        options &= ~ECP_SERVICE_OPTION_CHANNEL_BINDING;
+    }
+
+    if (options & ECP_SERVICE_OPTION_HOLDER_OF_KEY) {
+        APR_ARRAY_PUSH(names, const char *) = "holder-of-key";
+        options &= ~ECP_SERVICE_OPTION_HOLDER_OF_KEY;
+    }
+
+    if (options & ECP_SERVICE_OPTION_WANT_AUTHN_SIGNED) {
+        APR_ARRAY_PUSH(names, const char *) = "want-authn-signed";
+        options &= ~ECP_SERVICE_OPTION_WANT_AUTHN_SIGNED;
+    }
+
+    if (options & ECP_SERVICE_OPTION_DELEGATION) {
+        APR_ARRAY_PUSH(names, const char *) = "delegation";
+        options &= ~ECP_SERVICE_OPTION_DELEGATION;
+    }
+
+    if (options) {
+        APR_ARRAY_PUSH(names, const char *) =
+            apr_psprintf(pool, "(unknown bits = %#x)", options);
+    }
+
+    return apr_array_pstrcat(pool, names, ',');
+}
+
+/* Determine if request is compatible with PAOS, decode headers
+ *
+ * To indicate support for the ECP profile, and the PAOS binding, the
+ * request MUST include the following HTTP header fields:
+ *
+ * 1. An Accept header indicating acceptance of the MIME type
+ *    "application/vnd.paos+xml"
+ *
+ * 2. A PAOS header specifying the PAOS version with a value, at minimum, of
+ *    "urn:liberty:paos:2003-08" and a supported service value of
+ *    "urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp". The service value MAY
+ *    contain option values.
+ *
+ * This function validates the Accept header the the PAOS header, if
+ * all condidtions are met it returns true, false otherwise. If the
+ * validation succeeds any ECP options specified along with the
+ * ECP service are parsed and stored in req_cfg->ecp_service_options
+ *
+ * Any error discovered during processing are returned in the
+ * error_code parameter, zero indicates success. This function never
+ * returns true if an error occurred.
+ *
+ * Parameters:
+ *  request_rec *r     The current request.
+ *  int * error_code   Return error code here
+ *
+ */
+bool am_is_paos_request(request_rec *r, int *error_code)
 {
     const char *accept_header = NULL;
     const char *paos_header = NULL;
     bool have_paos_media_type = false;
     bool valid_paos_header = false;
     bool is_paos = false;
+    ECPServiceOptions ecp_service_options = 0;
 
+    *error_code = 0;
     accept_header = apr_table_get(r->headers_in, "Accept");
     paos_header = apr_table_get(r->headers_in, "PAOS");
     if (accept_header) {
@@ -1854,8 +2318,11 @@ bool am_is_paos_request(request_rec *r)
         }
     }
     if (paos_header) {
-        if (am_validate_paos_header(r, paos_header)) {
+        if (am_parse_paos_header(r, paos_header, &ecp_service_options)) {
             valid_paos_header = true;
+        } else {
+            if (*error_code == 0)
+                *error_code = AM_ERROR_INVALID_PAOS_HEADER;
         }
     }
     if (have_paos_media_type) {
@@ -1865,19 +2332,33 @@ bool am_is_paos_request(request_rec *r)
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "request supplied PAOS media type in Accept header "
                           "but omitted valid PAOS header");
+            if (*error_code == 0)
+                *error_code = AM_ERROR_MISSING_PAOS_HEADER;
         }
     } else {
         if (valid_paos_header) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "request supplied valid PAOS header "
                           "but omitted PAOS media type in Accept header");
+            if (*error_code == 0)
+                *error_code = AM_ERROR_MISSING_PAOS_MEDIA_TYPE;
         }
     }
     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                  "have_paos_media_type=%s valid_paos_header=%s is_paos=%s",
+                  "have_paos_media_type=%s valid_paos_header=%s is_paos=%s "
+                  "error_code=%d ecp options=[%s]",
                   have_paos_media_type ? "True" : "False",
                   valid_paos_header ? "True" : "False",
-                  is_paos ? "True" : "False");
+                  is_paos ? "True" : "False",
+                  *error_code,
+                  am_ecp_service_options_str(r->pool, ecp_service_options));
+
+    if (is_paos) {
+        am_req_cfg_rec *req_cfg;
+
+        req_cfg = am_get_req_cfg(r);
+        req_cfg->ecp_service_options = ecp_service_options;
+    }
 
     return is_paos;
 }
