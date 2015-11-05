@@ -1827,7 +1827,9 @@ char *am_get_assertion_consumer_service_by_binding(LassoProvider *provider, cons
     }
 
     if (selected_descriptor) {
-        url = lasso_provider_get_metadata_one(provider, selected_descriptor);
+        url = lasso_provider_get_metadata_one_for_role(provider,
+                                                       LASSO_PROVIDER_ROLE_SP,
+                                                       selected_descriptor);
     }
 
     lasso_release_list_of_strings(descriptors);
