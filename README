@@ -2,7 +2,7 @@
  README file for mod_auth_mellon
 ===========================================================================
 
-mod_auth_mellon is a authentication module for apache. It authenticates
+mod_auth_mellon is a authentication module for Apache. It authenticates
 the user against a SAML 2.0 IdP, and grants access to directories
 depending on attributes received from the IdP.
 
@@ -114,8 +114,8 @@ MellonCacheSize 100
 MellonLockFile "/var/run/mod_auth_mellon.lock"
 
 # MellonPostDirectory is the full path of a directory where POST requests
-# are saved during authentication. This directory must writeable by the
-# Apache user. It should not be writeable (or readable) by other users.
+# are saved during authentication. This directory must writable by the
+# Apache user. It should not be writable (or readable) by other users.
 # Default: None
 # Example: MellonPostDirectory "/var/cache/mod_auth_mellon_postdata"
 
@@ -226,7 +226,7 @@ MellonPostCount 100
         # Default. None set.
         MellonSetEnvNoPrefix "DISPLAY_NAME" "displayName"
 
-        # MellonMergeEnvVars merges multiple values of environement variables
+        # MellonMergeEnvVars merges multiple values of environment variables
         # set using MellonSetEnv into single variable:
         # ie: MYENV_VAR => val1;val2;val3 instead of default behaviour of:
         #     MYENV_VAR_0 => val1, MYENV_VAR_1 => val2 ... etc.
@@ -236,7 +236,7 @@ MellonPostCount 100
         MellonMergeEnvVars On
         MellonMergeEnvVars On ":"
 
-        # MellonEnvVarsIndexStart specifies if environement variables for
+        # MellonEnvVarsIndexStart specifies if environment variables for
         # multi-valued attributes should start indexing from 0 or 1
         # The syntax is 'MellonEnvVarsIndexStart <0|1>'.
         # Default: MellonEnvVarsIndexStart 0
@@ -612,7 +612,7 @@ value.
 NOTE: 
 
 if MellonMergeEnvVars is set to On multiple values of attributes 
-will be stored in single environement variable, separated by ";" 
+will be stored in single environment variable, separated by ";"
 
 MELLON_<name> -> "value1;value2;value3[;valueX]"
 
@@ -753,8 +753,8 @@ mod_auth_mellon sends by default HTTP1.1 Cache-Control header with values
   cached or stored content each time on accessing location.
 
 This default behavior ensures that user agent never shows cached static
-HTML pages after logout without revalidationg. So that user couldn't be
-misleaded about malfunction of logout procedure. Revalidating content after
+HTML pages after logout without revalidating. So that user couldn't be
+misled about malfunction of logout procedure. Revalidating content after
 logout leads to new authentication procedure via mellon.
 
 But mod_auth_mellon will never prohibit specifically any user agent to
@@ -776,7 +776,7 @@ For Apache 2.4 exists shorter notation:
 
   Header always unset Cache-Control expr=%{CONTENT_TYPE}==image/png
 
-Editing, appanding, overwriting headers is possible in other cases.
+Editing, appending, overwriting headers is possible in other cases.
 
 ===========================================================================
  Support
