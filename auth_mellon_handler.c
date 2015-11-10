@@ -2761,8 +2761,51 @@ static int am_init_authn_request_common(request_rec *r,
 
     LASSO_PROFILE(login)->msg_relayState = g_strdup(return_to_url);
 
+#ifdef HAVE_ECP
+    {
+        am_req_cfg_rec *req_cfg;
+        ECPServiceOptions unsupported_ecp_options;
+        req_cfg = am_get_req_cfg(r);
+
+        /*
+         * Currently we only support the WANT_AUTHN_SIGNED ECP option,
+         * if a client sends us anything else let them know it's not
+         * implemented.
+         *
+         * We do test for CHANNEL_BINDING below but that's because if
+         * and when we support it we don't want to forget channel
+         * bindings require the authn request to be signed.
+         */
+        unsupported_ecp_options =
+            req_cfg->ecp_service_options &
+            ~ECP_SERVICE_OPTION_WANT_AUTHN_SIGNED;
+        if (unsupported_ecp_options) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Unsupported ECP service options [%s]",
+                          am_ecp_service_options_str(r->pool,
+                                                     unsupported_ecp_options));
+            return HTTP_NOT_IMPLEMENTED;
+        }
+
+        /*
+         * The signature hint must be set prior to calling
+         * lasso_login_build_authn_request_msg
+         */
+        if (req_cfg->ecp_service_options &
+            (ECP_SERVICE_OPTION_WANT_AUTHN_SIGNED |
+             ECP_SERVICE_OPTION_CHANNEL_BINDING)) {
+            /*
+             * authnRequest should be signed if the client requested it
+             * or if channel bindings are enabled.
+             */
+            lasso_profile_set_signature_hint(LASSO_PROFILE(login),
+                                             LASSO_PROFILE_SIGNATURE_HINT_FORCE);
+        }
+    }
+#endif
+
     ret = lasso_login_build_authn_request_msg(login);
-    if(ret != 0) {
+    if (ret != 0) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error building login request."
                       " Lasso error: [%i] %s", ret, lasso_strerror(ret));
@@ -3438,7 +3481,12 @@ int am_auth_mellon_user(request_rec *r)
              * See am_check_uid for detailed explanation.
              */
 
-            if (am_is_paos_request(r)) {
+            bool is_paos;
+            int error_code;
+
+            is_paos = am_is_paos_request(r, &error_code);
+            if (error_code) return HTTP_BAD_REQUEST;
+            if (is_paos) {
                 am_req_cfg_rec *req_cfg;
 
                 req_cfg = am_get_req_cfg(r);
