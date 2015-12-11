@@ -85,6 +85,9 @@ static const int default_env_vars_index_start = -1;
  */
 static const int default_env_vars_count_in_n = -1;
 
+/* The default list of trusted redirect domains. */
+static const char * const default_redirect_domains[] = { "[self]", NULL };
+
 /* This function handles configuration directives which set a 
  * multivalued string slot in the module configuration (the destination
  * strucure is a hash).
@@ -895,6 +898,43 @@ static const char *am_set_merge_env_vars(cmd_parms *cmd,
     return NULL;
 }
 
+/* Handle MellonRedirectDomains option.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *  int argc             Number of redirect domains.
+ *  char *const argv[]   List of redirect domains.
+ *
+ * Returns:
+ *  NULL on success, or errror string on failure.
+ */
+static const char *am_set_redirect_domains(cmd_parms *cmd,
+                                          void *struct_ptr,
+                                          int argc,
+                                          char *const argv[])
+{
+    am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
+    const char **redirect_domains;
+    int i;
+
+    if (argc < 1)
+        return apr_psprintf(cmd->pool, "%s takes at least one arguments",
+                            cmd->cmd->name);
+
+    redirect_domains = apr_palloc(cmd->pool, sizeof(const char *) * (argc + 1));
+    for (i = 0; i < argc; i++) {
+        redirect_domains[i] = argv[i];
+    }
+    redirect_domains[argc] = NULL;
+
+    cfg->redirect_domains = redirect_domains;
+
+    return NULL;
+}
+
 /* This array contains all the configuration directive which are handled
  * by auth_mellon.
  */    
@@ -1295,6 +1335,13 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Whether to send an ECP client a list of IdP's. Default is off."
         ),
+    AP_INIT_TAKE_ARGV(
+        "MellonRedirectDomains",
+        am_set_redirect_domains,
+        NULL,
+        OR_AUTHCFG,
+        "List of domains we can redirect to."
+        ),
     {NULL}
 };
 
@@ -1391,6 +1438,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->subject_confirmation_data_address_check = inherit_subject_confirmation_data_address_check;
     dir->do_not_verify_logout_signature = apr_hash_make(p);
     dir->post_replay = inherit_post_replay;
+    dir->redirect_domains = default_redirect_domains;
 
     dir->ecp_send_idplist = inherit_ecp_send_idplist;
 
@@ -1624,6 +1672,11 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->post_replay = CFG_MERGE(add_cfg, base_cfg, post_replay);
 
     new_cfg->ecp_send_idplist = CFG_MERGE(add_cfg, base_cfg, ecp_send_idplist);
+
+    new_cfg->redirect_domains =
+        (add_cfg->redirect_domains != default_redirect_domains ?
+         add_cfg->redirect_domains :
+         base_cfg->redirect_domains);
 
     return new_cfg;
 }

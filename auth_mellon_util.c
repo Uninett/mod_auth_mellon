@@ -51,6 +51,98 @@ char *am_reconstruct_url(request_rec *r)
     return url;
 }
 
+/* Get the hostname of the current request.
+ *
+ * Parameters:
+ *  request_rec *r       The current request.
+ *
+ * Returns:
+ *  The hostname of the current request.
+ */
+static const char *am_request_hostname(request_rec *r)
+{
+    const char *url;
+    apr_uri_t uri;
+    int ret;
+
+    url = am_reconstruct_url(r);
+
+    ret = apr_uri_parse(r->pool, url, &uri);
+    if (ret != APR_SUCCESS) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Failed to parse request URL: %s", url);
+        return NULL;
+    }
+
+    if (uri.hostname == NULL) {
+        /* This shouldn't happen, since the request URL is built with a hostname,
+         * but log a message to make any debuggin around this code easier.
+         */
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "No hostname in request URL: %s", url);
+        return NULL;
+    }
+
+    return uri.hostname;
+}
+
+/* Validate the redirect URL.
+ *
+ * Checks that the redirect URL is to a trusted domain & scheme.
+ *
+ * Parameters:
+ *  request_rec *r       The current request.
+ *  const char *url      The redirect URL to validate.
+ *
+ * Returns:
+ *  OK if the URL is valid, HTTP_BAD_REQUEST if not.
+ */
+int am_validate_redirect_url(request_rec *r, const char *url)
+{
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+    apr_uri_t uri;
+    int ret;
+
+    ret = apr_uri_parse(r->pool, url, &uri);
+    if (ret != APR_SUCCESS) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Invalid redirect URL: %s", url);
+        return HTTP_BAD_REQUEST;
+    }
+
+    /* Sanity check of the scheme of the domain. We only allow http and https. */
+    if (uri.scheme) {
+        if (strcasecmp(uri.scheme, "http")
+            && strcasecmp(uri.scheme, "https")) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Only http or https scheme allowed in redirect URL: %s (%s)",
+                          url, uri.scheme);
+            return HTTP_BAD_REQUEST;
+        }
+    }
+
+    if (!uri.hostname) {
+        return OK; /* No hostname to check. */
+    }
+
+    for (int i = 0; cfg->redirect_domains[i] != NULL; i++) {
+        const char *redirect_domain = cfg->redirect_domains[i];
+        if (!strcasecmp(redirect_domain, "[self]")) {
+            if (!strcasecmp(uri.hostname, am_request_hostname(r))) {
+                return OK;
+            }
+        } else if (apr_fnmatch(redirect_domain, uri.hostname,
+                               APR_FNM_PERIOD | APR_FNM_CASE_BLIND) ==
+                   APR_SUCCESS) {
+            return OK;
+        }
+    }
+    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                  "Untrusted hostname (%s) in redirect URL: %s",
+                  uri.hostname, url);
+    return HTTP_BAD_REQUEST;
+}
+
 /* This function builds an array of regexp backreferences
  *
  * Parameters:

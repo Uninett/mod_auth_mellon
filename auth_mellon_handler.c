@@ -837,6 +837,14 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
         return rc;
     }
 
+    /* Make sure that it is a valid redirect URL. */
+    rc = am_validate_redirect_url(r, return_to);
+    if (rc != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Invalid target domain in logout response RelayState parameter.");
+        return rc;
+    }
+
     apr_table_setn(r->headers_out, "Location", return_to);
     return HTTP_SEE_OTHER;
 }
@@ -873,6 +881,13 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
         ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
                       "Could not urldecode ReturnTo value.");
         return HTTP_BAD_REQUEST;
+    }
+
+    rc = am_validate_redirect_url(r, return_to);
+    if (rc != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Invalid target domain in logout request ReturnTo parameter.");
+        return rc;
     }
 
     /* Disable the the local session (in case the IdP doesn't respond). */
@@ -1859,6 +1874,13 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
         return rc;
     }
 
+    rc = am_validate_redirect_url(r, relay_state);
+    if (rc != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Invalid target domain in logout response RelayState parameter.");
+        return rc;
+    }
+
     apr_table_setn(r->headers_out, "Location",
                    relay_state);
 
@@ -2353,6 +2375,7 @@ static int am_handle_repost(request_rec *r)
     char *output;
     char *return_url;
     const char *(*post_mkform)(request_rec *, const char *);
+    int rc;
 
     if (am_cookie_get(r) == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
@@ -2433,6 +2456,13 @@ static int am_handle_repost(request_rec *r)
     if (am_urldecode(return_url) != OK) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "Bad repost query: return");
         return HTTP_BAD_REQUEST;
+    }
+
+    rc = am_validate_redirect_url(r, return_url);
+    if (rc != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Invalid target domain in repost request ReturnTo parameter.");
+        return rc;
     }
 
     psf_filename = apr_psprintf(r->pool, "%s/%s", mod_cfg->post_dir, psf_id);
@@ -3094,6 +3124,13 @@ static int am_handle_login(request_rec *r)
         return ret;
     }
 
+    ret = am_validate_redirect_url(r, return_to);
+    if(ret != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Invalid target domain in login request ReturnTo parameter.");
+        return ret;
+    }
+
     idp_param = am_extract_query_parameter(r->pool, r->args, "IdP");
     if(idp_param != NULL) {
         ret = am_urldecode(idp_param);
@@ -3211,6 +3248,13 @@ static int am_handle_probe_discovery(request_rec *r) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, ret, r,
                       "Could not urldecode return value.");
         return HTTP_BAD_REQUEST;
+    }
+
+    ret = am_validate_redirect_url(r, return_to);
+    if (ret != OK) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Invalid target domain in probe discovery return parameter.");
+        return ret;
     }
 
     idp_param = am_extract_query_parameter(r->pool, r->args, "returnIDParam");

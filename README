@@ -531,6 +531,23 @@ MellonPostCount 100
         # sending an ECP PAOS <AuthnRequest> message to an ECP client.
         MellonECPSendIDPList Off
 
+        # List of domains that we allow redirects to.
+        # The special name "[self]" means the domain of the current request.
+        # The domain names can also use wildcards.
+        #
+        # Example:
+        #  * Allow redirects to example.com and all subdomains:
+        #    MellonRedirectDomains example.com *.example.com
+        #  * Allow redirects to the host running mod_auth_mellon, as well as the
+        #    web page at www.example.com:
+        #    MellonRedirectDomains [self] www.example.com
+        #  * Allow redirects to all domains:
+        #    MellonRedirectDomains *
+        #
+        # Default:
+        #  MellonRedirectDomains [self]
+        MellonRedirectDomains [self]
+
 </Location>
 
 
