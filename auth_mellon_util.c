@@ -574,12 +574,21 @@ int am_read_post_data(request_rec *r, char **data, apr_size_t *length)
     bytes_left = len;
 
     while (bytes_left > 0) {
-        /* Read data from the client. Returns 0 on EOF or error, the
-         * number of bytes otherwise.
+        /* Read data from the client. Returns 0 on EOF and -1 on
+         * error, the number of bytes otherwise.
          */
         read_length = ap_get_client_block(r, &(*data)[bytes_read],
                                           bytes_left);
         if (read_length == 0) {
+            /* got the EOF */
+            (*data)[bytes_read] = '\0';
+
+            if (length != NULL) {
+                *length = bytes_read;
+            }
+            break;
+        }
+        else if (read_length < 0) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "Failed to read POST data from client.");
             return HTTP_INTERNAL_SERVER_ERROR;
