@@ -474,6 +474,12 @@ int am_read_post_data(request_rec *r, char **data, apr_size_t *length)
     }
 
     *data = (char *)apr_palloc(r->pool, len + 1);
+    if (*data == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Failed to allocate memory for %lu bytes of POST data.",
+                      (unsigned long)len);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
 
     /* Make sure that the data is null-terminated.  */
     (*data)[len] = '\0';
