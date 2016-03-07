@@ -561,6 +561,14 @@ int am_read_post_data(request_rec *r, char **data, apr_size_t *length)
         len = r->remaining;
     }
 
+    if (len >= 1024*1024) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Too large POST data payload (%lu bytes).",
+                      (unsigned long)len);
+        return HTTP_BAD_REQUEST;
+    }
+
+
     if (length != NULL) {
         *length = len;
     }
