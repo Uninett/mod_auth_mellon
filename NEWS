@@ -1,3 +1,24 @@
+Version 0.12.0
+---------------------------------------------------------------------------
+
+Security fixes:
+
+* [CVE-2016-2145] Fix DOS attack (Apache worker process crash) due to
+  incorrect error handling when reading POST data from client.
+
+* [CVE-2016-2146] Fix DOS attack (Apache worker process crash /
+  resource exhaustion) due to missing size checks when reading
+  POST data.
+
+In addition this release contains the following new features and fixes:
+
+* Add MellonRedirecDomains option to limit the sites that
+  mod_auth_mellon can redirect to. This option is enabled by default.
+
+* Add support for ECP service options in PAOS requests.
+
+* Fix AssertionConsumerService lookup for PAOS requests.
+
 Version 0.11.0
 ---------------------------------------------------------------------------
 
