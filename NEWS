@@ -1,3 +1,16 @@
+Version 0.11.1
+---------------------------------------------------------------------------
+
+Security fixes:
+
+* [CVE-2016-2145] Fix DOS attack (Apache worker process crash) due to
+  incorrect error handling when reading POST data from client.
+
+* [CVE-2016-2146] Fix DOS attack (Apache worker process crash /
+  resource exhaustion) due to missing size checks when reading
+  POST data.
+
+
 Version 0.11.0
 ---------------------------------------------------------------------------
 
@@ -295,7 +308,7 @@ Version 0.2.1
 ---------------------------------------------------------------------------
 
 * Make SAML authentication assertion and Lasso session available in the
-  environement.
+  environment.
 
 Version 0.2.0
 ---------------------------------------------------------------------------
