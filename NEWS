@@ -19,6 +19,18 @@ In addition this release contains the following new features and fixes:
 
 * Fix AssertionConsumerService lookup for PAOS requests.
 
+Version 0.11.1
+---------------------------------------------------------------------------
+
+Security fixes:
+
+* [CVE-2016-2145] Fix DOS attack (Apache worker process crash) due to
+  incorrect error handling when reading POST data from client.
+
+* [CVE-2016-2146] Fix DOS attack (Apache worker process crash /
+  resource exhaustion) due to missing size checks when reading
+  POST data.
+
 Version 0.11.0
 ---------------------------------------------------------------------------
 
