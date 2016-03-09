@@ -12,7 +12,7 @@ Security fixes:
 
 In addition this release contains the following new features and fixes:
 
-* Add MellonRedirecDomains option to limit the sites that
+* Add MellonRedirectDomains option to limit the sites that
   mod_auth_mellon can redirect to. This option is enabled by default.
 
 * Add support for ECP service options in PAOS requests.
