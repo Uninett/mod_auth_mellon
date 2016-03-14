@@ -3316,9 +3316,17 @@ static int am_handle_probe_discovery(request_rec *r) {
     }
 
     /* 
-     * On failure, try default
+     * On failure, fail if a MellonProbeDiscoveryIdP
+     * list was provided, otherwise try first IdP.
      */
     if (disco_idp == NULL) {
+        if (!apr_is_empty_table(cfg->probe_discovery_idp)) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "probeDiscovery failed and non empty "
+                          "MellonProbeDiscoveryIdP was provided.");
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+
         disco_idp = am_first_idp(r);
         if (disco_idp == NULL) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 

@@ -471,6 +471,9 @@ MellonPostCount 100
 
         # MellonProbeDiscoveryIdP can be used to restrict the 
         # list of IdP queried by the IdP probe discovery service.
+        # If probe discovery fails and this is provided, an
+        # HTTP error 500 is returned, instead of proceeding
+        # with first available IdP.
         #
         # Default unset, which means that all configured IdP are 
         # queried.
