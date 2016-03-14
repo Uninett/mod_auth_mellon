@@ -1254,8 +1254,8 @@ const command_rec auth_mellon_commands[] = {
         ap_set_int_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, probe_discovery_timeout),
         OR_AUTHCFG,
-        "The timeout of IdP probe discovery service. "
-        "Default is 1s"
+        "The timeout in seconds of IdP probe discovery service. "
+        "The default is unset, which means that this feature is disabled."
         ),
     AP_INIT_TAKE12(
         "MellonProbeDiscoveryIdP",
