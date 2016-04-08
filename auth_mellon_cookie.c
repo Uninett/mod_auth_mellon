@@ -52,6 +52,7 @@ static const char *am_cookie_name(request_rec *r)
 static const char *am_cookie_params(request_rec *r)
 {
     int secure_cookie;
+    int http_only_cookie;
     const char *cookie_domain = ap_get_server_name(r);
     const char *cookie_path = "/";
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
@@ -65,11 +66,13 @@ static const char *am_cookie_params(request_rec *r)
     }
 
     secure_cookie = cfg->secure;
+    http_only_cookie = cfg->http_only;
 
     return apr_psprintf(r->pool,
-                        "Version=1; Path=%s; Domain=%s%s;",
+                        "Version=1; Path=%s; Domain=%s%s%s;",
                         cookie_path, cookie_domain,
-                        secure_cookie ? "; HttpOnly; secure" : "");
+                        http_only_cookie ? "; HttpOnly" : "",
+                        secure_cookie ? "; secure" : "");
 }
 
 

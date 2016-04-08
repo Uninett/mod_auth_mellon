@@ -38,9 +38,13 @@ static const char *default_user_attribute = "NAME_ID";
  */
 static const char *default_cookie_name = "cookie";
 
-/* The default setting for cookie flags is to not enforce HttpOnly and secure
+/* The default setting for cookie is to not enforce secure flag
  */
 static const int default_secure_cookie = 0; 
+
+/* The default setting for cookie is to not enforce HttpOnly flag
+ */
+static const int default_http_only_cookie = 0;
 
 /* The default setting for setting MELLON_SESSION
  */
@@ -442,6 +446,38 @@ static const char *am_set_enable_slot(cmd_parms *cmd,
     return NULL;
 }
 
+/* This function handles the MellonSecureCookie configuration directive.
+ * This directive can be set to "on", "off", "secure" or "httponly".
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *  const char *arg      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *
+ * Returns:
+ *  NULL on success or an error string if the argument is wrong.
+ */
+static const char *am_set_secure_slots(cmd_parms *cmd,
+                                      void *struct_ptr,
+                                      const char *arg)
+{
+    am_dir_cfg_rec *d = (am_dir_cfg_rec *)struct_ptr;
+
+    if(!strcasecmp(arg, "on")) {
+        d->secure = 1;
+        d->http_only = 1;
+    } else if(!strcasecmp(arg, "secure")) {
+        d->secure = 1;
+    } else if(!strcasecmp(arg, "httponly")) {
+        d->http_only = 1;
+    } else if(strcasecmp(arg, "off")) {
+        return "parameter must be 'on', 'off', 'secure' or 'httponly'";
+    }
+
+    return NULL;
+}
 
 /* This function handles the obsolete MellonDecoder configuration directive.
  * It is a no-op.
@@ -1032,13 +1068,15 @@ const command_rec auth_mellon_commands[] = {
         " cookie name, and the default name of the cookie will therefore"
         " be 'mellon-cookie'."
         ),
-    AP_INIT_FLAG(
+    AP_INIT_TAKE1(
         "MellonSecureCookie",
-        ap_set_flag_slot,
-        (void *)APR_OFFSETOF(am_dir_cfg_rec, secure),
+        am_set_secure_slots,
+        NULL,
         OR_AUTHCFG,
         "Whether the cookie set by auth_mellon should have HttpOnly and"
-        " secure flags set. Default is off."
+        " secure flags set. Default is 'off'. Once 'on' - both flags will"
+        " be set. Values 'httponly' or 'secure' will respectively set only"
+        " one flag."
         ),
     AP_INIT_TAKE1(
         "MellonCookieDomain",
@@ -1395,6 +1433,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
 
     dir->varname = default_cookie_name;
     dir->secure = default_secure_cookie;
+    dir->http_only = default_http_only_cookie;
     dir->merge_env_vars = default_merge_env_vars;
     dir->env_vars_index_start = default_env_vars_index_start;
     dir->env_vars_count_in_n = default_env_vars_count_in_n;
@@ -1515,6 +1554,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->secure = (add_cfg->secure != default_secure_cookie ?
                         add_cfg->secure :
                         base_cfg->secure);
+
+    new_cfg->http_only = (add_cfg->http_only != default_http_only_cookie ?
+                        add_cfg->http_only :
+                        base_cfg->http_only);
 
     new_cfg->merge_env_vars = (add_cfg->merge_env_vars != default_merge_env_vars ?
                                add_cfg->merge_env_vars :
