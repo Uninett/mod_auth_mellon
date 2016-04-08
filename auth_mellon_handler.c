@@ -3625,6 +3625,12 @@ int am_check_uid(request_rec *r)
         return OK;
     }
 
+    /* Check that the user has enabled authentication for this directory. */
+    if(dir->enable_mellon == am_enable_off
+       || dir->enable_mellon == am_enable_default) {
+	return DECLINED;
+    }
+
 #ifdef HAVE_ECP
     am_req_cfg_rec *req_cfg = am_get_req_cfg(r);
     if (req_cfg->ecp_authn_req) {
