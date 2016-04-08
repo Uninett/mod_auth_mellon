@@ -180,8 +180,9 @@ MellonPostCount 100
         # Default: "cookie"
         MellonVariable "cookie"
 
-        # MellonSecureCookie enforces the HttpOnly and secure flags
-        # for the mod_mellon cookie
+        # Whether the cookie set by auth_mellon should have HttpOnly and
+        # secure flags set. Once "On" - both flags will be set. Values 
+        # "httponly" or "secure" will respectively set only one flag.
         # Default: Off
         MellonSecureCookie On
 
