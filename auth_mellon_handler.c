@@ -3700,7 +3700,7 @@ int am_check_uid(request_rec *r)
     return_code = am_check_permissions(r, session);
     if(return_code != OK) {
         am_release_request_session(r, session);
-        return HTTP_UNAUTHORIZED;
+        return return_code;
     }
 
     /* The user has been authenticated, and we can now populate r->user
