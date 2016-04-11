@@ -140,7 +140,7 @@ operations.
   response = session.post(ecp.msgUrl,
                           data=ecp.msgBody,
                           auth=requests.auth.HTTPDigestAuth(user, password)
-                          headers={'Content-Type': 'application/soap+xml'})
+                          headers={'Content-Type': 'text/xml'})
 
   # Process returned SOAP wrapped <Assertion> from IdP
   ecp.processResponseMsg(response.text)
