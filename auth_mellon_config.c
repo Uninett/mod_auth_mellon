@@ -1034,7 +1034,7 @@ const command_rec auth_mellon_commands[] = {
         (void *)APR_OFFSETOF(am_mod_cfg_rec, post_size),
         RSRC_CONF,
         "The maximum size of a saved POST, in bytes."
-        " Default value is 1 MB."
+        " Default value is 1 GB."
         ), 
 
 
