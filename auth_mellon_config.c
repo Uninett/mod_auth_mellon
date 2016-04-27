@@ -67,7 +67,7 @@ static const apr_time_t post_ttl = 15 * 60;
 /* saved POST session maximum size
  * the MellonPostSize configuration directive if you change this.
  */
-static const apr_size_t post_size = 1024 * 1024 * 1024;
+static const apr_size_t post_size = 1024 * 1024;
 
 /* maximum saved POST sessions
  * the MellonPostCount configuration directive if you change this.

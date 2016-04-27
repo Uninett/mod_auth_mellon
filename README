@@ -125,8 +125,8 @@ MellonLockFile "/var/run/mod_auth_mellon.lock"
 MellonPostTTL 900
 
 # MellonPostSize is the maximum size for saved POST requests
-# Default: MellonPostSize 1073741824 (1 GB)
-MellonPostSize 1073741824
+# Default: MellonPostSize 1048576 (1 MB)
+MellonPostSize 1048576
 
 # MellonPostCount is the maximum amount of saved POST requests
 # Default: MellonPostCount 100
