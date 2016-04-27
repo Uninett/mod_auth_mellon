@@ -67,7 +67,7 @@ static const apr_time_t post_ttl = 15 * 60;
 /* saved POST session maximum size
  * the MellonPostSize configuration directive if you change this.
  */
-static const apr_size_t post_size = 1024 * 1024 * 1024;
+static const apr_size_t post_size = 1024 * 1024;
 
 /* maximum saved POST sessions
  * the MellonPostCount configuration directive if you change this.
@@ -1034,7 +1034,7 @@ const command_rec auth_mellon_commands[] = {
         (void *)APR_OFFSETOF(am_mod_cfg_rec, post_size),
         RSRC_CONF,
         "The maximum size of a saved POST, in bytes."
-        " Default value is 1 GB."
+        " Default value is 1 MB."
         ), 
 
 
