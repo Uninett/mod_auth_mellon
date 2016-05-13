@@ -250,8 +250,8 @@ MellonPostCount 100
         #     MELLON__groups_0=group1
         #     MELLON__groups_1=group2
         #     MELLON__groups_N=2
-        # Default: MellonEnvVarsIndexStart Off
-        MellonEnvVarsIndexStart On
+        # Default: MellonEnvVarsSetCount Off
+        MellonEnvVarsSetCount On
 
         # If MellonSessionDump is set, then the SAML session will be
         # available in the MELLON_SESSION environment variable
