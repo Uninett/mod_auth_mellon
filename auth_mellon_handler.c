@@ -678,7 +678,8 @@ static int am_handle_logout_request(request_rec *r,
     /* Process the logout message. Ignore missing signature. */
     res = lasso_logout_process_request_msg(logout, msg);
 #ifdef HAVE_lasso_profile_set_signature_verify_hint
-    if(res != 0 && res != LASSO_DS_ERROR_SIGNATURE_NOT_FOUND) {
+    if(res != 0 && res != LASSO_DS_ERROR_SIGNATURE_NOT_FOUND &&
+       logout->parent.remote_providerID != NULL) {
         if (apr_hash_get(cfg->do_not_verify_logout_signature,
                          logout->parent.remote_providerID,
                          APR_HASH_KEY_STRING)) {
@@ -787,7 +788,8 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
 
     res = lasso_logout_process_response_msg(logout, r->args);
 #ifdef HAVE_lasso_profile_set_signature_verify_hint
-    if(res != 0 && res != LASSO_DS_ERROR_SIGNATURE_NOT_FOUND) {
+    if(res != 0 && res != LASSO_DS_ERROR_SIGNATURE_NOT_FOUND &&
+       logout->parent.remote_providerID != NULL) {
         if (apr_hash_get(cfg->do_not_verify_logout_signature,
                          logout->parent.remote_providerID,
                          APR_HASH_KEY_STRING)) {
