@@ -365,7 +365,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
  *  apr_size_t *size     This is a pointer to where we will store the length
  *                       of the downloaded data, not including the
  *                       null-terminator we add. This parameter can be NULL.
- *  apr_time_t timeout   Timeout in seconds, 0 for no timeout.
+ *  int timeout          Timeout in seconds, 0 for no timeout.
  *  long *status         Pointer to HTTP status code. 
  *
  * Returns:
@@ -374,7 +374,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
  */
 int am_httpclient_get(request_rec *r, const char *uri,
                       void **buffer, apr_size_t *size,
-                      apr_time_t timeout, long *status)
+                      int timeout, long *status)
 {
     am_hc_block_header_t bh;
     CURL *curl;
@@ -390,7 +390,7 @@ int am_httpclient_get(request_rec *r, const char *uri,
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
+    res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)timeout);
     if(res != CURLE_OK) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to download data from the uri \"%s\", "
@@ -399,7 +399,7 @@ int am_httpclient_get(request_rec *r, const char *uri,
         goto cleanup_fail;
     }
     
-    res = curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, timeout);
+    res = curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, (long)timeout);
     if(res != CURLE_OK) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to download data from the uri \"%s\", "
