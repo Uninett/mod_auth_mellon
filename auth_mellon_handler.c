@@ -3230,7 +3230,7 @@ static int am_handle_probe_discovery(request_rec *r) {
     if (timeout == -1) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "probe discovery handler invoked but not "
-                      "configured. Plase set MellonProbeDiscoveryTimeout.");
+                      "configured. Please set MellonProbeDiscoveryTimeout.");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
