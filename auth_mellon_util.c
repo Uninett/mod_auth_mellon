@@ -1814,7 +1814,7 @@ tokenize(apr_pool_t *pool, const char *str, bool ignore_whitespace,
             if (*p != '\"') {
                 *error = apr_psprintf(pool,
                                       "unterminated string begining at "
-                                      "position %lu in \"%s\"",
+                                      "position %" APR_SIZE_T_FMT " in \"%s\"",
                                       start-str, str);
                 break;
             }
@@ -1840,7 +1840,7 @@ tokenize(apr_pool_t *pool, const char *str, bool ignore_whitespace,
         else {                  /* unrecognized token */
             *error = apr_psprintf(pool,
                                   "unknown token at "
-                                  "position %lu in string \"%s\"",
+                                  "position %" APR_SIZE_T_FMT " in string \"%s\"",
                                   p-str, str);
             break;
         }
@@ -1908,7 +1908,7 @@ parse_error_msg(apr_array_header_t *tokens, apr_size_t index)
         return "end of string";
     }
 
-    return apr_psprintf(tokens->pool, "\"%s\" at position %lu",
+    return apr_psprintf(tokens->pool, "\"%s\" at position %" APR_SIZE_T_FMT,
                         APR_ARRAY_IDX(tokens, index, Token).str,
                         APR_ARRAY_IDX(tokens, index, Token).offset);
 }
