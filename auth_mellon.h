@@ -441,7 +441,7 @@ int am_handler(request_rec *r);
 
 int am_httpclient_get(request_rec *r, const char *uri, 
                       void **buffer, apr_size_t *size, 
-                      apr_time_t timeout, long *status);
+                      int timeout, long *status);
 int am_httpclient_post(request_rec *r, const char *uri,
                        const void *post_data, apr_size_t post_length,
                        const char *content_type,
