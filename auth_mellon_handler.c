@@ -285,8 +285,8 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
         if (error != 0) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "Error adding metadata \"%s\" to "
-                          "lasso server objects: %s.",
-                          idp_metadata->file, lasso_strerror(error));
+                          "lasso server objects. Lasso error: [%i] %s",
+                          idp_metadata->file, error, lasso_strerror(error));
         }
     }
 
