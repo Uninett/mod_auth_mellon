@@ -21,6 +21,9 @@
 
 #include "auth_mellon.h"
 
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(auth_mellon);
+#endif
 
 /* This function gets the session associated with a user, using a cookie
  *

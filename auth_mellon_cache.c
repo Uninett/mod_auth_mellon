@@ -21,6 +21,10 @@
 
 #include "auth_mellon.h"
 
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(auth_mellon);
+#endif
+
 /* Calculate the pointer to a cache entry.
  *
  * Parameters:

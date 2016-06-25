@@ -21,6 +21,9 @@
 
 #include "auth_mellon.h"
 
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(auth_mellon);
+#endif
 
 /* This function retrieves the name of our cookie.
  *

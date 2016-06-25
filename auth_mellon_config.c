@@ -21,6 +21,10 @@
 
 #include "auth_mellon.h"
 
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(auth_mellon);
+#endif
+
 /* This is the default endpoint path. Remember to update the description of
  * the MellonEndpointPath configuration directive if you change this.
  */

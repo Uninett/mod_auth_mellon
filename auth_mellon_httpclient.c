@@ -19,15 +19,16 @@
  *
  */
 
-
 #include "auth_mellon.h"
 
 #include <curl/curl.h>
 
-
 /* The size of the blocks we will allocate. */
 #define AM_HC_BLOCK_SIZE 1000
 
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(auth_mellon);
+#endif
 
 /* This structure describes a single-linked list of downloaded blocks. */
 typedef struct am_hc_block_s {
