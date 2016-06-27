@@ -19,10 +19,13 @@
  *
  */
 
-
 #include "auth_mellon.h"
 
 #include <curl/curl.h>
+
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(auth_mellon);
+#endif
 
 /* This function is called after the configuration of the server is parsed
  * (it's a post-config hook).

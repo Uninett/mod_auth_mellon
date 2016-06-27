@@ -26,6 +26,10 @@
 
 #include "auth_mellon.h"
 
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(auth_mellon);
+#endif
+
 /* This function is used to get the url of the current request.
  *
  * Parameters:
