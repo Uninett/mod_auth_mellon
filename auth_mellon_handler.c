@@ -1360,6 +1360,10 @@ static int am_validate_conditions(request_rec *r,
     LassoSaml2AudienceRestriction *ar;
 
     conditions = assertion->Conditions;
+    if (conditions == NULL) {
+        /* An assertion without conditions -- nothing to validate. */
+        return OK;
+    }
     if (!LASSO_IS_SAML2_CONDITIONS(conditions)) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Wrong type of Conditions node.");
