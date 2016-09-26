@@ -1340,6 +1340,13 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Check address given in SubjectConfirmationData Address attribute. Default is on."
         ),
+    AP_INIT_FLAG(
+        "MellonSendCacheControlHeader",
+        ap_set_flag_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, send_cache_control_header),
+        OR_AUTHCFG,
+        "Send the cache-control header on responses. Default is on."
+        ),
     AP_INIT_TAKE1(
         "MellonDoNotVerifyLogoutSignature",
         am_set_do_not_verify_logout_signature,
@@ -1488,6 +1495,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->server = NULL;
     dir->authn_context_class_ref = apr_array_make(p, 0, sizeof(char *));
     dir->subject_confirmation_data_address_check = inherit_subject_confirmation_data_address_check;
+    dir->send_cache_control_header = inherit_send_cache_control_header;
     dir->do_not_verify_logout_signature = apr_hash_make(p);
     dir->post_replay = inherit_post_replay;
     dir->redirect_domains = default_redirect_domains;
@@ -1729,6 +1737,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
 
     new_cfg->subject_confirmation_data_address_check =
         CFG_MERGE(add_cfg, base_cfg, subject_confirmation_data_address_check);
+
+    new_cfg->send_cache_control_header =
+        CFG_MERGE(add_cfg, base_cfg, send_cache_control_header);
+
     new_cfg->post_replay = CFG_MERGE(add_cfg, base_cfg, post_replay);
 
     new_cfg->ecp_send_idplist = CFG_MERGE(add_cfg, base_cfg, ecp_send_idplist);

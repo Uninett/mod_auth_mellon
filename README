@@ -542,6 +542,11 @@ MellonPostCount 100
         # sending an ECP PAOS <AuthnRequest> message to an ECP client.
         MellonECPSendIDPList Off
 
+        # This option controls whether the Cache-control header is sent
+        # back in responses.
+        # Default: On
+        # MellonSendCacheControlHeader Off
+
         # List of domains that we allow redirects to.
         # The special name "[self]" means the domain of the current request.
         # The domain names can also use wildcards.
