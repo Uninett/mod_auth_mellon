@@ -3506,7 +3506,9 @@ int am_auth_mellon_user(request_rec *r)
     }
 
     /* Set defaut Cache-Control headers within this location */
-    am_set_cache_control_headers(r);
+    if (CFG_VALUE(dir, send_cache_control_header)) {
+        am_set_cache_control_headers(r);
+    }
 
     /* Check if this is a request for one of our endpoints. We check if
      * the uri starts with the path set with the MellonEndpointPath
