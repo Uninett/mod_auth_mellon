@@ -1099,14 +1099,6 @@ const command_rec auth_mellon_commands[] = {
         " '/'."
         ),
     AP_INIT_TAKE1(
-        "MellonCookieSameSite",
-        ap_set_string_slot,
-        (void *)APR_OFFSETOF(am_dir_cfg_rec, cookie_samesite),
-        OR_AUTHCFG,
-        "The SameSite value for the auth_mellon cookie. Defaults to"
-        " having no SameSite value. Accepts values of Lax or Strict."
-        ),
-    AP_INIT_TAKE1(
         "MellonUser",
         ap_set_string_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, userattr),
@@ -1459,7 +1451,6 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->cond = apr_array_make(p, 0, sizeof(am_cond_t));
     dir->cookie_domain = NULL;
     dir->cookie_path = NULL;
-    dir->cookie_samesite = NULL;
     dir->envattr   = apr_hash_make(p);
     dir->userattr  = default_user_attribute;
     dir->idpattr  = NULL;
@@ -1599,10 +1590,6 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->cookie_path = (add_cfg->cookie_path != NULL ?
                         add_cfg->cookie_path :
                         base_cfg->cookie_path);
-
-    new_cfg->cookie_samesite = (add_cfg->cookie_samesite != NULL ?
-                        add_cfg->cookie_samesite :
-                        base_cfg->cookie_samesite);
 
     new_cfg->cond = apr_array_copy(p,
                                    (!apr_is_empty_array(add_cfg->cond)) ?
