@@ -58,6 +58,7 @@ static const char *am_cookie_params(request_rec *r)
     int http_only_cookie;
     const char *cookie_domain = ap_get_server_name(r);
     const char *cookie_path = "/";
+    const char *cookie_samesite = "";
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
 
     if (cfg->cookie_domain) {
@@ -68,14 +69,23 @@ static const char *am_cookie_params(request_rec *r)
         cookie_path = cfg->cookie_path;
     }
 
+    if (cfg->cookie_samesite) {
+        if (strcasecmp("lax", cfg->cookie_samesite) == 0) {
+            cookie_samesite = "; SameSite=Lax";
+        } else if (strcasecmp("strict", cfg->cookie_samesite) == 0) {
+            cookie_samesite = "; SameSite=Strict";
+        }
+    }
+
     secure_cookie = cfg->secure;
     http_only_cookie = cfg->http_only;
 
     return apr_psprintf(r->pool,
-                        "Version=1; Path=%s; Domain=%s%s%s;",
+                        "Version=1; Path=%s; Domain=%s%s%s%s;",
                         cookie_path, cookie_domain,
                         http_only_cookie ? "; HttpOnly" : "",
-                        secure_cookie ? "; secure" : "");
+                        secure_cookie ? "; secure" : "",
+                        cookie_samesite);
 }
 
 

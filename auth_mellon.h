@@ -179,6 +179,7 @@ typedef struct am_dir_cfg_rec {
     int env_vars_count_in_n;
     const char *cookie_domain;
     const char *cookie_path;
+    const char *cookie_samesite;
     apr_array_header_t *cond;
     apr_hash_t *envattr;
     const char *userattr;
