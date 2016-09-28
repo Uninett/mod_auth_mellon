@@ -136,6 +136,12 @@ typedef enum {
 } am_enable_t;
 
 typedef enum {
+  am_samesite_default,
+  am_samesite_lax,
+  am_samesite_strict
+} am_samesite_t;
+
+typedef enum {
     AM_COND_FLAG_NULL = 0x000, /* No flags */
     AM_COND_FLAG_OR   = 0x001, /* Or with  next condition */
     AM_COND_FLAG_NOT  = 0x002, /* Negate this condition */
@@ -179,6 +185,7 @@ typedef struct am_dir_cfg_rec {
     int env_vars_count_in_n;
     const char *cookie_domain;
     const char *cookie_path;
+    am_samesite_t cookie_samesite;
     apr_array_header_t *cond;
     apr_hash_t *envattr;
     const char *userattr;
