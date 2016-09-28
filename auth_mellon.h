@@ -232,10 +232,15 @@ typedef struct am_dir_cfg_rec {
 
     /* AuthnContextClassRef list */
     apr_array_header_t *authn_context_class_ref;
+
     /* Controls the checking of SubjectConfirmationData.Address attribute */
     int subject_confirmation_data_address_check;
+
     /* MellonDoNotVerifyLogoutSignature idp set */
     apr_hash_t *do_not_verify_logout_signature;
+
+    /* Controls whether the cache control header is set */
+    int send_cache_control_header;
 
     /* Whether we should replay POST data after authentication. */
     int post_replay;
@@ -338,6 +343,11 @@ extern const am_error_map_t auth_mellon_errormap[];
  */
 static const int default_subject_confirmation_data_address_check = 1;
 static const int inherit_subject_confirmation_data_address_check = -1;
+
+/** Default values for seting the cache-control header
+ */
+static const int default_send_cache_control_header = 1;
+static const int inherit_send_cache_control_header = -1;
 
 /* Default and inherit values for MellonPostReplay option. */
 static const int default_post_replay = 0;
