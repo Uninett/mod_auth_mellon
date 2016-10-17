@@ -166,6 +166,12 @@ MellonPostCount 100
         #           return a 403 Forbidden error. If he isn't authenticated
         #           then we will redirect him to the login page of the IdP.
         #
+        #           There is a special handling of AJAX requests, that are
+        #           identified by the "X-Request-With: XMLHttpRequest" HTTP
+        #           header. Since no user interaction can happen there,
+        #           we always fail unauthenticated (not logged in) requests
+        #           with a 403 Forbidden error without redirecting to the IdP.
+        #
         # Default: MellonEnable "off"
         MellonEnable "auth"
 

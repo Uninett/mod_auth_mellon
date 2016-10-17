@@ -3491,6 +3491,7 @@ int am_auth_mellon_user(request_rec *r)
     am_dir_cfg_rec *dir = am_get_dir_cfg(r);
     int return_code = HTTP_UNAUTHORIZED;
     am_cache_entry_t *session;
+    const char *ajax_header;
 
     if (r->main) {
         /* We are a subrequest. Trust the main request to have
@@ -3532,6 +3533,19 @@ int am_auth_mellon_user(request_rec *r)
             if(session) {
                 /* Release the session. */
                 am_release_request_session(r, session);
+            }
+
+            /*
+             * If this is an AJAX request, we cannot proceed to the IdP,
+             * Just fail early to save our resources
+             */
+            ajax_header = apr_table_get(r->headers_in, "X-Request-With");
+            if (ajax_header != NULL &&
+                strcmp(ajax_header, "XMLHttpRequest") == 0) {
+                    ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                      "Deny unauthenticated X-Request-With XMLHttpRequest "
+                      "(AJAX) request");
+                    return HTTP_FORBIDDEN;
             }
 
 #ifdef HAVE_ECP
