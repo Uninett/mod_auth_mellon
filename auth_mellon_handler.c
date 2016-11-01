@@ -1551,6 +1551,12 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
                 continue;
             }
 
+            if (attribute->Name == NULL) {
+                ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                              "SAML 2.0 attribute without name.");
+                continue;
+            }
+
             /* attribute->AttributeValue is a list of
              * LassoSaml2AttributeValue objects.
              */
