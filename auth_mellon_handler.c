@@ -345,6 +345,9 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 	    apr_thread_mutex_unlock(cfg->server_mutex);
 	    return NULL;
 	}
+#ifdef HAVE_SHA256
+	cfg->server->signature_method = LASSO_SIGNATURE_METHOD_RSA_SHA256;
+#endif
     }
 
     apr_thread_mutex_unlock(cfg->server_mutex);
