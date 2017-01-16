@@ -827,6 +827,18 @@ To subscribe: https://sympa.uninett.no/lists/uninett.no/subscribe/modmellon
 List archives: https://sympa.uninett.no/lists/uninett.no/arc/modmellon
 
 ===========================================================================
+ Reporting security vulnerabilities
+===========================================================================
+
+For reporting security vulnerabilities in mod_auth_mellon, please contact
+the maintainer directly at the following email address:
+
+  olav.morken@uninett.no
+
+This allows us to coordinate the disclosure of the vulnerability with the
+fixes for the vulnerability.
+
+===========================================================================
  Contributors
 ===========================================================================
 
