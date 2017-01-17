@@ -2655,7 +2655,7 @@ static int am_set_authn_request_post_content(request_rec *r, LassoLogin *login)
  */
 static int am_set_authn_request_paos_content(request_rec *r, LassoLogin *login)
 {
-    apr_table_setn(r->headers_out, "Content-Type", MEDIA_TYPE_PAOS);
+    ap_set_content_type(r, MEDIA_TYPE_PAOS);
     ap_rputs(LASSO_PROFILE(login)->msg_body, r);
 
     return OK;
