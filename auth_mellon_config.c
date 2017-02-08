@@ -1036,7 +1036,7 @@ const command_rec auth_mellon_commands[] = {
         (void *)APR_OFFSETOF(am_mod_cfg_rec, lock_file),
         RSRC_CONF,
         "The lock file for session synchronization."
-        " Default value is \"/tmp/mellonLock\"."
+        " Default value is \"/var/run/mod_auth_mellon.lock\"."
         ), 
     AP_INIT_TAKE1(
         "MellonPostDirectory",
@@ -1044,7 +1044,7 @@ const command_rec auth_mellon_commands[] = {
         (void *)APR_OFFSETOF(am_mod_cfg_rec, post_dir),
         RSRC_CONF,
         "The directory for saving POST requests."
-        " Default value is \"/var/tmp/mellonpost\"."
+        " Not set by default."
         ), 
     AP_INIT_TAKE1(
         "MellonPostTTL",
@@ -1052,7 +1052,7 @@ const command_rec auth_mellon_commands[] = {
         (void *)APR_OFFSETOF(am_mod_cfg_rec, post_ttl),
         RSRC_CONF,
         "The time to live for saved POST requests in seconds."
-        " Default value is 15 mn."
+        " Default value is 900 (15 minutes)."
         ), 
     AP_INIT_TAKE1(
         "MellonPostCount",
@@ -1068,7 +1068,7 @@ const command_rec auth_mellon_commands[] = {
         (void *)APR_OFFSETOF(am_mod_cfg_rec, post_size),
         RSRC_CONF,
         "The maximum size of a saved POST, in bytes."
-        " Default value is 1 MB."
+        " Default value is 1048576 (1 MB)."
         ), 
 
 
