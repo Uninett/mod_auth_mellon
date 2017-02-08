@@ -1,3 +1,49 @@
+Version 0.13.0
+---------------------------------------------------------------------------
+
+Security fix:
+
+Fix a denial of service attack in the logout handler, which allows a
+remote attacker to crash the Apache worker process with a segmentation
+fault. This is caused by a null-pointer dereference when processing a
+malformed logout message.
+
+New features:
+
+* Allow MellonSecureCookie to be configured to enable just one of the
+  "httponly" of "secure" flags, instead of always enabling both flags.
+
+* Support per-module log level with Apache 2.4.
+
+* Allow disabling the Cache-Control HTTP response header.
+
+* Add support for SameSite cookie parameter.
+
+Bug fixes:
+
+* Fix MellonProbeDiscoveryIdP redirecting to the wrong IdP if no IdPs
+  respond to the probe request.
+
+* Fix mod_auth_mellon interfering with other Apache apache
+  authentication modules even when it is disabled for a path.
+
+* Fix wrong HTTP status code being returned in some cases during user
+  permission checks.
+
+* Fix default POST size limit to actually be 1 MB.
+
+* Fix error if authentication response is missing the optional
+  Conditions-element.
+
+* Fix AJAX requests being redirected to the IdP.
+
+* Fix wrong content type for ECP authentication request responses.
+
+In addition there are various fixes for errors in the documentation,
+as well as internal code changes that do not have any user visible
+effects.
+
+
 Version 0.12.0
 ---------------------------------------------------------------------------
 
