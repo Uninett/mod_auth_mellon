@@ -24,8 +24,8 @@ Bug fixes:
 * Fix MellonProbeDiscoveryIdP redirecting to the wrong IdP if no IdPs
   respond to the probe request.
 
-* Fix mod_auth_mellon interfering with other Apache apache
-  authentication modules even when it is disabled for a path.
+* Fix mod_auth_mellon interfering with other Apache authentication
+  modules even when it is disabled for a path.
 
 * Fix wrong HTTP status code being returned in some cases during user
   permission checks.
