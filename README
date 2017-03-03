@@ -221,7 +221,7 @@ MellonPostCount 100
         MellonUser "NAME_ID"
 
         # MellonIdP selects in which attribute we should dump the remote 
-        # IdP providerId. This is passed to other apache modules and to 
+        # IdP entityId. This is passed to other apache modules and to 
         # the web pages the user visits.
         # Default: none
         # MellonIdP "IDP"
@@ -454,13 +454,13 @@ MellonPostCount 100
         # On initial user authentication, it is redirected to the
         # IdP discovery URL, with the following arguments set:
         #
-        #   entityID         SP providerID URL, where our metadata 
+        #   entityID         SP entityId URL, where our metadata 
         #                    are published.
         #   returnIDParam    Argument that IdP discovery must send back.
         #   return           Return URL the IdP discovery should return to.
         #
         # The IdP discovery must redirect the user to the return URL, 
-        # with returnIDParam set to the selected IdP providerID.
+        # with returnIDParam set to the selected IdP entityId.
         # 
         # The builtin:get-metadata discovery URL is not supported anymore
         # starting with 0.3.1. See MellonProbeDiscoveryTimeout for
@@ -723,7 +723,7 @@ Here is a sample configuration:
   MellonDiscoveryUrl "/saml/probeDisco"
   MellonProbeDiscoveryTimeout 1
 
-The SP will sends HTTP GET to each configured IdP providerId URL until
+The SP will sends HTTP GET to each configured IdP entityId URL until
 it gets an HTTP 200 response within the 1 second timeout. It will then 
 proceed with that IdP.
 
