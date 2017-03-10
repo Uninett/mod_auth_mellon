@@ -71,8 +71,8 @@ void am_cache_init(am_mod_cfg_rec *mod_cfg)
  *
  * Parameters:
  *  server_rec *s        The current server.
- *  const char *key      The session key or user
  *  am_cache_key_t type  AM_CACHE_SESSION or AM_CACHE_NAMEID
+ *  const char *key      The session key or user
  *
  * Returns:
  *  The session entry on success or NULL on failure.
