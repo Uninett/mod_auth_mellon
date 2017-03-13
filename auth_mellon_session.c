@@ -25,6 +25,42 @@
 APLOG_USE_MODULE(auth_mellon);
 #endif
 
+/* Retrieve a session from the cache and validate its cookie settings
+ *
+ * Parameters:
+ *  request_rec *r       The request we received from the user.
+ *  am_cache_key_t type  AM_CACHE_SESSION or AM_CACHE_NAMEID
+ *  const char *key      The session key or user
+ *
+ * Returns:
+ *  The session associated, or NULL if unable to retrieve the given session.
+ */
+am_cache_entry_t *am_lock_and_validate(request_rec *r,
+                                       am_cache_key_t type,
+                                       const char *key)
+{
+    am_cache_entry_t *session = am_cache_lock(r->server, type, key);
+    if (session == NULL) {
+        return NULL;
+    }
+
+    const char *cookie_token_session = am_cache_entry_get_string(
+        session, &session->cookie_token);
+    const char *cookie_token_target = am_cookie_token(r);
+    if (strcmp(cookie_token_session, cookie_token_target)) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Session cookie parameter mismatch. "
+                      "Session created with {%s}, but current "
+                      "request has {%s}.",
+                      cookie_token_session,
+                      cookie_token_target);
+        am_cache_unlock(r->server, session);
+        return NULL;
+    }
+
+    return session;
+}
+
 /* This function gets the session associated with a user, using a cookie
  *
  * Parameters:
@@ -45,7 +81,7 @@ am_cache_entry_t *am_get_request_session(request_rec *r)
         return NULL;
     }
 
-    return am_cache_lock(r->server, AM_CACHE_SESSION, session_id);
+    return am_lock_and_validate(r, AM_CACHE_SESSION, session_id);
 }
 
 /* This function gets the session associated with a user, using a NameID
@@ -60,7 +96,7 @@ am_cache_entry_t *am_get_request_session(request_rec *r)
  */
 am_cache_entry_t *am_get_request_session_by_nameid(request_rec *r, char *nameid)
 {
-    return am_cache_lock(r->server, AM_CACHE_NAMEID, nameid);
+    return am_lock_and_validate(r, AM_CACHE_NAMEID, nameid);
 }
 
 /* This function creates a new session.
@@ -87,7 +123,8 @@ am_cache_entry_t *am_new_request_session(request_rec *r)
     /* Set session id. */
     am_cookie_set(r, session_id);
 
-    return am_cache_new(r->server, session_id);
+    const char *cookie_token = am_cookie_token(r);
+    return am_cache_new(r->server, session_id, cookie_token);
 }
 
 

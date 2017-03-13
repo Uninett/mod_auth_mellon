@@ -252,3 +252,31 @@ void am_cookie_delete(request_rec *r)
 
     apr_table_addn(r->err_headers_out, "Set-Cookie", cookie);
 }
+
+/* Get string that is used to tie a session to a specific cookie.
+ *
+ *  request_rec *r       The current request.
+ * Returns:
+ *  The cookie token, as a fixed length byte buffer.
+ */
+const char *am_cookie_token(request_rec *r)
+{
+    const char *cookie_name = am_cookie_name(r);
+    const char *cookie_domain = ap_get_server_name(r);
+    const char *cookie_path = "/";
+    am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+
+    if (cfg->cookie_domain) {
+        cookie_domain = cfg->cookie_domain;
+    }
+
+    if (cfg->cookie_path) {
+        cookie_path = cfg->cookie_path;
+    }
+
+    return apr_psprintf(r->pool, "Name='%s' Domain='%s' Path='%s'",
+                        cookie_name,
+                        cookie_domain,
+                        cookie_path
+                        );
+}

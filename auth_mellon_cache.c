@@ -273,12 +273,15 @@ const char *am_cache_entry_get_string(am_cache_entry_t *e,
  * Parameters:
  *  server_rec *s        The current server.
  *  const char *key      The key of the session to allocate.
+ *  const char *cookie_token  The cookie token to tie the session to.
  *
  * Returns:
  *  The new session entry on success. NULL if key is a invalid session
  *  key.
  */
-am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
+am_cache_entry_t *am_cache_new(server_rec *s,
+                               const char *key,
+                               const char *cookie_token)
 {
     am_cache_entry_t *t;
     am_mod_cfg_rec *mod_cfg;
@@ -374,6 +377,7 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
     t->logged_in = 0;
     t->size = 0;
 
+    am_cache_storage_null(&t->cookie_token);
     am_cache_storage_null(&t->user);
     am_cache_storage_null(&t->lasso_identity);
     am_cache_storage_null(&t->lasso_session);
@@ -383,6 +387,18 @@ am_cache_entry_t *am_cache_new(server_rec *s, const char *key)
     t->pool_size = am_cache_entry_pool_size(mod_cfg);
     t->pool[0] = '\0';
     t->pool_used = 1;
+
+    rv = am_cache_entry_store_string(t, &t->cookie_token, cookie_token);
+    if (rv != 0) {
+        /* For some strange reason our cookie token is too big to fit in the
+         * session. This should never happen outside of absurd configurations.
+         */
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                     "Unable to store cookie token in new session.");
+        t->key[0] = '\0'; /* Mark the entry as free. */
+        apr_global_mutex_unlock(mod_cfg->lock);
+        return NULL;
+    }
 
     return t;
 }

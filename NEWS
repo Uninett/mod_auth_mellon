@@ -1,6 +1,30 @@
 Version 0.13.1
 ---------------------------------------------------------------------------
 
+Security fix:
+
+Fix a cross-site session transfer vulnerability. mod_auth_mellon
+version 0.13.0 and older failed to validate that the session specified
+in the user's session cookie was created for the web site the user
+actually accesses.
+
+If two different web sites are hosted on the same web server, and both
+web sites use mod_auth_mellon for authentication, this vulnerability
+makes it possible for an attacker with access to one of the web sites
+to copy their session cookie to the other web site, and then use the
+same session to get access to the other web site.
+
+Thanks to François Kooman for reporting this vulnerability.
+
+This vulnerability has been assigned CVE-2017-6807.
+
+Note: The fix for this vunlerability makes mod_auth_mellon validate
+that the cookie parameters used when creating the session match the
+cookie parameters that should be used when accessing the current
+page. If you currently use mod_auth_mellon across multiple subdomains,
+you must make sure that you set the `MellonCookie`-option to the same
+value on all domains.
+
 Bug fixes:
 
 * Fix segmentation fault if a (trusted) identity provider returns a
