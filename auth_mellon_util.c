@@ -1238,6 +1238,14 @@ int am_save_post(request_rec *r, const char **relay_state)
     apr_size_t written;
     apr_file_t *psf;
 
+    mod_cfg = am_get_mod_cfg(r->server);
+    if (mod_cfg->post_dir == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "MellonPostReplay enabled but MellonPostDirectory not set "
+                      "-- cannot save post data");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
     if (am_postdir_cleanup(r) != OK)
         return HTTP_INTERNAL_SERVER_ERROR;
 
@@ -1263,8 +1271,6 @@ int am_save_post(request_rec *r, const char **relay_state)
 
         charset = am_get_header_attr(r, content_type, NULL, "charset");
     }     
-
-    mod_cfg = am_get_mod_cfg(r->server);
 
     if ((psf_id = am_generate_id(r)) == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "cannot generate id");

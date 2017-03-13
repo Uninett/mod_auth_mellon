@@ -30,6 +30,8 @@ Bug fixes:
 * Fix segmentation fault if a (trusted) identity provider returns a
   SAML 2.0 attribute without a Name.
 
+* Fix segmentation fault if MellonPostReplay is enabled but
+  MellonPostDirectory is not set.
 
 Version 0.13.0
 ---------------------------------------------------------------------------
