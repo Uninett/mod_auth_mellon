@@ -745,6 +745,10 @@ int am_urldecode(char *data)
     if (data == NULL) {
         return HTTP_BAD_REQUEST;
     }
+    
+    if (strlen(data) == 0) {
+        return OK;
+    }
 
     ip = data;
     op = data;
