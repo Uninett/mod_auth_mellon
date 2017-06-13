@@ -39,7 +39,7 @@ am_cache_entry_t *am_lock_and_validate(request_rec *r,
                                        am_cache_key_t type,
                                        const char *key)
 {
-    am_cache_entry_t *session = am_cache_lock(r->server, type, key);
+    am_cache_entry_t *session = am_cache_lock(r, type, key);
     if (session == NULL) {
         return NULL;
     }
@@ -54,7 +54,7 @@ am_cache_entry_t *am_lock_and_validate(request_rec *r,
                       "request has {%s}.",
                       cookie_token_session,
                       cookie_token_target);
-        am_cache_unlock(r->server, session);
+        am_cache_unlock(r, session);
         return NULL;
     }
 
@@ -124,7 +124,7 @@ am_cache_entry_t *am_new_request_session(request_rec *r)
     am_cookie_set(r, session_id);
 
     const char *cookie_token = am_cookie_token(r);
-    return am_cache_new(r->server, session_id, cookie_token);
+    return am_cache_new(r, session_id, cookie_token);
 }
 
 
@@ -140,7 +140,7 @@ am_cache_entry_t *am_new_request_session(request_rec *r)
  */
 void am_release_request_session(request_rec *r, am_cache_entry_t *session)
 {
-    am_cache_unlock(r->server, session);
+    am_cache_unlock(r, session);
 }
 
 
@@ -164,5 +164,5 @@ void am_delete_request_session(request_rec *r, am_cache_entry_t *session)
     }
 
     /* Delete session from the session store. */
-    am_cache_delete(r->server, session);
+    am_cache_delete(r, session);
 }

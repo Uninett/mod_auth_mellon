@@ -70,14 +70,14 @@ void am_cache_init(am_mod_cfg_rec *mod_cfg)
  * after you are done with it.
  *
  * Parameters:
- *  server_rec *s        The current server.
+ *  request_rec *r       The request we are processing.
  *  am_cache_key_t type  AM_CACHE_SESSION or AM_CACHE_NAMEID
  *  const char *key      The session key or user
  *
  * Returns:
  *  The session entry on success or NULL on failure.
  */
-am_cache_entry_t *am_cache_lock(server_rec *s, 
+am_cache_entry_t *am_cache_lock(request_rec *r, 
                                 am_cache_key_t type,
                                 const char *key)
 {
@@ -104,14 +104,14 @@ am_cache_entry_t *am_cache_lock(server_rec *s,
         break;
     }
 
-    mod_cfg = am_get_mod_cfg(s);
+    mod_cfg = am_get_mod_cfg(r->server);
 
 
     /* Lock the table. */
     if((rv = apr_global_mutex_lock(mod_cfg->lock)) != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-                     "apr_global_mutex_lock() failed [%d]: %s",
-                     rv, apr_strerror(rv, buffer, sizeof(buffer)));
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "apr_global_mutex_lock() failed [%d]: %s",
+                      rv, apr_strerror(rv, buffer, sizeof(buffer)));
         return NULL;
     }
 
@@ -271,7 +271,7 @@ const char *am_cache_entry_get_string(am_cache_entry_t *e,
  * Remember to unlock the table with am_cache_unlock(...) afterwards.
  *
  * Parameters:
- *  server_rec *s        The current server.
+ *  request_rec *r       The request we are processing.
  *  const char *key      The key of the session to allocate.
  *  const char *cookie_token  The cookie token to tie the session to.
  *
@@ -279,7 +279,7 @@ const char *am_cache_entry_get_string(am_cache_entry_t *e,
  *  The new session entry on success. NULL if key is a invalid session
  *  key.
  */
-am_cache_entry_t *am_cache_new(server_rec *s,
+am_cache_entry_t *am_cache_new(request_rec *r,
                                const char *key,
                                const char *cookie_token)
 {
@@ -298,14 +298,14 @@ am_cache_entry_t *am_cache_new(server_rec *s,
     }
 
 
-    mod_cfg = am_get_mod_cfg(s);
+    mod_cfg = am_get_mod_cfg(r->server);
 
 
     /* Lock the table. */
     if((rv = apr_global_mutex_lock(mod_cfg->lock)) != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-                     "apr_global_mutex_lock() failed [%d]: %s",
-                     rv, apr_strerror(rv, buffer, sizeof(buffer)));
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "apr_global_mutex_lock() failed [%d]: %s",
+                      rv, apr_strerror(rv, buffer, sizeof(buffer)));
         return NULL;
     }
 
@@ -357,11 +357,11 @@ am_cache_entry_t *am_cache_new(server_rec *s,
         age = (current_time - t->access) / 1000000;
 
         if(age < 3600) {
-            ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, s,
-                         "Dropping LRU entry entry with age = %" APR_TIME_T_FMT
-                         "s, which is less than one hour. It may be a good"
-                         " idea to increase MellonCacheSize.",
-                         age);
+            ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
+                          "Dropping LRU entry entry with age = %" APR_TIME_T_FMT
+                          "s, which is less than one hour. It may be a good"
+                          " idea to increase MellonCacheSize.",
+                          age);
         }
     }
 
@@ -393,8 +393,8 @@ am_cache_entry_t *am_cache_new(server_rec *s,
         /* For some strange reason our cookie token is too big to fit in the
          * session. This should never happen outside of absurd configurations.
          */
-        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-                     "Unable to store cookie token in new session.");
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Unable to store cookie token in new session.");
         t->key[0] = '\0'; /* Mark the entry as free. */
         apr_global_mutex_unlock(mod_cfg->lock);
         return NULL;
@@ -407,20 +407,20 @@ am_cache_entry_t *am_cache_new(server_rec *s,
 /* This function unlocks a session entry.
  *
  * Parameters:
- *  server_rec *s            The current server.
+ *  request_rec *r           The request we are processing.
  *  am_cache_entry_t *entry  The session entry.
  *
  * Returns:
  *  Nothing.
  */
-void am_cache_unlock(server_rec *s, am_cache_entry_t *entry)
+void am_cache_unlock(request_rec *r, am_cache_entry_t *entry)
 {
     am_mod_cfg_rec *mod_cfg;
 
     /* Update access time. */
     entry->access = apr_time_now();
 
-    mod_cfg = am_get_mod_cfg(s);
+    mod_cfg = am_get_mod_cfg(r->server);
     apr_global_mutex_unlock(mod_cfg->lock);
 }
 
@@ -429,13 +429,14 @@ void am_cache_unlock(server_rec *s, am_cache_entry_t *entry)
  * timestamp is earlier than the previous.
  *
  * Parameters:
+ *  request_rec *r        The request we are processing.
  *  am_cache_entry_t *t   The current session.
  *  apr_time_t expires    The new timestamp.
  *
  * Returns:
  *  Nothing.
  */
-void am_cache_update_expires(am_cache_entry_t *t, apr_time_t expires)
+void am_cache_update_expires(request_rec *r, am_cache_entry_t *t, apr_time_t expires)
 {
     /* Check if we should update the expires timestamp. */
     if(t->expires == 0 || t->expires > expires) {
@@ -698,13 +699,13 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
 /* This function deletes a given key from the session store.
  *
  * Parameters:
- *  server_rec *s             The current server.
+ *  request_rec *r            The request we are processing.
  *  am_cache_entry_t *cache   The entry we are deleting.
  *
  * Returns:
  *  Nothing.
  */
-void am_cache_delete(server_rec *s, am_cache_entry_t *cache)
+void am_cache_delete(request_rec *r, am_cache_entry_t *cache)
 {
     /* We write a null-byte at the beginning of the key to
      * mark this slot as unused. 
@@ -712,7 +713,7 @@ void am_cache_delete(server_rec *s, am_cache_entry_t *cache)
     cache->key[0] = '\0';
 
     /* Unlock the entry. */
-    am_cache_unlock(s, cache);
+    am_cache_unlock(r, cache);
 }
 
 

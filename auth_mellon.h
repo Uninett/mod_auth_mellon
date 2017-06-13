@@ -378,23 +378,23 @@ const char *am_cookie_token(request_rec *r);
 
 
 void am_cache_init(am_mod_cfg_rec *mod_cfg);
-am_cache_entry_t *am_cache_lock(server_rec *s, 
+am_cache_entry_t *am_cache_lock(request_rec *r, 
                                 am_cache_key_t type, const char *key);
 const char *am_cache_entry_get_string(am_cache_entry_t *e,
                                       am_cache_storage_t *slot);
-am_cache_entry_t *am_cache_new(server_rec *s,
+am_cache_entry_t *am_cache_new(request_rec *r,
                                const char *key,
                                const char *cookie_token);
-void am_cache_unlock(server_rec *s, am_cache_entry_t *entry);
+void am_cache_unlock(request_rec *r, am_cache_entry_t *entry);
 
-void am_cache_update_expires(am_cache_entry_t *t, apr_time_t expires);
+void am_cache_update_expires(request_rec *r, am_cache_entry_t *t, apr_time_t expires);
 
 void am_cache_env_populate(request_rec *r, am_cache_entry_t *session);
 int am_cache_env_append(am_cache_entry_t *session,
                         const char *var, const char *val);
 const char *am_cache_env_fetch_first(am_cache_entry_t *t,
                                      const char *var);
-void am_cache_delete(server_rec *s, am_cache_entry_t *session);
+void am_cache_delete(request_rec *r, am_cache_entry_t *session);
 
 int am_cache_set_lasso_state(am_cache_entry_t *session,
                              const char *lasso_identity,

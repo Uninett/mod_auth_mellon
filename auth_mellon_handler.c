@@ -1479,7 +1479,7 @@ static void am_handle_session_expire(request_rec *r, am_cache_entry_t *session,
         /* Updates the expires timestamp if this one is earlier than the
          * previous timestamp.
          */
-        am_cache_update_expires(session, t);
+        am_cache_update_expires(r, session, t);
     }
 }
 
@@ -1517,10 +1517,10 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
     /* Set expires to whatever is set by MellonSessionLength. */
     if(dir_cfg->session_length == -1) {
         /* -1 means "use default. The current default is 86400 seconds. */
-        am_cache_update_expires(session, apr_time_now()
+        am_cache_update_expires(r, session, apr_time_now()
                                 + apr_time_make(86400, 0));
     } else {
-        am_cache_update_expires(session, apr_time_now()
+        am_cache_update_expires(r, session, apr_time_now()
                                 + apr_time_make(dir_cfg->session_length, 0));
     }
 
