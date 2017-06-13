@@ -242,6 +242,12 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
         idp_public_key_file = NULL;
 #endif /* ! HAVE_lasso_server_load_metadata */
 
+    if (cfg->idp_metadata->nelts == 0) {
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                          "Error, URI \"%s\" has no IdP's defined", r->uri);
+            return 0;
+    }
+
     for (index = 0; index < cfg->idp_metadata->nelts; index++) {
         const am_metadata_t *idp_metadata;
         int error;
