@@ -85,6 +85,14 @@
 #define AM_ERROR_MISSING_PAOS_MEDIA_TYPE 3
 
 
+#ifdef ENABLE_DIAGNOSTICS
+typedef enum {
+    AM_DIAG_FLAG_ENABLED       = (1 << 0),
+    AM_DIAG_FLAG_DISABLE       = 0,
+    AM_DIAG_FLAG_ENABLE_ALL    = ~0,
+} am_diag_flags_t;
+#endif
+
 /* This is the length of the id we use (for session IDs and
  * replaying POST data).
  */
@@ -100,6 +108,9 @@
 
 #define am_get_req_cfg(r) (am_req_cfg_rec *)ap_get_module_config((r)->request_config, &auth_mellon_module)
 
+#ifdef ENABLE_DIAGNOSTICS
+#define am_get_diag_cfg(s) (&(am_get_srv_cfg((s)))->diag_cfg)
+#endif
 
 typedef struct am_mod_cfg_rec {
     int cache_size;
@@ -124,8 +135,20 @@ typedef struct am_mod_cfg_rec {
 } am_mod_cfg_rec;
 
 
+#ifdef ENABLE_DIAGNOSTICS
+typedef struct am_diag_cfg_rec {
+    const char *filename;
+    apr_file_t *fd;
+    am_diag_flags_t flags;
+    apr_table_t *dir_cfg_emitted;
+} am_diag_cfg_rec;
+#endif
+
 typedef struct am_srv_cfg_rec {
     am_mod_cfg_rec *mc;
+#ifdef ENABLE_DIAGNOSTICS
+    am_diag_cfg_rec diag_cfg;
+#endif
 } am_srv_cfg_rec;
 
 typedef enum {
@@ -284,7 +307,6 @@ typedef struct am_dir_cfg_rec {
 
     /* List of domains we can redirect to. */
     const char * const *redirect_domains;
-
 } am_dir_cfg_rec;
 
 /* Bitmask for PAOS service options */
@@ -301,6 +323,9 @@ typedef struct am_req_cfg_rec {
     bool ecp_authn_req;
     ECPServiceOptions ecp_service_options;
 #endif /* HAVE_ECP */
+#ifdef ENABLE_DIAGNOSTICS
+    bool diag_emitted;
+#endif
 } am_req_cfg_rec;
 
 typedef struct am_cache_storage_t {
@@ -393,6 +418,7 @@ static const int inherit_ecp_send_idplist = -1;
 void *auth_mellon_dir_config(apr_pool_t *p, char *d);
 void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add);
 void *auth_mellon_server_config(apr_pool_t *p, server_rec *s);
+void *auth_mellon_srv_merge(apr_pool_t *p, void *base, void *add);
 
 
 const char *am_cookie_get(request_rec *r);
@@ -502,5 +528,73 @@ int am_httpclient_post_str(request_rec *r, const char *uri,
 
 
 extern module AP_MODULE_DECLARE_DATA auth_mellon_module;
+
+#ifdef ENABLE_DIAGNOSTICS
+
+/* Initializing an apr_time_t to 0x7fffffffffffffffLL yields an
+ * iso 8601 time with 1 second precision of "294247-01-10T04:00:54Z"
+ * this is 22 characters, +1 for null terminator. */
+#define ISO_8601_BUF_SIZE 23
+
+typedef struct {
+    bool req_headers_written;
+} am_diag_request_data;
+
+const char *
+am_diag_cache_key_type_str(am_cache_key_t key_type);
+
+const char *
+am_diag_cond_str(request_rec *r, const am_cond_t *cond);
+
+int
+am_diag_finalize_request(request_rec *r);
+
+const char *
+am_diag_lasso_http_method_str(LassoHttpMethod http_method);
+
+void
+am_diag_log_cache_entry(request_rec *r, int level, am_cache_entry_t *entry,
+                        const char *fmt, ...)
+    __attribute__((format(printf,4,5)));
+
+void
+am_diag_log_file_data(request_rec *r, int level, am_file_data_t *file_data,
+                      const char *fmt, ...)
+    __attribute__((format(printf,4,5)));
+
+int
+am_diag_log_init(apr_pool_t *pc, apr_pool_t *p, apr_pool_t *pt, server_rec *s);
+
+void
+am_diag_log_lasso_node(request_rec *r, int level, LassoNode *node,
+                       const char *fmt, ...)
+    __attribute__((format(printf,4,5)));
+
+void
+am_diag_log_profile(request_rec *r, int level, LassoProfile *profile,
+                    const char *fmt, ...)
+    __attribute__((format(printf,4,5)));
+
+void
+am_diag_printf(request_rec *r, const char *fmt, ...)
+    __attribute__((format(printf,2,3)));
+
+void
+am_diag_rerror(const char *file, int line, int module_index,
+               int level, apr_status_t status,
+               request_rec *r, const char *fmt, ...);
+
+char *
+am_diag_time_t_to_8601(request_rec *r, apr_time_t t);
+
+#else  /* ENABLE_DIAGNOSTICS */
+
+#define am_diag_log_cache_entry(...) do {} while(0)
+#define am_diag_log_file_data(...) do {} while(0)
+#define am_diag_log_lasso_node(...) do {} while(0)
+#define am_diag_log_profile(...) do {} while(0)
+#define am_diag_printf(...) do {} while(0)
+
+#endif /* ENABLE_DIAGNOSTICS */
 
 #endif /* MOD_AUTH_MELLON_H */
