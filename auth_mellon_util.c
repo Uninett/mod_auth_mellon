@@ -370,6 +370,10 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
 
         ce = &((am_cond_t *)(dir_cfg->cond->elts))[i];
 
+        am_diag_printf(r, "%s processing condition %d of %d: %s ",
+                       __func__, i, dir_cfg->cond->nelts,
+                       am_diag_cond_str(r, ce));
+
         /*
          * Rule with ignore flog?
          */
@@ -384,9 +388,11 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
             if (!(ce->flags & AM_COND_FLAG_OR))
                 skip_or = 0;
 
-             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                           "Skip %s, [OR] rule matched previously",
-                           ce->directive);
+            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                          "Skip %s, [OR] rule matched previously",
+                          ce->directive);
+
+            am_diag_printf(r, "Skip, [OR] rule matched previously\n");
             continue;
         }
         
@@ -433,6 +439,8 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
                           "Evaluate %s vs \"%s\"", 
                           ce->directive, value);
+
+            am_diag_printf(r, "evaluate value \"%s\" ", value);
     
             if (value == NULL) {
                  match = 0;          /* can not happen */
@@ -463,10 +471,15 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
             } else {
                  match = !strcmp(ce->str, value);
             }
+
+        am_diag_printf(r, "match=%s, ", match ? "yes" : "no");
         }
 
-        if (ce->flags & AM_COND_FLAG_NOT)
+        if (ce->flags & AM_COND_FLAG_NOT) {
             match = !match;
+
+            am_diag_printf(r, "negating now match=%s ", match ? "yes" : "no");
+        }
 
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
                       "%s: %smatch", ce->directive,
@@ -479,6 +492,9 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
             ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
                           "Client failed to match %s",
                           ce->directive);
+
+            am_diag_printf(r, "failed (no OR condition)"
+                           " returning HTTP_FORBIDDEN\n");
             return HTTP_FORBIDDEN;
         }
 
@@ -488,7 +504,11 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
          */
         if (match && (ce->flags & AM_COND_FLAG_OR))
             skip_or = 1;
+
+        am_diag_printf(r, "\n");
     }
+
+    am_diag_printf(r, "%s succeeds\n", __func__);
 
     return OK;
 }

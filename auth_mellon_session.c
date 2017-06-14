@@ -39,9 +39,18 @@ am_cache_entry_t *am_lock_and_validate(request_rec *r,
                                        am_cache_key_t type,
                                        const char *key)
 {
-    am_cache_entry_t *session = am_cache_lock(r, type, key);
+    am_cache_entry_t *session = NULL;
+
+    am_diag_printf(r, "searching for session with key %s (%s) ... ",
+                   key, am_diag_cache_key_type_str(type));
+
+    session = am_cache_lock(r, type, key);
     if (session == NULL) {
+        am_diag_printf(r, "not found\n");
         return NULL;
+    } else {
+        am_diag_printf(r, "found.\n");
+        am_diag_log_cache_entry(r, 0, session, "Session Cache Entry");
     }
 
     const char *cookie_token_session = am_cache_entry_get_string(
@@ -123,6 +132,10 @@ am_cache_entry_t *am_new_request_session(request_rec *r)
     am_cookie_set(r, session_id);
 
     const char *cookie_token = am_cookie_token(r);
+
+    am_diag_printf(r, "%s id=%s cookie_token=\"%s\"\n",
+                   __func__, session_id, cookie_token);
+
     return am_cache_new(r, session_id, cookie_token);
 }
 
@@ -155,6 +168,8 @@ void am_release_request_session(request_rec *r, am_cache_entry_t *session)
  */
 void am_delete_request_session(request_rec *r, am_cache_entry_t *session)
 {
+    am_diag_log_cache_entry(r, 0, session, "delete session");
+
     /* Delete the cookie. */
     am_cookie_delete(r);
 

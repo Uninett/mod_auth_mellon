@@ -41,6 +41,15 @@ The executable may also be named 'apxs'.
 ])
 fi
 
+AC_ARG_WITH(
+        [diagnostics],
+        [  --with-diagnostics Build with diagnostic support.],
+        [],
+        [with_diagnostics=no])
+
+AS_IF([test "x$with_diagnostics" != xno],
+	MELLON_CFLAGS="$MELLON_CFLAGS -DWITH_DIAGNOSTICS")
+
 # Replace any occurances of @APXS2@ with the value of $APXS2 in the Makefile.
 AC_SUBST(APXS2)
 
@@ -73,6 +82,8 @@ AC_SUBST(OPENSSL_LIBS)
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.12])
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
+
+AC_SUBST(MELLON_CFLAGS)
 
 # Test to see if we can include lasso/utils.h
 # AC_CHECK_HEADER won't work correctly unless we specifiy the include directories

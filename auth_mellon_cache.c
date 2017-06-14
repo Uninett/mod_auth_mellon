@@ -144,10 +144,16 @@ am_cache_entry_t *am_cache_lock(request_rec *r,
             continue;
 
         if(strcmp(tablekey, key) == 0) {
+            apr_time_t now = apr_time_now();
             /* We found the entry. */
-            if(e->expires > apr_time_now()) {
+            if(e->expires > now) {
                 /* And it hasn't expired. */
                 return e;
+            }
+            else {
+                am_diag_log_cache_entry(r, 0, e,
+                                        "found expired session, now %s\n",
+                                        am_diag_time_t_to_8601(r, now));
             }
         }
     }
@@ -342,6 +348,10 @@ am_cache_entry_t *am_cache_new(request_rec *r,
              * Update 't' and exit loop.
              */
             t = e;
+            am_diag_log_cache_entry(r, 0, e,
+                                    "%s ejecting expired sessions, now %s\n",
+                                    __func__,
+                                    am_diag_time_t_to_8601(r, current_time));
             break;
         }
 
@@ -399,6 +409,11 @@ am_cache_entry_t *am_cache_new(request_rec *r,
         apr_global_mutex_unlock(mod_cfg->lock);
         return NULL;
     }
+
+    am_diag_printf(r, "%s created new session, id=%s at %s"
+                   " cookie_token=\"%s\"\n",
+                   __func__, t->key, am_diag_time_t_to_8601(r, current_time),
+                   cookie_token);
 
     return t;
 }

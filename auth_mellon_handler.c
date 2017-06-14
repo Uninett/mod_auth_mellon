@@ -121,6 +121,8 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
     char *cert = "";
     const char *sp_entity_id;
 
+    am_diag_printf(r, "Generating SP metadata\n");
+
     sp_entity_id = cfg->sp_entity_id ? cfg->sp_entity_id : url;
 
     if (cfg->sp_cert_file && cfg->sp_cert_file->contents) {
@@ -250,6 +252,13 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
 #endif /* HAVE_lasso_server_load_metadata */
 
         idp_metadata = &( ((const am_metadata_t*)cfg->idp_metadata->elts) [index] );
+
+        am_diag_log_file_data(r, 0, idp_metadata->metadata,
+                              "Loading IdP Metadata");
+        if (idp_metadata->chain) {
+            am_diag_log_file_data(r, 0, idp_metadata->chain,
+                                  "Loading IdP metadata chain");
+        }
 
 #ifdef HAVE_lasso_server_load_metadata
         error = lasso_server_load_metadata(cfg->server,
@@ -674,6 +683,9 @@ static void am_restore_lasso_profile_state(request_rec *r,
             am_release_request_session(r, am_session);
         }
     }
+    am_diag_log_cache_entry(r, 0, am_session, "%s: Session Cache Entry", __func__);
+
+    am_diag_log_profile(r, 0, profile,  "%s: Restored Profile", __func__);
 }
 
 /* This function handles an IdP initiated logout request.
@@ -692,6 +704,8 @@ static int am_handle_logout_request(request_rec *r,
     gint res = 0, rc = HTTP_OK;
     am_cache_entry_t *session = NULL;
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
+
+    am_diag_printf(r, "enter function %s\n", __func__);
 
     /* Process the logout message. Ignore missing signature. */
     res = lasso_logout_process_request_msg(logout, msg);
@@ -724,6 +738,10 @@ static int am_handle_logout_request(request_rec *r,
         rc = HTTP_BAD_REQUEST;
         goto exit;
     }
+
+    am_diag_printf(r, "%s name id %s\n", __func__,
+                   ((LassoSaml2NameID*)logout->parent.nameIdentifier)->content);
+
     session = am_get_request_session_by_nameid(r,
                     ((LassoSaml2NameID*)logout->parent.nameIdentifier)->content);
     if (session == NULL) {
@@ -733,6 +751,9 @@ static int am_handle_logout_request(request_rec *r,
                       ((LassoSaml2NameID*)logout->parent.nameIdentifier)->content);
 
     }
+
+    am_diag_log_cache_entry(r, 0, session, "%s", __func__);
+
     if (session == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error processing logout request message."
@@ -830,6 +851,9 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
 
     /* Delete the session. */
     session = am_get_request_session(r);
+
+    am_diag_log_cache_entry(r, 0, session, "%s\n", __func__);
+
     if(session != NULL) {
         am_delete_request_session(r, session);
     }
@@ -1482,6 +1506,9 @@ static void am_handle_session_expire(request_rec *r, am_cache_entry_t *session,
         /* Find timestamp. */
         not_on_or_after = authn->SessionNotOnOrAfter;
         if(not_on_or_after == NULL) {
+            am_diag_printf(r, "%s failed to find"
+                           " Assertion.AuthnStatement.SessionNotOnOrAfter\n",
+                           __func__);
             continue;
         }
 
@@ -1491,6 +1518,10 @@ static void am_handle_session_expire(request_rec *r, am_cache_entry_t *session,
         if(t == 0) {
             continue;
         }
+
+        am_diag_printf(r, "%s Assertion.AuthnStatement.SessionNotOnOrAfter:"
+                       " %s\n",
+                       __func__, am_diag_time_t_to_8601(r, t));
 
         /* Updates the expires timestamp if this one is earlier than the
          * previous timestamp.
@@ -1629,6 +1660,10 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
                         g_free(dump);
                 }
                 /* Decode and save the attribute. */
+
+                am_diag_printf(r, "%s name=%s value=%s\n",
+                               __func__, attribute->Name, content);
+
                 ret = am_cache_env_append(session, attribute->Name, content);
                 if(ret != OK) {
                     return ret;
@@ -1724,6 +1759,9 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     am_cache_entry_t *session;
     int rc;
     const char *idp;
+
+    am_diag_log_lasso_node(r, 0, LASSO_PROFILE(login)->response,
+                           "SAMLResponse:");
 
     url = am_reconstruct_url(r);
     chr = strchr(url, '?');
@@ -1867,7 +1905,6 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-
     /* Save the profile state. */
     rc = am_save_lasso_profile_state(r, session, LASSO_PROFILE(login),
                                      saml_response);
@@ -1940,6 +1977,8 @@ static int am_handle_post_reply(request_rec *r)
     char *relay_state;
     am_dir_cfg_rec *dir_cfg = am_get_dir_cfg(r);
     int i, err;
+
+    am_diag_printf(r, "enter function %s\n", __func__);
 
     /* Make sure that this is a POST request. */
     if(r->method_number != M_POST) {
@@ -2050,6 +2089,8 @@ static int am_handle_paos_reply(request_rec *r)
     char *relay_state = NULL;
     int i, err;
 
+    am_diag_printf(r, "enter function %s\n", __func__);
+
     /* Make sure that this is a POST request. */
     if(r->method_number != M_POST) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
@@ -2136,6 +2177,8 @@ static int am_handle_artifact_reply(request_rec *r)
     char *relay_state;
     char *saml_art;
     char *post_data;
+
+    am_diag_printf(r, "enter function %s\n", __func__);
 
     /* Make sure that this is a GET request. */
     if(r->method_number != M_GET && r->method_number != M_POST) {
@@ -2408,6 +2451,8 @@ static int am_handle_repost(request_rec *r)
     const char *(*post_mkform)(request_rec *, const char *);
     int rc;
 
+    am_diag_printf(r, "enter function %s\n", __func__);
+
     if (am_cookie_get(r) == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
                       "Repost query without a session");
@@ -2569,6 +2614,8 @@ static int am_handle_metadata(request_rec *r)
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     LassoServer *server;
     const char *data;
+
+    am_diag_printf(r, "enter function %s\n", __func__);
 
     server = am_get_lasso_server(r);
     if(server == NULL)
@@ -2898,6 +2945,11 @@ static int am_init_authn_request_common(request_rec *r,
 static int am_set_authn_request_content(request_rec *r, LassoLogin *login)
 
 {
+
+    am_diag_log_lasso_node(r, 0, LASSO_PROFILE(login)->request,
+                           "SAML AuthnRequest: http_method=%s",
+                           am_diag_lasso_http_method_str(login->http_method));
+
     switch (login->http_method) {
     case LASSO_HTTP_METHOD_REDIRECT:
         return am_set_authn_request_redirect_content(r, login);
@@ -3112,6 +3164,8 @@ static int am_handle_auth(request_rec *r)
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
     const char *relay_state;
 
+    am_diag_printf(r, "enter function %s\n", __func__);
+
     relay_state = am_reconstruct_url(r);
 
     /* Check if IdP discovery is in use and no IdP was selected yet */
@@ -3150,6 +3204,8 @@ static int am_handle_login(request_rec *r)
     char *return_to;
     int is_passive;
     int ret;
+
+    am_diag_printf(r, "enter function %s\n", __func__);
 
     return_to = am_extract_query_parameter(r->pool, r->args, "ReturnTo");
     if(return_to == NULL) {
@@ -3254,6 +3310,8 @@ static int am_handle_probe_discovery(request_rec *r) {
     char *idp_param;
     char *redirect_url;
     int ret;
+
+    am_diag_printf(r, "enter function %s\n", __func__);
 
     server = am_get_lasso_server(r);
     if(server == NULL) {
@@ -3488,6 +3546,8 @@ static int am_start_auth(request_rec *r)
     const char *idp;
     const char *login_url;
 
+    am_diag_printf(r, "enter function %s\n", __func__);
+
     return_to = am_reconstruct_url(r);
 
     /* If this is a POST request, attempt to save it */
@@ -3539,6 +3599,8 @@ int am_auth_mellon_user(request_rec *r)
 	return DECLINED;
     }
 
+    am_diag_printf(r, "enter function %s\n", __func__);
+
     /* Set defaut Cache-Control headers within this location */
     if (CFG_VALUE(dir, send_cache_control_header)) {
         am_set_cache_control_headers(r);
@@ -3562,6 +3624,9 @@ int am_auth_mellon_user(request_rec *r)
 
         if(session == NULL || !session->logged_in) {
             /* We don't have a valid session. */
+
+            am_diag_printf(r, "%s am_enable_auth, no valid session\n",
+                           __func__);
 
             if(session) {
                 /* Release the session. */
@@ -3613,9 +3678,14 @@ int am_auth_mellon_user(request_rec *r)
 #endif /* HAVE_ECP */
         }
 
+        am_diag_printf(r, "%s am_enable_auth, have valid session\n",
+                       __func__);
+
         /* Verify that the user has access to this resource. */
         return_code = am_check_permissions(r, session);
         if(return_code != OK) {
+            am_diag_printf(r, "%s failed am_check_permissions, status=%d\n",
+                           __func__, return_code);
             am_release_request_session(r, session);
 
             return return_code;
@@ -3643,11 +3713,17 @@ int am_auth_mellon_user(request_rec *r)
            && session->logged_in
            && am_check_permissions(r, session) == OK) {
 
+            am_diag_printf(r, "%s am_enable_info, have valid session\n",
+                           __func__);
+
             /* The user is authenticated and has access to the resource.
              * Now we populate the environment with information about
              * the user.
              */
             am_cache_env_populate(r, session);
+        } else {
+            am_diag_printf(r, "%s am_enable_info, no valid session\n",
+                           __func__);
         }
 
         if(session != NULL) {
@@ -3687,6 +3763,8 @@ int am_check_uid(request_rec *r)
        || dir->enable_mellon == am_enable_default) {
 	return DECLINED;
     }
+
+    am_diag_printf(r, "enter function %s\n", __func__);
 
 #ifdef HAVE_ECP
     am_req_cfg_rec *req_cfg = am_get_req_cfg(r);
@@ -3744,11 +3822,15 @@ int am_check_uid(request_rec *r)
 
     /* If we don't have a session, then we can't authorize the user. */
     if(session == NULL) {
+        am_diag_printf(r, "%s no session, return HTTP_UNAUTHORIZED\n",
+                       __func__);
         return HTTP_UNAUTHORIZED;
     }
 
     /* If the user isn't logged in, then we can't authorize the user. */
     if(!session->logged_in) {
+        am_diag_printf(r, "%s session not logged in,"
+                       " return HTTP_UNAUTHORIZED\n", __func__);
         am_release_request_session(r, session);
         return HTTP_UNAUTHORIZED;
     }
@@ -3756,6 +3838,8 @@ int am_check_uid(request_rec *r)
     /* Verify that the user has access to this resource. */
     return_code = am_check_permissions(r, session);
     if(return_code != OK) {
+        am_diag_printf(r, "%s failed am_check_permissions, status=%d\n",
+                       __func__, return_code);
         am_release_request_session(r, session);
         return return_code;
     }
