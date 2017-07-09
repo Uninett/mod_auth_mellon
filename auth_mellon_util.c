@@ -1823,7 +1823,7 @@ tokenize(apr_pool_t *pool, const char *str, bool ignore_whitespace,
             }
             if (*p != '\"') {
                 *error = apr_psprintf(pool,
-                                      "unterminated string begining at "
+                                      "unterminated string beginning at "
                                       "position %" APR_SIZE_T_FMT " in \"%s\"",
                                       start-str, str);
                 break;

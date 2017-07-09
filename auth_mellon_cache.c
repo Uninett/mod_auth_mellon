@@ -740,7 +740,7 @@ int am_cache_set_lasso_state(am_cache_entry_t *session,
                                          lasso_identity);
     if (status != 0) {
         ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
-                     "Lasso identity is to big for storage. Size of lasso"
+                     "Lasso identity is too big for storage. Size of lasso"
                      " identity is %" APR_SIZE_T_FMT ".",
                      (apr_size_t)strlen(lasso_identity));
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -751,7 +751,7 @@ int am_cache_set_lasso_state(am_cache_entry_t *session,
                                          lasso_session);
     if (status != 0) {
         ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
-                     "Lasso session is to big for storage. Size of lasso"
+                     "Lasso session is too big for storage. Size of lasso"
                      " session is %" APR_SIZE_T_FMT ".",
                      (apr_size_t)strlen(lasso_session));
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -762,8 +762,8 @@ int am_cache_set_lasso_state(am_cache_entry_t *session,
                                          lasso_saml_response);
     if (status != 0) {
         ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
-                     "Lasso SAML response is to big for storage. Size of "
-                     "lasso SAML Reponse is %" APR_SIZE_T_FMT ".",
+                     "Lasso SAML response is too big for storage. Size of "
+                     "lasso SAML Response is %" APR_SIZE_T_FMT ".",
                      (apr_size_t)strlen(lasso_saml_response));
         return HTTP_INTERNAL_SERVER_ERROR;
     }
