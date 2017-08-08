@@ -2329,6 +2329,7 @@ const char *am_post_mkform_urlencoded(request_rec *r, const char *post_data)
     const char *item;
     char *last;
     char *post_form = "";
+    char empty_value[] = "";
 
     for (item = am_xstrtok(r, post_data, "&", &last); item; 
          item = am_xstrtok(r, NULL, "&", &last)) {
@@ -2344,7 +2345,7 @@ const char *am_post_mkform_urlencoded(request_rec *r, const char *post_data)
             continue;
 
         if (value == NULL)
-            value = (char *)"";
+            value = empty_value;
 
         if (am_urldecode(name) != OK) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
