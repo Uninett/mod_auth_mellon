@@ -176,9 +176,8 @@ static const char *am_set_table_string_slot(cmd_parms *cmd,
     return NULL;
 }
 
-/* This function handles configuration directives which set a file
- * slot in the module configuration. If lasso is recent enough, it
- * attempts to read the file immediatly.
+/* This function handles configuration directives which set a file slot
+ * in the module configuration. The file contents are immediately read.
  *
  * Parameters:
  *  cmd_parms *cmd       The command structure for this configuration
@@ -192,12 +191,15 @@ static const char *am_set_table_string_slot(cmd_parms *cmd,
  * Returns:
  *  NULL on success or an error string on failure.
  */
-static const char *am_set_filestring_slot(cmd_parms *cmd,
+static const char *am_set_file_contents_slot(cmd_parms *cmd,
                                           void *struct_ptr,
                                           const char *arg)
 {
-    const char *data;
     const char *path;
+    apr_status_t rv;
+    am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
+    int offset;
+    am_file_data_t **p_file_data, *file_data;
 
     path = ap_server_root_relative(cmd->pool, arg);
     if (!path) {
@@ -205,29 +207,64 @@ static const char *am_set_filestring_slot(cmd_parms *cmd,
                            ": Invalid file path ", arg, NULL);
     }
 
-#ifdef HAVE_lasso_server_new_from_buffers
-    data = am_getfile(cmd->pool, cmd->server, path);
-    if (!data) {
-        return apr_pstrcat(cmd->pool, cmd->cmd->name,
-                           ": Cannot read file ", path, NULL);
+    offset = (int)(long)cmd->info;
+    p_file_data = (am_file_data_t **)((char *)cfg + offset);
+    *p_file_data = am_file_data_new(cmd->pool, path);
+    file_data = *p_file_data;
+    rv = am_file_read(file_data);
+    if (rv != APR_SUCCESS) {
+        return file_data->strerror;
     }
-#else
-    apr_finfo_t finfo;
+
+    return NULL;
+}
+
+/* This function handles configuration directives which set a file
+ * pathname in the module configuration. The file is checked for
+ * existence.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *                       This value isn't used by this function.
+ *  const char *arg      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_file_pathname_slot(cmd_parms *cmd,
+                                             void *struct_ptr,
+                                             const char *arg)
+{
+    const char *path;
     apr_status_t rv;
-    char error[64];
+    am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
+    int offset;
+    am_file_data_t **p_file_data, *file_data;
 
-    rv = apr_stat(&finfo, path, APR_FINFO_SIZE, cmd->pool);
-    if(rv != 0) {
-        apr_strerror(rv, error, sizeof(error));
-        return apr_psprintf(cmd->pool,
-                            "%s - Cannot read file \"%s\" [%d] \"%s\"",
-                            cmd->cmd->name, path, rv, error);
+    path = ap_server_root_relative(cmd->pool, arg);
+    if (!path) {
+        return apr_pstrcat(cmd->pool, cmd->cmd->name,
+                           ": Invalid file_data path ", arg, NULL);
     }
 
-    data = path;
-#endif
+    offset = (int)(long)cmd->info;
+    p_file_data = (am_file_data_t **)((char *)cfg + offset);
+    *p_file_data = am_file_data_new(cmd->pool, path);
+    file_data = *p_file_data;
+    rv = am_file_stat(file_data);
+    if (rv != APR_SUCCESS) {
+        return file_data->strerror;
+    }
+    if (file_data->finfo.filetype != APR_REG) {
+        return apr_psprintf(cmd->pool, "file \"%s\" is not a regular file",
+                            file_data->path);
+    }
 
-    return ap_set_string_slot(cmd, struct_ptr, data);
+    return NULL;
 }
 
 
@@ -305,6 +342,8 @@ static const char *am_set_idp_string_slot(cmd_parms *cmd,
     server_rec *s = cmd->server;
     apr_pool_t *pconf = s->process->pconf;
     am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
+    am_file_data_t *idp_file_data = NULL;
+    am_file_data_t *chain_file_data = NULL;
 
 #ifndef HAVE_lasso_server_load_metadata
     if (chain != NULL)
@@ -313,9 +352,23 @@ static const char *am_set_idp_string_slot(cmd_parms *cmd,
                             "lasso_server_load_metadata()", cmd->cmd->name);
 #endif /* HAVE_lasso_server_load_metadata */
 
+    idp_file_data = am_file_data_new(pconf, metadata);
+    if (am_file_stat(idp_file_data) != APR_SUCCESS) {
+        return idp_file_data->strerror;
+    }
+
+    if (chain) {
+        chain_file_data = am_file_data_new(pconf, chain);
+        if (am_file_stat(chain_file_data) != APR_SUCCESS) {
+            return chain_file_data->strerror;
+        }
+    } else {
+        chain_file_data = NULL;
+    }
+
     am_metadata_t *idp_metadata = apr_array_push(cfg->idp_metadata);
-    idp_metadata->file = apr_pstrdup(pconf, metadata);
-    idp_metadata->chain = apr_pstrdup(pconf, chain);
+    idp_metadata->metadata = idp_file_data;
+    idp_metadata->chain = chain_file_data;
 
     return NULL;
 }
@@ -1230,21 +1283,21 @@ const command_rec auth_mellon_commands[] = {
         ),
     AP_INIT_TAKE1(
         "MellonSPMetadataFile",
-        am_set_filestring_slot,
+        am_set_file_contents_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_metadata_file),
         OR_AUTHCFG,
         "Full path to xml file with metadata for the SP."
         ),
     AP_INIT_TAKE1(
         "MellonSPPrivateKeyFile",
-        am_set_filestring_slot,
+        am_set_file_contents_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_private_key_file),
         OR_AUTHCFG,
         "Full path to pem file with the private key for the SP."
         ),
     AP_INIT_TAKE1(
         "MellonSPCertFile",
-        am_set_filestring_slot,
+        am_set_file_contents_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_cert_file),
         OR_AUTHCFG,
         "Full path to pem file with certificate for the SP."
@@ -1267,14 +1320,14 @@ const command_rec auth_mellon_commands[] = {
         ),
     AP_INIT_TAKE1(
         "MellonIdPPublicKeyFile",
-        ap_set_file_slot,
+        am_set_file_pathname_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, idp_public_key_file),
         OR_AUTHCFG,
         "Full path to pem file with the public key for the IdP."
         ),
     AP_INIT_TAKE1(
         "MellonIdPCAFile",
-        ap_set_file_slot,
+        am_set_file_pathname_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, idp_ca_file),
         OR_AUTHCFG,
         "Full path to pem file with CA chain for the IdP."
@@ -1678,7 +1731,6 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->no_success_error_page = (add_cfg->no_success_error_page != NULL ?
                                      add_cfg->no_success_error_page :
                                      base_cfg->no_success_error_page);
-
 
     new_cfg->sp_metadata_file = (add_cfg->sp_metadata_file ?
                                  add_cfg->sp_metadata_file :

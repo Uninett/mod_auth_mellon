@@ -119,7 +119,6 @@ am_cache_entry_t *am_new_request_session(request_rec *r)
         return NULL;
     }
 
-
     /* Set session id. */
     am_cookie_set(r, session_id);
 

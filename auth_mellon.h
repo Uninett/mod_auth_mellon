@@ -159,6 +159,30 @@ typedef enum {
 
 extern const char *am_cond_options[];
 
+/*
+ * am_file_data_t is used to maintain information about a file:
+ *
+ * * The filesystem pathname
+ * * Stat information about the file (e.g. type, size, times, etc.)
+ * * If and when the file was stat'ed or read
+ * * Error code of failed operation and error string description
+ * * Contents of the file
+ * * Flag indicating if contents were generated instead of being read
+ *   from a file.
+ */
+typedef struct am_file_data_t {
+    apr_pool_t *pool;     /* allocation pool */
+    const char *path;     /* filesystem pathname, NULL for generated file */
+    apr_time_t stat_time; /* when stat was performed, zero indicates never */
+    apr_finfo_t finfo;    /* stat data */
+    char *contents;       /* file contents */
+    apr_time_t read_time; /* when contents was read, zero indicates never */
+    apr_status_t rv;      /* most recent result value */
+    const char *strerror; /* if rv is error then this is error description */
+    bool generated;       /* true if contents generated instead of being
+                             read from path */
+} am_file_data_t;
+
 typedef struct {
     const char *varname;
     int flags;
@@ -168,8 +192,8 @@ typedef struct {
 } am_cond_t;
 
 typedef struct am_metadata {
-    const char *file;    /* Metadata file with one or many IdP */
-    const char *chain;   /* Validating chain */
+    am_file_data_t *metadata; /* Metadata file with one or many IdP */
+    am_file_data_t *chain;    /* Validating chain */
 } am_metadata_t;
 
 typedef struct am_dir_cfg_rec {
@@ -201,12 +225,12 @@ typedef struct am_dir_cfg_rec {
     const char *endpoint_path;
 
     /* Lasso configuration variables. */
-    const char *sp_metadata_file;
-    const char *sp_private_key_file;
-    const char *sp_cert_file;
+    am_file_data_t *sp_metadata_file;
+    am_file_data_t *sp_private_key_file;
+    am_file_data_t *sp_cert_file;
     apr_array_header_t *idp_metadata;
-    const char *idp_public_key_file;
-    const char *idp_ca_file;
+    am_file_data_t *idp_public_key_file;
+    am_file_data_t *idp_ca_file;
     GList *idp_ignore;
 
     /* metadata autogeneration helper */
@@ -424,7 +448,11 @@ char *am_urlencode(apr_pool_t *pool, const char *str);
 int am_urldecode(char *data);
 int am_check_url(request_rec *r, const char *url);
 char *am_generate_id(request_rec *r);
-char *am_getfile(apr_pool_t *conf, server_rec *s, const char *file);
+am_file_data_t *am_file_data_new(apr_pool_t *pool, const char *path);
+am_file_data_t *am_file_data_copy(apr_pool_t *pool,
+                                  am_file_data_t *src_file_data);
+apr_status_t am_file_read(am_file_data_t *file_data);
+apr_status_t am_file_stat(am_file_data_t *file_data);
 char *am_get_endpoint_url(request_rec *r);
 int am_postdir_cleanup(request_rec *s);
 char *am_htmlencode(request_rec *r, const char *str);
