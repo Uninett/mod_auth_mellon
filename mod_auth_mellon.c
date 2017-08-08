@@ -220,7 +220,6 @@ static void register_hooks(apr_pool_t *p)
      * r->handler and decide that it is the only handler for this URL.
      */
     ap_hook_handler(am_handler, NULL, NULL, APR_HOOK_FIRST);
-    return;
 }
 
 

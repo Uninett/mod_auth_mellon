@@ -32,13 +32,6 @@ APLOG_USE_MODULE(auth_mellon);
  * the ECP.rst file.
  */
 
-#ifdef HAVE_lasso_server_new_from_buffers
-#  define SERVER_NEW lasso_server_new_from_buffers
-#else /* HAVE_lasso_server_new_from_buffers */
-#  define SERVER_NEW lasso_server_new
-#endif /* HAVE_lasso_server_new_from_buffers */
-
-
 
 #ifdef HAVE_lasso_server_new_from_buffers
 /* This function generates optional metadata for a given element
@@ -130,7 +123,7 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
 
     sp_entity_id = cfg->sp_entity_id ? cfg->sp_entity_id : url;
 
-    if (cfg->sp_cert_file) {
+    if (cfg->sp_cert_file && cfg->sp_cert_file->contents) {
 	char *sp_cert_file;
         char *cp;
         char *bp;
@@ -141,7 +134,7 @@ static char *am_generate_metadata(apr_pool_t *p, request_rec *r)
          * Try to remove leading and trailing garbage, as it can
          * wreak havoc XML parser if it contains [<>&]
          */
-	sp_cert_file = apr_pstrdup(p, cfg->sp_cert_file);
+	sp_cert_file = apr_pstrdup(p, cfg->sp_cert_file->contents);
 
         cp = strstr(sp_cert_file, begin);
         if (cp != NULL) 
@@ -237,7 +230,8 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
     const char *idp_public_key_file;
 
     if (cfg->idp_metadata->nelts == 1)
-        idp_public_key_file = cfg->idp_public_key_file;
+        idp_public_key_file = cfg->idp_public_key_file ?
+            cfg->idp_public_key_file->path : NULL;
     else
         idp_public_key_file = NULL;
 #endif /* ! HAVE_lasso_server_load_metadata */
@@ -260,8 +254,9 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
 #ifdef HAVE_lasso_server_load_metadata
         error = lasso_server_load_metadata(cfg->server,
                                            LASSO_PROVIDER_ROLE_IDP,
-                                           idp_metadata->file,
-                                           idp_metadata->chain,
+                                           idp_metadata->metadata->path,
+                                           idp_metadata->chain ?
+                                           idp_metadata->chain->path : NULL,
                                            cfg->idp_ignore,
                                            &loaded_idp,
                                            LASSO_SERVER_LOAD_METADATA_FLAG_DEFAULT);
@@ -271,7 +266,7 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
             for (idx = loaded_idp; idx != NULL; idx = idx->next) {
                  ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
                                "loaded IdP \"%s\" from \"%s\".",
-                               (char *)idx->data, idp_metadata->file);
+                               (char *)idx->data, idp_metadata->metadata->path);
             }
         }
 
@@ -285,16 +280,17 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
 #else /* HAVE_lasso_server_load_metadata */
         error = lasso_server_add_provider(cfg->server,
                                           LASSO_PROVIDER_ROLE_IDP,
-                                          idp_metadata->file,
+                                          idp_metadata->metadata->path,
                                           idp_public_key_file,
-                                          cfg->idp_ca_file);
+                                          cfg->idp_ca_file ?
+                                          cfg->idp_ca_file->path : NULL);
 #endif /* HAVE_lasso_server_load_metadata */
 
         if (error != 0) {
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "Error adding metadata \"%s\" to "
                           "lasso server objects. Lasso error: [%i] %s",
-                          idp_metadata->file, error, lasso_strerror(error));
+                          idp_metadata->metadata->path, error, lasso_strerror(error));
         }
     }
 
@@ -317,7 +313,10 @@ static LassoServer *am_get_lasso_server(request_rec *r)
              * Try to generate missing metadata
              */
             apr_pool_t *pool = r->server->process->pconf;
-            cfg->sp_metadata_file = am_generate_metadata(pool, r);
+            cfg->sp_metadata_file = am_file_data_new(pool, NULL);
+            cfg->sp_metadata_file->rv = APR_SUCCESS;
+            cfg->sp_metadata_file->generated = true;
+            cfg->sp_metadata_file->contents = am_generate_metadata(pool, r);
 #else
             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
                           "Missing MellonSPMetadataFile option.");
@@ -326,11 +325,22 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 #endif /* HAVE_lasso_server_new_from_buffers */
         }
 
-        cfg->server = SERVER_NEW(cfg->sp_metadata_file,
-                                 cfg->sp_private_key_file,
-                                 NULL,
-                                 cfg->sp_cert_file);
-        if(cfg->server == NULL) {
+#ifdef HAVE_lasso_server_new_from_buffers
+        cfg->server = lasso_server_new_from_buffers(cfg->sp_metadata_file->contents,
+                                                    cfg->sp_private_key_file ?
+                                                    cfg->sp_private_key_file->contents : NULL,
+                                                    NULL,
+                                                    cfg->sp_cert_file ?
+                                                    cfg->sp_cert_file->contents : NULL);
+#else
+        cfg->server = lasso_server_new(cfg->sp_metadata_file->path,
+                                       cfg->sp_private_key_file ?
+                                       cfg->sp_private_key_file->path : NULL,
+                                       NULL,
+                                       cfg->sp_cert_file ?
+                                       cfg->sp_cert_file->path : NULL);
+#endif
+        if (cfg->server == NULL) {
 	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
 			  "Error initializing lasso server object. Please"
 			  " verify the following configuration directives:"
@@ -2390,8 +2400,8 @@ static int am_handle_repost(request_rec *r)
     char *charset;
     char *psf_id;
     char *cp;
-    char *psf_filename;
-    char *post_data;
+    am_file_data_t *file_data;
+    const char *post_data;
     const char *post_form;
     char *output;
     char *return_url;
@@ -2486,14 +2496,24 @@ static int am_handle_repost(request_rec *r)
         return rc;
     }
 
-    psf_filename = apr_psprintf(r->pool, "%s/%s", mod_cfg->post_dir, psf_id);
-    post_data = am_getfile(r->pool, r->server, psf_filename);
-    if (post_data == NULL) {
-        /* Unable to load repost data. Just redirect us instead. */
+    if ((file_data = am_file_data_new(r->pool, NULL)) == NULL) {
         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                      "Bad repost query: cannot find \"%s\"", psf_filename);
+                      "Bad repost query: cannot allocate file_data");
         apr_table_setn(r->headers_out, "Location", return_url);
         return HTTP_SEE_OTHER;
+    }
+
+    file_data->path = apr_psprintf(file_data->pool, "%s/%s",
+                                   mod_cfg->post_dir, psf_id);
+    rc = am_file_read(file_data);
+    if (rc != APR_SUCCESS) {
+        /* Unable to load repost data. Just redirect us instead. */
+        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                      "Bad repost query: %s", file_data->strerror);
+        apr_table_setn(r->headers_out, "Location", return_url);
+        return HTTP_SEE_OTHER;
+    } else {
+        post_data = file_data->contents;
     }
 
     if ((post_form = (*post_mkform)(r, post_data)) == NULL) {
@@ -2556,7 +2576,7 @@ static int am_handle_metadata(request_rec *r)
 
     cfg = cfg->inherit_server_from;
 
-    data = cfg->sp_metadata_file;
+    data = cfg->sp_metadata_file ? cfg->sp_metadata_file->contents : NULL;
     if (data == NULL)
         return HTTP_INTERNAL_SERVER_ERROR;
 

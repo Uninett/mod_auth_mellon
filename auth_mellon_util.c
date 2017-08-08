@@ -1022,57 +1022,179 @@ const char *am_filepath_dirname(apr_pool_t *p, const char *path)
 }
 
 /*
- * malloc a buffer and fill it with a given file
+ * Allocate and initialize a am_file_data_t
  *
  * Parameters:
- *   apr_pool_t *conf   The configuration pool. Valid as long as this
- *   server_rec *s      The server record for the current server.
- *   const char *file   The file path
+ *   apr_pool_t *pool  Allocation pool.
+ *   const char *path  If non-NULL initialize file_data->path to copy of path
  *
  * Returns:
- *   char *             The file content
+ *   Newly allocated & initialized file_data_t
  */
-char *am_getfile(apr_pool_t *conf, server_rec *s, const char *file)
+am_file_data_t *am_file_data_new(apr_pool_t *pool, const char *path)
 {
-    apr_status_t rv;
+    am_file_data_t *file_data = NULL;
+
+    if ((file_data = apr_pcalloc(pool, sizeof(am_file_data_t))) == NULL) {
+        return NULL;
+    }
+
+    file_data->pool = pool;
+    file_data->rv = APR_EINIT;
+    if (path) {
+        file_data->path = apr_pstrdup(file_data->pool, path);
+    }
+
+    return file_data;
+}
+
+/*
+ * Allocate a new am_file_data_t and copy
+ *
+ * Parameters:
+ *   apr_pool_t *pool              Allocation pool.
+ *   am_file_data_t *src_file_data The src being copied.
+ *
+ * Returns:
+ *   Newly allocated & initialized from src_file_data
+ */
+am_file_data_t *am_file_data_copy(apr_pool_t *pool,
+                                  am_file_data_t *src_file_data)
+{
+    am_file_data_t *dst_file_data = NULL;
+
+    if ((dst_file_data = am_file_data_new(pool, src_file_data->path)) == NULL) {
+        return NULL;
+    }
+
+    dst_file_data->path = apr_pstrdup(pool, src_file_data->path);
+    dst_file_data->stat_time = src_file_data->stat_time;
+    dst_file_data->finfo = src_file_data->finfo;
+    dst_file_data->contents = apr_pstrdup(pool, src_file_data->contents);
+    dst_file_data->read_time = src_file_data->read_time;
+    dst_file_data->rv = src_file_data->rv;
+    dst_file_data->strerror = apr_pstrdup(pool, src_file_data->strerror);
+    dst_file_data->generated = src_file_data->generated;
+
+    return dst_file_data;
+}
+
+/*
+ * Peform a stat on a file to get it's properties
+ *
+ * A stat is performed on the file. If there was an error the
+ * result value is left in file_data->rv and an error description
+ * string is formatted and left in file_data->strerror and function
+ * returns the rv value. If the stat was successful the stat
+ * information is left in file_data->finfo and APR_SUCCESS
+ * set set as file_data->rv and returned as the function result.
+ * 
+ * The file_data->stat_time indicates if and when the stat was
+ * performed, a zero time value indicates the operation has not yet
+ * been performed.
+ *
+ * Parameters:
+ *   am_file_data_t *file_data   Struct containing file information
+ *
+ * Returns:
+ *   APR status code, same value as file_data->rv
+ */
+apr_status_t am_file_stat(am_file_data_t *file_data)
+{
     char buffer[512];
-    apr_finfo_t finfo;
-    char *data;
+
+    if (file_data == NULL) {
+        return APR_EINVAL;
+    }
+
+    file_data->strerror = NULL;
+
+    file_data->stat_time = apr_time_now();
+    file_data->rv = apr_stat(&file_data->finfo, file_data->path,
+                             APR_FINFO_SIZE, file_data->pool);
+    if (file_data->rv != APR_SUCCESS) {
+        file_data->strerror =
+            apr_psprintf(file_data->pool,
+                         "apr_stat: Error opening \"%s\" [%d] \"%s\"",
+                         file_data->path, file_data->rv,
+                         apr_strerror(file_data->rv, buffer, sizeof(buffer)));
+    }
+
+    return file_data->rv;
+}
+
+/*
+ * Read file into dynamically allocated buffer
+ *
+ * First a stat is performed on the file. If there was an error the
+ * result value is left in file_data->rv and an error description
+ * string is formatted and left in file_data->strerror and function
+ * returns the rv value. If the stat was successful the stat
+ * information is left in file_data->finfo.
+ *
+ * A buffer is dynamically allocated and the contents of the file is
+ * read into file_data->contents. If there was an error the result
+ * value is left in file_data->rv and an error description string is
+ * formatted and left in file_data->strerror and the function returns
+ * the rv value.
+ *
+ * The file_data->stat_time and file_data->read_time indicate if and
+ * when those operations were performed, a zero time value indicates
+ * the operation has not yet been performed.
+ *
+ * Parameters:
+ *   am_file_data_t *file_data   Struct containing file information
+ *
+ * Returns:
+ *   APR status code, same value as file_data->rv
+ */
+apr_status_t am_file_read(am_file_data_t *file_data)
+{
+    char buffer[512];
     apr_file_t *fd;
     apr_size_t nbytes;
 
-    if (file == NULL)
-        return NULL;
+    if (file_data == NULL) {
+        return APR_EINVAL;
+    }
+    file_data->rv = APR_SUCCESS;
+    file_data->strerror = NULL;
 
-    if ((rv = apr_file_open(&fd, file, APR_READ, 0, conf)) != 0) {
-        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
-                     "apr_file_open: Error opening \"%s\" [%d] \"%s\"",
-                     file, rv, apr_strerror(rv, buffer, sizeof(buffer)));
-        return NULL;
+    am_file_stat(file_data);
+    if (file_data->rv != APR_SUCCESS) {
+        return file_data->rv;
     }
 
-    if ((rv = apr_file_info_get(&finfo, APR_FINFO_SIZE, fd)) != 0) {
-        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
-                     "apr_file_info_get: Error opening \"%s\" [%d] \"%s\"",
-                     file, rv, apr_strerror(rv, buffer, sizeof(buffer)));
+    if ((file_data->rv = apr_file_open(&fd, file_data->path,
+                                       APR_READ, 0, file_data->pool)) != 0) {
+        file_data->strerror =
+            apr_psprintf(file_data->pool,
+                         "apr_file_open: Error opening \"%s\" [%d] \"%s\"",
+                         file_data->path, file_data->rv,
+                         apr_strerror(file_data->rv, buffer, sizeof(buffer)));
+        return file_data->rv;
+    }
+
+    file_data->read_time = apr_time_now();
+    nbytes = file_data->finfo.size;
+    file_data->contents = (char *)apr_palloc(file_data->pool, nbytes + 1);
+
+    file_data->rv = apr_file_read_full(fd, file_data->contents, nbytes, NULL);
+    if (file_data->rv != 0) {
+        file_data->strerror =
+            apr_psprintf(file_data->pool,
+                         "apr_file_read_full: Error reading \"%s\" [%d] \"%s\"",
+                         file_data->path, file_data->rv,
+                         apr_strerror(file_data->rv, buffer, sizeof(buffer)));
         (void)apr_file_close(fd);
-        return NULL;
-    }
+        return file_data->rv;
 
-    nbytes = finfo.size;
-    data = (char *)apr_palloc(conf, nbytes + 1);
-
-    rv = apr_file_read_full(fd, data, nbytes, NULL);
-    if (rv != 0) {
-        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
-                     "apr_file_read_full: Error reading \"%s\" [%d] \"%s\"",
-                     file, rv, apr_strerror(rv, buffer, sizeof(buffer)));
     }
-    data[nbytes] = '\0';
+    file_data->contents[nbytes] = '\0';
 
     (void)apr_file_close(fd);
 
-    return data;
+    return file_data->rv;
 }
 
 /*
