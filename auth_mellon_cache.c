@@ -552,7 +552,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
     if (am_cache_entry_slot_is_empty(&t->user)) {
         for(i = 0; i < t->size; ++i) {
             varname = am_cache_entry_get_string(t, &t->env[i].varname);
-            if (strcmp(varname, d->userattr) == 0) {
+            if (strcasecmp(varname, d->userattr) == 0) {
                 value = am_cache_entry_get_string(t, &t->env[i].value);
                 status = am_cache_entry_store_string(t, &t->user, value);
                 if (status != 0) {
@@ -592,7 +592,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
          * If we find a variable remapping to MellonUser, use it.
          */
         if (am_cache_entry_slot_is_empty(&t->user) &&
-            (strcmp(varname, d->userattr) == 0)) {
+            (strcasecmp(varname, d->userattr) == 0)) {
             status = am_cache_entry_store_string(t, &t->user, value);
             if (status != 0) {
                 ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
