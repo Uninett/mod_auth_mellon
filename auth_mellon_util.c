@@ -73,7 +73,7 @@ static const char *am_request_hostname(request_rec *r)
 
     ret = apr_uri_parse(r->pool, url, &uri);
     if (ret != APR_SUCCESS) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to parse request URL: %s", url);
         return NULL;
     }
@@ -82,7 +82,7 @@ static const char *am_request_hostname(request_rec *r)
         /* This shouldn't happen, since the request URL is built with a hostname,
          * but log a message to make any debuggin around this code easier.
          */
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "No hostname in request URL: %s", url);
         return NULL;
     }
@@ -109,7 +109,7 @@ int am_validate_redirect_url(request_rec *r, const char *url)
 
     ret = apr_uri_parse(r->pool, url, &uri);
     if (ret != APR_SUCCESS) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Invalid redirect URL: %s", url);
         return HTTP_BAD_REQUEST;
     }
@@ -118,7 +118,7 @@ int am_validate_redirect_url(request_rec *r, const char *url)
     if (uri.scheme) {
         if (strcasecmp(uri.scheme, "http")
             && strcasecmp(uri.scheme, "https")) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Only http or https scheme allowed in redirect URL: %s (%s)",
                           url, uri.scheme);
             return HTTP_BAD_REQUEST;
@@ -141,7 +141,7 @@ int am_validate_redirect_url(request_rec *r, const char *url)
             return OK;
         }
     }
-    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+    AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                   "Untrusted hostname (%s) in redirect URL: %s",
                   uri.hostname, url);
     return HTTP_BAD_REQUEST;
@@ -334,7 +334,7 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
  
         c->regex = ap_pregcomp(r->pool, outstr, regex_flags);
         if (c->regex == NULL) {
-             ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+             AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                            "Invalid regular expression \"%s\"", outstr);
              return ce;
         }
@@ -586,7 +586,7 @@ int am_read_post_data(request_rec *r, char **data, apr_size_t *length)
     }
 
     if (len >= 1024*1024) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Too large POST data payload (%lu bytes).",
                       (unsigned long)len);
         return HTTP_BAD_REQUEST;
@@ -599,7 +599,7 @@ int am_read_post_data(request_rec *r, char **data, apr_size_t *length)
 
     *data = (char *)apr_palloc(r->pool, len + 1);
     if (*data == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to allocate memory for %lu bytes of POST data.",
                       (unsigned long)len);
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -627,7 +627,7 @@ int am_read_post_data(request_rec *r, char **data, apr_size_t *length)
             break;
         }
         else if (read_length < 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Failed to read POST data from client.");
             return HTTP_INTERNAL_SERVER_ERROR;
         }
@@ -911,7 +911,7 @@ int am_check_url(request_rec *r, const char *url)
     for (i = url; *i; i++) {
         if (*i >= 0 && *i < ' ') {
             /* Deny all control-characters. */
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, HTTP_BAD_REQUEST, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, HTTP_BAD_REQUEST, r,
                           "Control character detected in URL.");
             return HTTP_BAD_REQUEST;
         }
@@ -938,7 +938,7 @@ int am_generate_random_bytes(request_rec *r, void *dest, apr_size_t count)
     int rc;
     rc = RAND_bytes((unsigned char *)dest, (int)count);
     if(rc != 1) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error generating random data: %lu",
                       ERR_get_error());
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -1247,7 +1247,7 @@ int am_postdir_cleanup(request_rec *r)
      */
     rv = apr_dir_open(&postdir, mod_cfg->post_dir, r->pool);
     if (rv != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Unable to open MellonPostDirectory \"%s\": %s",
                       mod_cfg->post_dir,
                       apr_strerror(rv, error_buffer, sizeof(error_buffer)));
@@ -1278,7 +1278,7 @@ int am_postdir_cleanup(request_rec *r)
     (void)apr_dir_close(postdir);
 
     if (count >= mod_cfg->post_count) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Too many saved POST sessions. "
                       "Increase MellonPostCount directive.");
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -1382,7 +1382,7 @@ int am_save_post(request_rec *r, const char **relay_state)
 
     mod_cfg = am_get_mod_cfg(r->server);
     if (mod_cfg->post_dir == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "MellonPostReplay enabled but MellonPostDirectory not set "
                       "-- cannot save post data");
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -1406,7 +1406,7 @@ int am_save_post(request_rec *r, const char **relay_state)
             content_type = "multipart";
 
         } else {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Unknown POST Content-Type \"%s\"", content_type);
             return HTTP_INTERNAL_SERVER_ERROR;
         }
@@ -1415,7 +1415,7 @@ int am_save_post(request_rec *r, const char **relay_state)
     }     
 
     if ((psf_id = am_generate_id(r)) == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "cannot generate id");
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r, "cannot generate id");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
@@ -1425,19 +1425,19 @@ int am_save_post(request_rec *r, const char **relay_state)
                       APR_WRITE|APR_CREATE|APR_BINARY, 
                       APR_FPROT_UREAD|APR_FPROT_UWRITE,
                       r->pool) != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "cannot create POST session file");
         return HTTP_INTERNAL_SERVER_ERROR;
     } 
 
     if (am_read_post_data(r, &post_data, &post_data_len) != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "cannot read POST data");
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r, "cannot read POST data");
         (void)apr_file_close(psf);
         return HTTP_INTERNAL_SERVER_ERROR;
     } 
 
     if (post_data_len > mod_cfg->post_size) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "POST data size %" APR_SIZE_T_FMT 
                       " exceeds maximum %" APR_SIZE_T_FMT ". "
                       "Increase MellonPostSize directive.",
@@ -1449,14 +1449,14 @@ int am_save_post(request_rec *r, const char **relay_state)
     written = post_data_len;
     if ((apr_file_write(psf, post_data, &written) != OK) ||
         (written != post_data_len)) { 
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "cannot write to POST session file");
             (void)apr_file_close(psf);
             return HTTP_INTERNAL_SERVER_ERROR;
     } 
     
     if (apr_file_close(psf) != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "cannot close POST session file");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -1722,7 +1722,7 @@ const char *am_get_mime_body(request_rec *r, const char *mime)
     apr_size_t body_len;
 
     if ((body = strstr(mime, lflf)) == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "No MIME body");
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r, "No MIME body");
         return NULL;
     }
 
@@ -1757,7 +1757,7 @@ am_get_service_url(request_rec *r, LassoProfile *profile, char *service_name)
     provider = lasso_server_get_provider(profile->server, 
                                          profile->remote_providerID);
     if (LASSO_IS_PROVIDER(provider) == FALSE) {
-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                       "Cannot find provider service %s, no provider.",
                       service_name);
 	return NULL;
@@ -1765,7 +1765,7 @@ am_get_service_url(request_rec *r, LassoProfile *profile, char *service_name)
 
     url = lasso_provider_get_metadata_one(provider, service_name);
     if (url == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                       "Cannot find provider service %s from metadata.",
                       service_name);
 	return NULL;
@@ -1821,7 +1821,7 @@ static void dump_tokens(request_rec *r, apr_array_header_t *tokens)
     
     for (i = 0; i < tokens->nelts; i++) {
         Token token = APR_ARRAY_IDX(tokens, i, Token);
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                       "token[%2zd] %s \"%s\" offset=%lu len=%lu ", i,
                       token_type_str(token.type), token.str,
                       token.offset, token.len);
@@ -2126,7 +2126,7 @@ bool am_parse_paos_header(request_rec *r, const char *header,
     apr_size_t i;
     char *error;
 
-    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+    AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                   "PAOS header: \"%s\"", header);
 
     tokens = tokenize(r->pool, header, true, &error);
@@ -2136,7 +2136,7 @@ bool am_parse_paos_header(request_rec *r, const char *header,
 #endif
 
     if (error) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "%s", error);
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r, "%s", error);
         goto cleanup;
     }
 
@@ -2144,7 +2144,7 @@ bool am_parse_paos_header(request_rec *r, const char *header,
     if (!is_token(tokens, 0, TOKEN_IDENTIFIER, "ver") ||
         !is_token(tokens, 1, TOKEN_EQUAL, NULL) ||
         !is_token(tokens, 2, TOKEN_DBL_QUOTE_STRING, LASSO_PAOS_HREF)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "invalid PAOS header, "
                       "expected header to begin with ver=\"%s\", "
                       "actual header=\"%s\"",
@@ -2154,7 +2154,7 @@ bool am_parse_paos_header(request_rec *r, const char *header,
 
     /* Next is the service value, separated from the version by a semicolon */
     if (!is_token(tokens, 3, TOKEN_SEMICOLON, NULL)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                      "invalid PAOS header, "
                      "expected semicolon after PAOS version "
                      "but found %s in header=\"%s\"",
@@ -2164,7 +2164,7 @@ bool am_parse_paos_header(request_rec *r, const char *header,
     }
 
     if (!is_token(tokens, 4, TOKEN_DBL_QUOTE_STRING, LASSO_ECP_HREF)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "invalid PAOS header, "
                       "expected service token to be \"%s\", "
                       "but found %s in header=\"%s\"",
@@ -2184,7 +2184,7 @@ bool am_parse_paos_header(request_rec *r, const char *header,
     /* More tokens after the service value, must be options, iterate over them */
     for (i = 5; i < tokens->nelts; i++) {
         if (!is_token(tokens, i, TOKEN_COMMA, NULL)) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "invalid PAOS header, "
                           "expected comma after PAOS service "
                           "but found %s in header=\"%s\"",
@@ -2194,7 +2194,7 @@ bool am_parse_paos_header(request_rec *r, const char *header,
         }
 
         if (++i > tokens->nelts) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "invalid PAOS header, "
                           "expected option after comma "
                           "in header=\"%s\"",
@@ -2205,7 +2205,7 @@ bool am_parse_paos_header(request_rec *r, const char *header,
         Token token = APR_ARRAY_IDX(tokens, i, Token);
 
         if (token.type != TOKEN_DBL_QUOTE_STRING) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "invalid PAOS header, "
                           "expected quoted string after comma "
                           "but found %s in header=\"%s\"",
@@ -2226,7 +2226,7 @@ bool am_parse_paos_header(request_rec *r, const char *header,
         } else if (g_str_equal(value, LASSO_SAML2_CONDITIONS_DELEGATION)) {
             options |= ECP_SERVICE_OPTION_DELEGATION;
         } else {
-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                           "Unknown PAOS service option = \"%s\"",
                           value);
             goto cleanup;
@@ -2268,7 +2268,7 @@ bool am_header_has_media_type(request_rec *r, const char *header, const char *me
     char *media_range = NULL;
 
     if (header == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                      "invalid Accept header, NULL");
         goto cleanup;
     }
@@ -2366,7 +2366,7 @@ int am_get_boolean_query_parameter(request_rec *r, const char *name,
     if (value_str != NULL) {
         ret = am_urldecode(value_str);
         if (ret != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Error urldecoding \"%s\" boolean query parameter, "
                           "value=\"%s\"", name, value_str);
             return ret;
@@ -2376,7 +2376,7 @@ int am_get_boolean_query_parameter(request_rec *r, const char *name,
         } else if(!strcmp(value_str, "false")) {
             *return_value = FALSE;
         } else {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Invalid value for \"%s\" boolean query parameter, "
                           "value=\"%s\"", name, value_str);
             ret = HTTP_BAD_REQUEST;
@@ -2596,7 +2596,7 @@ bool am_is_paos_request(request_rec *r, int *error_code)
         if (valid_paos_header) {
             is_paos = true;
         } else {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "request supplied PAOS media type in Accept header "
                           "but omitted valid PAOS header");
             if (*error_code == 0)
@@ -2604,14 +2604,14 @@ bool am_is_paos_request(request_rec *r, int *error_code)
         }
     } else {
         if (valid_paos_header) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "request supplied valid PAOS header "
                           "but omitted PAOS media type in Accept header");
             if (*error_code == 0)
                 *error_code = AM_ERROR_MISSING_PAOS_MEDIA_TYPE;
         }
     }
-    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+    AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                   "have_paos_media_type=%s valid_paos_header=%s is_paos=%s "
                   "error_code=%d ecp options=[%s]",
                   have_paos_media_type ? "True" : "False",

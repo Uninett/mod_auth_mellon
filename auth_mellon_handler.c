@@ -239,7 +239,7 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
 #endif /* ! HAVE_lasso_server_load_metadata */
 
     if (cfg->idp_metadata->nelts == 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Error, URI \"%s\" has no IdP's defined", r->uri);
             return 0;
     }
@@ -273,7 +273,7 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
             GList *idx;
 
             for (idx = loaded_idp; idx != NULL; idx = idx->next) {
-                 ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                 AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                                "loaded IdP \"%s\" from \"%s\".",
                                (char *)idx->data, idp_metadata->metadata->path);
             }
@@ -296,7 +296,7 @@ static guint am_server_add_providers(am_dir_cfg_rec *cfg, request_rec *r)
 #endif /* HAVE_lasso_server_load_metadata */
 
         if (error != 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Error adding metadata \"%s\" to "
                           "lasso server objects. Lasso error: [%i] %s",
                           idp_metadata->metadata->path, error, lasso_strerror(error));
@@ -327,7 +327,7 @@ static LassoServer *am_get_lasso_server(request_rec *r)
             cfg->sp_metadata_file->generated = true;
             cfg->sp_metadata_file->contents = am_generate_metadata(pool, r);
 #else
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Missing MellonSPMetadataFile option.");
             apr_thread_mutex_unlock(cfg->server_mutex);
             return NULL;
@@ -350,7 +350,7 @@ static LassoServer *am_get_lasso_server(request_rec *r)
                                        cfg->sp_cert_file->path : NULL);
 #endif
         if (cfg->server == NULL) {
-	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+	    AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
 			  "Error initializing lasso server object. Please"
 			  " verify the following configuration directives:"
 			  " MellonSPMetadataFile and MellonSPPrivateKeyFile.");
@@ -360,7 +360,7 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 	}
 
         if (am_server_add_providers(cfg, r) == 0) {
-	    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+	    AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
 			  "Error adding IdP to lasso server object. Please"
 			  " verify the following configuration directives:"
 			  " MellonIdPMetadataFile and"
@@ -409,7 +409,7 @@ static int am_start_disco(request_rec *r, const char *return_to)
     login_url = apr_psprintf(r->pool, "%slogin?ReturnTo=%s",
                              endpoint,
                              am_urlencode(r->pool, return_to));
-    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+    AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                   "login_url = %s", login_url);
 
     /* If discovery URL already has a ? we append a & */
@@ -421,7 +421,7 @@ static int am_start_disco(request_rec *r, const char *return_to)
                                  am_urlencode(r->pool, sp_entity_id),
                                  am_urlencode(r->pool, login_url));
 
-    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+    AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                   "discovery_url = %s", discovery_url);
     apr_table_setn(r->headers_out, "Location", discovery_url);
     return HTTP_SEE_OTHER;
@@ -490,7 +490,7 @@ static const char *am_get_idp(request_rec *r)
 
         rc = am_urldecode((char *)idp_provider_id);
         if (rc != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                           "Could not urldecode IdP discovery value.");
             idp_provider_id = NULL;
         } else {
@@ -502,7 +502,7 @@ static const char *am_get_idp(request_rec *r)
          * If we do not know about it, fall back to default.
          */
         if (idp_provider_id == NULL) {
-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                           "IdP discovery returned unknown or inexistant IdP");
             idp_provider_id = am_first_idp(r);
         }
@@ -544,14 +544,14 @@ static int am_save_lasso_profile_state(request_rec *r,
 
     lasso_identity = lasso_profile_get_identity(profile);
     if(lasso_identity == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                       "The current LassoProfile object doesn't contain a"
                       " LassoIdentity object.");
         identity_dump = NULL;
     } else {
         identity_dump = lasso_identity_dump(lasso_identity);
         if(identity_dump == NULL) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Could not create a identity dump from the"
                           " LassoIdentity object.");
             return HTTP_INTERNAL_SERVER_ERROR;
@@ -560,14 +560,14 @@ static int am_save_lasso_profile_state(request_rec *r,
 
     lasso_session = lasso_profile_get_session(profile);
     if(lasso_session == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                       "The current LassoProfile object doesn't contain a"
                       " LassoSession object.");
         session_dump = NULL;
     } else {
         session_dump = lasso_session_dump(lasso_session);
         if(session_dump == NULL) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Could not create a session dump from the"
                           " LassoSession object.");
             if(identity_dump != NULL) {
@@ -611,7 +611,7 @@ static int am_return_logout_response(request_rec *r,
 {
     if (profile->msg_url && profile->msg_body) {
         /* POST binding response */
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error building logout response message."
                       " POST binding is unsupported.");
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -626,7 +626,7 @@ static int am_return_logout_response(request_rec *r,
         ap_rputs(profile->msg_body, r);
         return OK;
     } else {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error building logout response message."
                       " There is no content to return.");
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -656,7 +656,7 @@ static void am_restore_lasso_profile_state(request_rec *r,
 
 
     if(am_session == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Could not get auth_mellon session while attempting"
                       " to restore the lasso profile state.");
         return;
@@ -666,7 +666,7 @@ static void am_restore_lasso_profile_state(request_rec *r,
     if(identity_dump != NULL) {
         rc = lasso_profile_set_identity_from_dump(profile, identity_dump);
         if(rc != 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Could not restore identity from dump."
                           " Lasso error: [%i] %s", rc, lasso_strerror(rc));
             am_release_request_session(r, am_session);
@@ -677,7 +677,7 @@ static void am_restore_lasso_profile_state(request_rec *r,
     if(session_dump != NULL) {
         rc = lasso_profile_set_session_from_dump(profile, session_dump);
         if(rc != 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Could not restore session from dump."
                           " Lasso error: [%i] %s", rc, lasso_strerror(rc));
             am_release_request_session(r, am_session);
@@ -722,7 +722,7 @@ static int am_handle_logout_request(request_rec *r,
     }
 #endif
     if(res != 0 && res != LASSO_DS_ERROR_SIGNATURE_NOT_FOUND) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error processing logout request message."
                       " Lasso error: [%i] %s", res, lasso_strerror(res));
 
@@ -732,7 +732,7 @@ static int am_handle_logout_request(request_rec *r,
 
     /* Search session using NameID */
     if (! LASSO_IS_SAML2_NAME_ID(logout->parent.nameIdentifier)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error processing logout request message."
                       " No NameID found");
         rc = HTTP_BAD_REQUEST;
@@ -745,7 +745,7 @@ static int am_handle_logout_request(request_rec *r,
     session = am_get_request_session_by_nameid(r,
                     ((LassoSaml2NameID*)logout->parent.nameIdentifier)->content);
     if (session == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error processing logout request message."
                       " No session found for NameID %s",
                       ((LassoSaml2NameID*)logout->parent.nameIdentifier)->content);
@@ -755,7 +755,7 @@ static int am_handle_logout_request(request_rec *r,
     am_diag_log_cache_entry(r, 0, session, "%s", __func__);
 
     if (session == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error processing logout request message."
                       " No session found.");
 
@@ -768,7 +768,7 @@ static int am_handle_logout_request(request_rec *r,
     if(res != 0 && 
        res != LASSO_DS_ERROR_SIGNATURE_NOT_FOUND &&
        res != LASSO_PROFILE_ERROR_SESSION_NOT_FOUND) {
-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                       "Error validating logout request."
                       " Lasso error: [%i] %s", res, lasso_strerror(res));
         rc = HTTP_INTERNAL_SERVER_ERROR;
@@ -787,7 +787,7 @@ static int am_handle_logout_request(request_rec *r,
     /* Create response message. */
     res = lasso_logout_build_response_msg(logout);
     if(res != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error building logout response message."
                       " Lasso error: [%i] %s", res, lasso_strerror(res));
 
@@ -839,7 +839,7 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
     }
 #endif
     if(res != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Unable to process logout response."
                       " Lasso error: [%i] %s", res, lasso_strerror(res));
 
@@ -860,7 +860,7 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
 
     return_to = am_extract_query_parameter(r->pool, r->args, "RelayState");
     if(return_to == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "No RelayState parameter to logout response handler."
                       " It is possible that your IdP doesn't support the"
                       " RelayState parameter.");
@@ -869,7 +869,7 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
 
     rc = am_urldecode(return_to);
     if(rc != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                       "Could not urldecode RelayState value in logout"
                       " response.");
         return HTTP_BAD_REQUEST;
@@ -884,7 +884,7 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
     /* Make sure that it is a valid redirect URL. */
     rc = am_validate_redirect_url(r, return_to);
     if (rc != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Invalid target domain in logout response RelayState parameter.");
         return rc;
     }
@@ -922,14 +922,14 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
     return_to = am_extract_query_parameter(r->pool, r->args, "ReturnTo");
     rc = am_urldecode(return_to);
     if (rc != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                       "Could not urldecode ReturnTo value.");
         return HTTP_BAD_REQUEST;
     }
 
     rc = am_validate_redirect_url(r, return_to);
     if (rc != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Invalid target domain in logout request ReturnTo parameter.");
         return rc;
     }
@@ -947,15 +947,15 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
     /* Early non failing return. */
     if (res != 0) {
         if(res == LASSO_PROFILE_ERROR_SESSION_NOT_FOUND) {
-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                           "User attempted to initiate logout without being"
                           " loggged in.");
         } else if (res == LASSO_LOGOUT_ERROR_UNSUPPORTED_PROFILE || res == LASSO_PROFILE_ERROR_UNSUPPORTED_PROFILE) {
-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, "Current identity provider "
+            AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r, "Current identity provider "
                             "does not support single logout. Destroying local session only.");
 
         } else if(res != 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Unable to create logout request."
                           " Lasso error: [%i] %s", res, lasso_strerror(res));
 
@@ -985,7 +985,7 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
             session, profile->remote_providerID);
         if(! assertion_list ||
                         LASSO_IS_SAML2_ASSERTION(assertion_list->data) == FALSE) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "No assertions found for the current session.");
             lasso_logout_destroy(logout);
             return HTTP_INTERNAL_SERVER_ERROR;
@@ -1001,7 +1001,7 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
         authnStatement = LASSO_SAML2_AUTHN_STATEMENT(assertion->AuthnStatement->data);
 
         if(!authnStatement) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "No AuthnStatement found in the current assertion.");
             lasso_logout_destroy(logout);
             return HTTP_INTERNAL_SERVER_ERROR;
@@ -1022,7 +1022,7 @@ static int am_init_logout_request(request_rec *r, LassoLogout *logout)
     /* Serialize the request message into a url which we can redirect to. */
     res = lasso_logout_build_request_msg(logout);
     if(res != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Unable to serialize lasso logout message."
                       " Lasso error: [%i] %s", res, lasso_strerror(res));
 
@@ -1077,7 +1077,7 @@ static int am_handle_logout(request_rec *r)
 
     logout = lasso_logout_new(server);
     if(logout == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error creating lasso logout object.");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -1098,7 +1098,7 @@ static int am_handle_logout(request_rec *r)
 
         rc = am_read_post_data(r, &post_data, NULL);
         if (rc != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                           "Error reading POST data.");
             return HTTP_INTERNAL_SERVER_ERROR;
         }
@@ -1121,7 +1121,7 @@ static int am_handle_logout(request_rec *r)
 
     } else {
         /* Unknown request to the logout handler. */
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "No known parameters passed to the logout"
                       " handler. Query string was \"%s\". To initiate"
                       " a logout, you need to pass a \"ReturnTo\""
@@ -1157,7 +1157,7 @@ static apr_time_t am_parse_timestamp(request_rec *r, const char *timestamp)
 
     /* Verify length of timestamp. */
     if(len < 20){
-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                       "Invalid length of timestamp: \"%s\".", timestamp);
     }
 
@@ -1208,7 +1208,7 @@ static apr_time_t am_parse_timestamp(request_rec *r, const char *timestamp)
         }
 
         if(expected != NULL) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Invalid character in timestamp at position %i."
                           " Expected %s, got '%c'. Full timestamp: \"%s\"",
                           i, expected, c, timestamp);
@@ -1217,7 +1217,7 @@ static apr_time_t am_parse_timestamp(request_rec *r, const char *timestamp)
     }
 
     if (timestamp[len - 1] != 'Z') {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Timestamp wasn't in UTC (did not end with 'Z')."
                       " Full timestamp: \"%s\"",
                       timestamp);
@@ -1260,7 +1260,7 @@ static apr_time_t am_parse_timestamp(request_rec *r, const char *timestamp)
 
     rc = apr_time_exp_gmt_get(&res, &time_exp);
     if(rc != APR_SUCCESS) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                       "Error converting timestamp \"%s\".",
                       timestamp);
         return 0;
@@ -1293,7 +1293,7 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
         /* No Subject to validate. */
         return OK;
     } else if (!LASSO_IS_SAML2_SUBJECT(assertion->Subject)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Wrong type of Subject node.");
         return HTTP_BAD_REQUEST;
     }
@@ -1302,7 +1302,7 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
         /* No SubjectConfirmation. */
         return OK;
     } else if (!LASSO_IS_SAML2_SUBJECT_CONFIRMATION(assertion->Subject->SubjectConfirmation)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Wrong type of SubjectConfirmation node.");
         return HTTP_BAD_REQUEST;
     }
@@ -1310,7 +1310,7 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
     sc = assertion->Subject->SubjectConfirmation;
     if (sc->Method == NULL ||
         strcmp(sc->Method, "urn:oasis:names:tc:SAML:2.0:cm:bearer")) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Invalid Method in SubjectConfirmation.");
         return HTTP_BAD_REQUEST;
     }
@@ -1320,7 +1320,7 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
         /* Nothing to verify. */
         return OK;
     } else if (!LASSO_IS_SAML2_SUBJECT_CONFIRMATION_DATA(scd)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Wrong type of SubjectConfirmationData node.");
         return HTTP_BAD_REQUEST;
     }
@@ -1330,12 +1330,12 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
     if (scd->NotBefore) {
         t = am_parse_timestamp(r, scd->NotBefore);
         if (t == 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Invalid timestamp in NotBefore in SubjectConfirmationData.");
             return HTTP_BAD_REQUEST;
         }
         if (t - 60000000 > now) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "NotBefore in SubjectConfirmationData was in the future.");
             return HTTP_BAD_REQUEST;
         }
@@ -1344,12 +1344,12 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
     if (scd->NotOnOrAfter) {
         t = am_parse_timestamp(r, scd->NotOnOrAfter);
         if (t == 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Invalid timestamp in NotOnOrAfter in SubjectConfirmationData.");
             return HTTP_BAD_REQUEST;
         }
         if (now >= t + 60000000) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "NotOnOrAfter in SubjectConfirmationData was in the past.");
             return HTTP_BAD_REQUEST;
         }
@@ -1357,7 +1357,7 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
 
     if (scd->Recipient) {
         if (strcmp(scd->Recipient, url)) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Wrong Recipient in SubjectConfirmationData. Current URL is: %s, Recipient is %s",
                           url, scd->Recipient);
             return HTTP_BAD_REQUEST;
@@ -1366,7 +1366,7 @@ static int am_validate_subject(request_rec *r, LassoSaml2Assertion *assertion,
 
     if (scd->Address && CFG_VALUE(cfg, subject_confirmation_data_address_check)) {
         if (strcasecmp(scd->Address, am_compat_request_ip(r))) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Wrong Address in SubjectConfirmationData."
                           "Current address is \"%s\", but should have been \"%s\".",
                           am_compat_request_ip(r), scd->Address);
@@ -1405,7 +1405,7 @@ static int am_validate_conditions(request_rec *r,
         return OK;
     }
     if (!LASSO_IS_SAML2_CONDITIONS(conditions)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Wrong type of Conditions node.");
         return HTTP_BAD_REQUEST;
     }
@@ -1414,7 +1414,7 @@ static int am_validate_conditions(request_rec *r,
         /* This is a list of LassoSaml2ConditionAbstract - if it
          * isn't empty, we have an unsupported condition.
          */
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Unsupported condition in Assertion.");
         return HTTP_BAD_REQUEST;
     }
@@ -1425,12 +1425,12 @@ static int am_validate_conditions(request_rec *r,
     if (conditions->NotBefore) {
         t = am_parse_timestamp(r, conditions->NotBefore);
         if (t == 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Invalid timestamp in NotBefore in Condition.");
             return HTTP_BAD_REQUEST;
         }
         if (t - 60000000 > now) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "NotBefore in Condition was in the future.");
             return HTTP_BAD_REQUEST;
         }
@@ -1439,12 +1439,12 @@ static int am_validate_conditions(request_rec *r,
     if (conditions->NotOnOrAfter) {
         t = am_parse_timestamp(r, conditions->NotOnOrAfter);
         if (t == 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Invalid timestamp in NotOnOrAfter in Condition.");
             return HTTP_BAD_REQUEST;
         }
         if (now >= t + 60000000) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "NotOnOrAfter in Condition was in the past.");
             return HTTP_BAD_REQUEST;
         }
@@ -1454,13 +1454,13 @@ static int am_validate_conditions(request_rec *r,
          i = g_list_next(i)) {
         ar = i->data;
         if (!LASSO_IS_SAML2_AUDIENCE_RESTRICTION(ar)) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Wrong type of AudienceRestriction node.");
             return HTTP_BAD_REQUEST;
         }
 
         if (ar->Audience == NULL || strcmp(ar->Audience, providerID)) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Invalid Audience in Conditions. Should be: %s",
                           providerID);
             return HTTP_BAD_REQUEST;
@@ -1498,7 +1498,7 @@ static void am_handle_session_expire(request_rec *r, am_cache_entry_t *session,
 
         authn = authn_itr->data;
         if (!LASSO_IS_SAML2_AUTHN_STATEMENT(authn)) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Wrong type of AuthnStatement node.");
             continue;
         }
@@ -1589,7 +1589,7 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
 
         atr_stmt = atr_stmt_itr->data;
         if (!LASSO_IS_SAML2_ATTRIBUTE_STATEMENT(atr_stmt)) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Wrong type of AttributeStatement node.");
             continue;
         }
@@ -1601,13 +1601,13 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
 
             attribute = atr_itr->data;
             if (!LASSO_IS_SAML2_ATTRIBUTE(attribute)) {
-                ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                               "Wrong type of Attribute node.");
                 continue;
             }
 
             if (attribute->Name == NULL) {
-                ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                               "SAML 2.0 attribute without name.");
                 continue;
             }
@@ -1622,7 +1622,7 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
 
                 value = value_itr->data;
                 if (!LASSO_IS_SAML2_ATTRIBUTE_VALUE(value)) {
-                    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                    AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                                   "Wrong type of AttributeValue node.");
                     continue;
                 }
@@ -1633,7 +1633,7 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
                  * We assume that the list contains a single text node.
                  */
                 if(value->any == NULL) {
-                    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                    AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                                   "AttributeValue element was empty.");
                     continue;
                 }
@@ -1644,14 +1644,14 @@ static int add_attributes(am_cache_entry_t *session, request_rec *r,
                      any_itr = g_list_next(any_itr)) {
                         /* Verify that this is a LassoNode object. */
                         if(!LASSO_NODE(any_itr->data)) {
-                            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                            AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                                           "AttributeValue element contained an "
                                           " element which wasn't a Node.");
                             continue;
                         }
                         dump = lasso_node_dump(LASSO_NODE(any_itr->data));
                         if (!dump) {
-                            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                            AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                                           "AttributeValue content dump failed.");
                             continue;
                         }
@@ -1692,7 +1692,7 @@ static int am_validate_authn_context_class_ref(request_rec *r,
         return OK;
 
     if (! assertion->AuthnStatement) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Missing AuthnStatement in assertion, returning BadRequest.");
         return HTTP_BAD_REQUEST;
     }
@@ -1700,20 +1700,20 @@ static int am_validate_authn_context_class_ref(request_rec *r,
      * sending more than one. */
     authn_statement = g_list_first(assertion->AuthnStatement)->data;
     if (! authn_statement->AuthnContext) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Missing AuthnContext in assertion, returning BadRequest.");
         return HTTP_BAD_REQUEST;
     }
     authn_context = authn_statement->AuthnContext;
     if (! authn_context->AuthnContextClassRef) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Missing AuthnContextClassRef in assertion, returning Forbidden.");
         return HTTP_FORBIDDEN;
     }
     for (i = 0; i < refs->nelts; i++) {
         const char *ref = ((char **)refs->elts)[i];
         if (strcmp(ref, authn_context->AuthnContextClassRef) == 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                           "AuthnContextClassRef (%s) matches the "
                           "MellonAuthnContextClassRef directive, "
                           "access can be granted.",
@@ -1721,7 +1721,7 @@ static int am_validate_authn_context_class_ref(request_rec *r,
             return OK;
         }
     }
-    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+    AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                   "AuthnContextClassRef (%s) does not match the "
                   "MellonAuthnContextClassRef directive, returning "
                   "Forbidden.",
@@ -1776,7 +1776,7 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     dir_cfg = am_get_dir_cfg(r);
 
     if(LASSO_PROFILE(login)->nameIdentifier == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "No acceptable name identifier found in"
                       " SAML 2.0 response.");
         lasso_login_destroy(login);
@@ -1790,7 +1790,7 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
 
     if (response->parent.Destination) {
         if (strcmp(response->parent.Destination, url)) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Invalid Destination on Response. Should be: %s",
                           url);
             lasso_login_destroy(login);
@@ -1799,20 +1799,20 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     }
 
     if (g_list_length(response->Assertion) == 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "No Assertion in response.");
         lasso_login_destroy(login);
         return HTTP_BAD_REQUEST;
     }
     if (g_list_length(response->Assertion) > 1) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "More than one Assertion in response.");
         lasso_login_destroy(login);
         return HTTP_BAD_REQUEST;
     }
     assertion = g_list_first(response->Assertion)->data;
     if (!LASSO_IS_SAML2_ASSERTION(assertion)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Wrong type of Assertion node.");
         lasso_login_destroy(login);
         return HTTP_BAD_REQUEST;
@@ -1840,7 +1840,7 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
             /* This is SP-initiated login. Check that we have a cookie. */
             if(am_cookie_get(r) == NULL) {
                 /* Missing cookie. */
-                ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                               "User has disabled cookies, or has lost"
                               " the cookie before returning from the SAML2"
                               " login server.");
@@ -1897,7 +1897,7 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
 
     rc = lasso_login_accept_sso(login);
     if(rc != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Unable to accept SSO message."
                       " Lasso error: [%i] %s", rc, lasso_strerror(rc));
         am_release_request_session(r, session);
@@ -1930,7 +1930,7 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
 
     rc = am_urldecode(relay_state);
     if (rc != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                       "Could not urldecode RelayState value.");
         return HTTP_BAD_REQUEST;
     }
@@ -1943,7 +1943,7 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
 
     rc = am_validate_redirect_url(r, relay_state);
     if (rc != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Invalid target domain in logout response RelayState parameter.");
         return rc;
     }
@@ -1982,7 +1982,7 @@ static int am_handle_post_reply(request_rec *r)
 
     /* Make sure that this is a POST request. */
     if(r->method_number != M_POST) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Expected POST request for HTTP-POST endpoint."
                       " Got a %s request instead.", r->method);
 
@@ -2004,7 +2004,7 @@ static int am_handle_post_reply(request_rec *r)
     /* Read POST-data. */
     rc = am_read_post_data(r, &post_data, NULL);
     if (rc != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                       "Error reading POST data.");
         return rc;
     }
@@ -2013,14 +2013,14 @@ static int am_handle_post_reply(request_rec *r)
     saml_response = am_extract_query_parameter(r->pool, post_data,
                                             "SAMLResponse");
     if (saml_response == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                       "Could not find SAMLResponse field in POST data.");
         return HTTP_BAD_REQUEST;
     }
 
     rc = am_urldecode(saml_response);
     if (rc != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                       "Could not urldecode SAMLResponse value.");
         return rc;
     }
@@ -2032,7 +2032,7 @@ static int am_handle_post_reply(request_rec *r)
 
     login = lasso_login_new(server);
     if (login == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to initialize LassoLogin object.");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -2040,7 +2040,7 @@ static int am_handle_post_reply(request_rec *r)
     /* Process login responce. */
     rc = lasso_login_process_authn_response_msg(login, saml_response);
     if (rc != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error processing authn response."
                       " Lasso error: [%i] %s", rc, lasso_strerror(rc));
 
@@ -2093,7 +2093,7 @@ static int am_handle_paos_reply(request_rec *r)
 
     /* Make sure that this is a POST request. */
     if(r->method_number != M_POST) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Expected POST request for paosResponse endpoint."
                       " Got a %s request instead.", r->method);
 
@@ -2115,7 +2115,7 @@ static int am_handle_paos_reply(request_rec *r)
     /* Read POST-data. */
     rc = am_read_post_data(r, &post_data, NULL);
     if (rc != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                       "Error reading POST data.");
         return rc;
     }
@@ -2127,7 +2127,7 @@ static int am_handle_paos_reply(request_rec *r)
 
     login = lasso_login_new(server);
     if (login == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to initialize LassoLogin object.");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -2135,7 +2135,7 @@ static int am_handle_paos_reply(request_rec *r)
     /* Process login response. */
     rc = lasso_login_process_paos_response_msg(login, post_data);
     if (rc != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error processing ECP authn response."
                       " Lasso error: [%i] %s", rc, lasso_strerror(rc));
 
@@ -2182,7 +2182,7 @@ static int am_handle_artifact_reply(request_rec *r)
 
     /* Make sure that this is a GET request. */
     if(r->method_number != M_GET && r->method_number != M_POST) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Expected GET or POST request for the HTTP-Artifact endpoint."
                       " Got a %s request instead.", r->method);
 
@@ -2206,7 +2206,7 @@ static int am_handle_artifact_reply(request_rec *r)
 
     login = lasso_login_new(server);
     if (login == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to initialize LassoLogin object.");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -2217,7 +2217,7 @@ static int am_handle_artifact_reply(request_rec *r)
                                   LASSO_HTTP_METHOD_ARTIFACT_GET);
 
         if(rc != 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Failed to handle login response."
                           " Lasso error: [%i] %s", rc, lasso_strerror(rc));
             lasso_login_destroy(login);
@@ -2226,14 +2226,14 @@ static int am_handle_artifact_reply(request_rec *r)
     } else {
         rc = am_read_post_data(r, &post_data, NULL);
         if (rc != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                     "Error reading POST data.");
             return HTTP_BAD_REQUEST;
         }
 
         saml_art = am_extract_query_parameter(r->pool, post_data, "SAMLart");
         if (saml_art == NULL) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, rc, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, rc, r,
                     "Error reading POST data missing SAMLart form parameter.");
             return HTTP_BAD_REQUEST;
         }
@@ -2241,7 +2241,7 @@ static int am_handle_artifact_reply(request_rec *r)
 
         rc = lasso_login_init_request(login, saml_art, LASSO_HTTP_METHOD_ARTIFACT_POST);
         if(rc != 0) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Failed to handle login response."
                           " Lasso error: [%i] %s", rc, lasso_strerror(rc));
             lasso_login_destroy(login);
@@ -2252,7 +2252,7 @@ static int am_handle_artifact_reply(request_rec *r)
     /* Prepare SOAP request. */
     rc = lasso_login_build_request_msg(login);
     if(rc != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to prepare SOAP message for HTTP-Artifact"
                       " resolution."
                       " Lasso error: [%i] %s", rc, lasso_strerror(rc));
@@ -2276,7 +2276,7 @@ static int am_handle_artifact_reply(request_rec *r)
 
     rc = lasso_login_process_response_msg(login, response);
     if(rc != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to handle HTTP-Artifact response data."
                       " Lasso error: [%i] %s", rc, lasso_strerror(rc));
         lasso_login_destroy(login);
@@ -2319,7 +2319,7 @@ const char *am_post_mkform_multipart(request_rec *r, const char *post_data)
     post_data = am_strip_cr(r, post_data);
 
     if ((boundary = am_xstrtok(r, post_data, "\n", &l1)) == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                      "Cannot figure initial boundary");
         return NULL;
     }
@@ -2349,14 +2349,14 @@ const char *am_post_mkform_multipart(request_rec *r, const char *post_data)
          */
         hdr = am_get_mime_header(r, mime_part, "Content-Disposition");
         if (hdr == NULL) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                          "No Content-Disposition header in MIME section,");
             continue;
         }
 
         name = am_get_header_attr(r, hdr, "form-data", "name");
         if (name == NULL) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                          "Unexpected Content-Disposition header: \"%s\"", hdr);
             continue;
         }
@@ -2407,13 +2407,13 @@ const char *am_post_mkform_urlencoded(request_rec *r, const char *post_data)
             value = empty_value;
 
         if (am_urldecode(name) != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                          "urldecode(\"%s\") failed", name);
             return NULL;
         }
 
         if (am_urldecode(value) != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                          "urldecode(\"%s\") failed", value);
             return NULL;
         }
@@ -2454,7 +2454,7 @@ static int am_handle_repost(request_rec *r)
     am_diag_printf(r, "enter function %s\n", __func__);
 
     if (am_cookie_get(r) == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Repost query without a session");
         return HTTP_FORBIDDEN;
     }
@@ -2462,7 +2462,7 @@ static int am_handle_repost(request_rec *r)
     mod_cfg = am_get_mod_cfg(r->server);
 
     if (!mod_cfg->post_dir) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Repost query without MellonPostDirectory.");
         return HTTP_NOT_FOUND;
     }
@@ -2471,7 +2471,7 @@ static int am_handle_repost(request_rec *r)
 
     enctype = am_extract_query_parameter(r->pool, query, "enctype");
     if (enctype == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Bad repost query: missing enctype");
         return HTTP_BAD_REQUEST;
     }
@@ -2482,7 +2482,7 @@ static int am_handle_repost(request_rec *r)
         enctype = "multipart/form-data";
         post_mkform = am_post_mkform_multipart;
     } else {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Bad repost query: invalid enctype \"%s\".", enctype);
         return HTTP_BAD_REQUEST;
     }
@@ -2490,7 +2490,7 @@ static int am_handle_repost(request_rec *r)
     charset = am_extract_query_parameter(r->pool, query, "charset");
     if (charset != NULL) {
         if (am_urldecode(charset) != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Bad repost query: invalid charset \"%s\"", charset);
             return HTTP_BAD_REQUEST;
         }
@@ -2498,7 +2498,7 @@ static int am_handle_repost(request_rec *r)
         /* Check that charset is sane */
         for (cp = charset; *cp; cp++) {
             if (!apr_isalnum(*cp) && (*cp != '-') && (*cp != '_')) {
-                ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+                AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                               "Bad repost query: invalid charset \"%s\"", charset);
                 return HTTP_BAD_REQUEST;
             }
@@ -2507,7 +2507,7 @@ static int am_handle_repost(request_rec *r)
 
     psf_id = am_extract_query_parameter(r->pool, query, "id");
     if (psf_id == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Bad repost query: missing id");
         return HTTP_BAD_REQUEST;
     }
@@ -2515,7 +2515,7 @@ static int am_handle_repost(request_rec *r)
     /* Check that Id is sane */
     for (cp = psf_id; *cp; cp++) {
         if (!apr_isalnum(*cp)) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Bad repost query: invalid id \"%s\"", psf_id);
             return HTTP_BAD_REQUEST;
         }
@@ -2524,25 +2524,25 @@ static int am_handle_repost(request_rec *r)
     
     return_url = am_extract_query_parameter(r->pool, query, "ReturnTo");
     if (return_url == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Invalid or missing query ReturnTo parameter.");
         return HTTP_BAD_REQUEST;
     }
 
     if (am_urldecode(return_url) != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "Bad repost query: return");
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r, "Bad repost query: return");
         return HTTP_BAD_REQUEST;
     }
 
     rc = am_validate_redirect_url(r, return_url);
     if (rc != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Invalid target domain in repost request ReturnTo parameter.");
         return rc;
     }
 
     if ((file_data = am_file_data_new(r->pool, NULL)) == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                       "Bad repost query: cannot allocate file_data");
         apr_table_setn(r->headers_out, "Location", return_url);
         return HTTP_SEE_OTHER;
@@ -2553,7 +2553,7 @@ static int am_handle_repost(request_rec *r)
     rc = am_file_read(file_data);
     if (rc != APR_SUCCESS) {
         /* Unable to load repost data. Just redirect us instead. */
-        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r,
                       "Bad repost query: %s", file_data->strerror);
         apr_table_setn(r->headers_out, "Location", return_url);
         return HTTP_SEE_OTHER;
@@ -2562,7 +2562,7 @@ static int am_handle_repost(request_rec *r)
     }
 
     if ((post_form = (*post_mkform)(r, post_data)) == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "am_post_mkform() failed");
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r, "am_post_mkform() failed");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
@@ -2634,7 +2634,7 @@ static int am_handle_metadata(request_rec *r)
     return OK;
 #else  /* ! HAVE_lasso_server_new_from_buffers */
 
-    ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+    AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                   "metadata publishing require lasso 2.2.2 or higher");
     return HTTP_NOT_FOUND;
 #endif
@@ -2799,7 +2799,7 @@ static int am_init_authn_request_common(request_rec *r,
 
     login = lasso_login_new(server);
     if(login == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
 		      "Error creating LassoLogin object from LassoServer.");
 	return HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -2807,7 +2807,7 @@ static int am_init_authn_request_common(request_rec *r,
 
     ret = lasso_login_init_authn_request(login, idp, http_method);
     if(ret != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error creating login request."
                       " Lasso error: [%i] %s", ret, lasso_strerror(ret));
 	return HTTP_INTERNAL_SERVER_ERROR;
@@ -2815,7 +2815,7 @@ static int am_init_authn_request_common(request_rec *r,
 
     request = LASSO_SAMLP2_AUTHN_REQUEST(LASSO_PROFILE(login)->request);
     if (request->NameIDPolicy == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error creating login request. Please verify the "
                       "MellonSPMetadataFile directive.");
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -2871,7 +2871,7 @@ static int am_init_authn_request_common(request_rec *r,
             req_authn_context->AuthnContextClassRef =
                     g_list_append(req_authn_context->AuthnContextClassRef,
                                     g_strdup(ref));
-            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                           "adding AuthnContextClassRef %s to the "
                           "AuthnRequest", ref);
         }
@@ -2898,7 +2898,7 @@ static int am_init_authn_request_common(request_rec *r,
             req_cfg->ecp_service_options &
             ~ECP_SERVICE_OPTION_WANT_AUTHN_SIGNED;
         if (unsupported_ecp_options) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Unsupported ECP service options [%s]",
                           am_ecp_service_options_str(r->pool,
                                                      unsupported_ecp_options));
@@ -2924,7 +2924,7 @@ static int am_init_authn_request_common(request_rec *r,
 
     ret = lasso_login_build_authn_request_msg(login);
     if (ret != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error building login request."
                       " Lasso error: [%i] %s", ret, lasso_strerror(ret));
 	return HTTP_INTERNAL_SERVER_ERROR;
@@ -2959,7 +2959,7 @@ static int am_set_authn_request_content(request_rec *r, LassoLogin *login)
         return am_set_authn_request_paos_content(r, login);
     default:
         /* We should never get here. */
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Unsupported http_method.");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -3097,7 +3097,7 @@ static int am_send_login_authn_request(request_rec *r, const char *idp,
     /* Find our IdP. */
     provider = lasso_server_get_provider(server, idp);
     if (provider == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Could not find metadata for the IdP \"%s\".",
                       idp);
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -3117,7 +3117,7 @@ static int am_send_login_authn_request(request_rec *r, const char *idp,
     }
     if (destination_url == NULL) {
         /* Both HTTP-Redirect and HTTP-POST unsupported - give up. */
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Could not find a supported SingleSignOnService endpoint"
                       " for the IdP \"%s\".", idp);
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -3209,21 +3209,21 @@ static int am_handle_login(request_rec *r)
 
     return_to = am_extract_query_parameter(r->pool, r->args, "ReturnTo");
     if(return_to == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Missing required ReturnTo parameter.");
         return HTTP_BAD_REQUEST;
     }
 
     ret = am_urldecode(return_to);
     if(ret != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error urldecoding ReturnTo parameter.");
         return ret;
     }
 
     ret = am_validate_redirect_url(r, return_to);
     if(ret != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Invalid target domain in login request ReturnTo parameter.");
         return ret;
     }
@@ -3232,7 +3232,7 @@ static int am_handle_login(request_rec *r)
     if(idp_param != NULL) {
         ret = am_urldecode(idp_param);
         if(ret != OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Error urldecoding IdP parameter.");
             return ret;
         }
@@ -3248,7 +3248,7 @@ static int am_handle_login(request_rec *r)
     } else if(cfg->discovery_url) {
         if(is_passive) {
             /* We cannot currently do discovery with passive authentication requests. */
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Discovery service with passive authentication request unsupported.");
             return HTTP_INTERNAL_SERVER_ERROR;
         }
@@ -3284,7 +3284,7 @@ static int am_probe_url(request_rec *r, const char *url, int timeout)
         return error;
 
     if (status != HTTP_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Probe on \"%s\" returned HTTP %ld",
                       url, status);
         return status;
@@ -3325,7 +3325,7 @@ static int am_handle_probe_discovery(request_rec *r) {
      */
     timeout = cfg->probe_discovery_timeout;
     if (timeout == -1) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "probe discovery handler invoked but not "
                       "configured. Please set MellonProbeDiscoveryTimeout.");
         return HTTP_INTERNAL_SERVER_ERROR;
@@ -3337,35 +3337,35 @@ static int am_handle_probe_discovery(request_rec *r) {
      */
     return_to = am_extract_query_parameter(r->pool, r->args, "return");
     if(return_to == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Missing required return parameter.");
         return HTTP_BAD_REQUEST;
     }
 
     ret = am_urldecode(return_to);
     if (ret != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, ret, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, ret, r,
                       "Could not urldecode return value.");
         return HTTP_BAD_REQUEST;
     }
 
     ret = am_validate_redirect_url(r, return_to);
     if (ret != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Invalid target domain in probe discovery return parameter.");
         return ret;
     }
 
     idp_param = am_extract_query_parameter(r->pool, r->args, "returnIDParam");
     if(idp_param == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Missing required returnIDParam parameter.");
         return HTTP_BAD_REQUEST;
     }
 
     ret = am_urldecode(idp_param);
     if (ret != OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, ret, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, ret, r,
                       "Could not urldecode returnIDParam value.");
         return HTTP_BAD_REQUEST;
     }
@@ -3420,7 +3420,7 @@ static int am_handle_probe_discovery(request_rec *r) {
      */
     if (disco_idp == NULL) {
         if (!apr_is_empty_table(cfg->probe_discovery_idp)) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "probeDiscovery failed and non empty "
                           "MellonProbeDiscoveryIdP was provided.");
             return HTTP_INTERNAL_SERVER_ERROR;
@@ -3428,15 +3428,15 @@ static int am_handle_probe_discovery(request_rec *r) {
 
         disco_idp = am_first_idp(r);
         if (disco_idp == NULL) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, 
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "probeDiscovery found no usable IdP.");
             return HTTP_INTERNAL_SERVER_ERROR;
         } else {
-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r, "probeDiscovery "
+            AM_LOG_RERROR(APLOG_MARK, APLOG_WARNING, 0, r, "probeDiscovery "
                           "failed, trying default IdP %s", disco_idp); 
         }
     } else {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_INFO, 0, r,
                       "probeDiscovery using %s", disco_idp);
     }
 
@@ -3520,7 +3520,7 @@ int am_handler(request_rec *r)
     } else if(!strcmp(endpoint, "probeDisco")) {
         return am_handle_probe_discovery(r);
     } else {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Endpoint \"%s\" not handled by mod_auth_mellon.",
                       endpoint);
 
@@ -3556,7 +3556,7 @@ static int am_start_auth(request_rec *r)
             if (am_save_post(r, &return_to) != OK)
                 return HTTP_INTERNAL_SERVER_ERROR;
         } else {
-            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                           "POST data dropped because we do not have a"
                           " MellonPostReplay is not enabled.");
         }
@@ -3572,7 +3572,7 @@ static int am_start_auth(request_rec *r)
                              endpoint,
                              am_urlencode(r->pool, return_to),
                              am_urlencode(r->pool, idp));
-    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+    AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                   "Redirecting to login URL: %s", login_url);
 
     apr_table_setn(r->headers_out, "Location", login_url);
@@ -3640,7 +3640,7 @@ int am_auth_mellon_user(request_rec *r)
             ajax_header = apr_table_get(r->headers_in, "X-Request-With");
             if (ajax_header != NULL &&
                 strcmp(ajax_header, "XMLHttpRequest") == 0) {
-                    ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                    AM_LOG_RERROR(APLOG_MARK, APLOG_INFO, 0, r,
                       "Deny unauthenticated X-Request-With XMLHttpRequest "
                       "(AJAX) request");
                     return HTTP_FORBIDDEN;
@@ -3769,7 +3769,7 @@ int am_check_uid(request_rec *r)
 #ifdef HAVE_ECP
     am_req_cfg_rec *req_cfg = am_get_req_cfg(r);
     if (req_cfg->ecp_authn_req) {
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                       "am_check_uid is performing ECP authn request flow");
         /*
          * Normally when a protected resource requires authentication

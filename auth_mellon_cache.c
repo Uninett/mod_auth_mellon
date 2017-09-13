@@ -109,7 +109,7 @@ am_cache_entry_t *am_cache_lock(request_rec *r,
 
     /* Lock the table. */
     if((rv = apr_global_mutex_lock(mod_cfg->lock)) != APR_SUCCESS) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "apr_global_mutex_lock() failed [%d]: %s",
                       rv, apr_strerror(rv, buffer, sizeof(buffer)));
         return NULL;
@@ -309,7 +309,7 @@ am_cache_entry_t *am_cache_new(request_rec *r,
 
     /* Lock the table. */
     if((rv = apr_global_mutex_lock(mod_cfg->lock)) != APR_SUCCESS) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "apr_global_mutex_lock() failed [%d]: %s",
                       rv, apr_strerror(rv, buffer, sizeof(buffer)));
         return NULL;
@@ -367,7 +367,7 @@ am_cache_entry_t *am_cache_new(request_rec *r,
         age = (current_time - t->access) / 1000000;
 
         if(age < 3600) {
-            ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_NOTICE, 0, r,
                           "Dropping LRU entry entry with age = %" APR_TIME_T_FMT
                           "s, which is less than one hour. It may be a good"
                           " idea to increase MellonCacheSize.",
@@ -403,7 +403,7 @@ am_cache_entry_t *am_cache_new(request_rec *r,
         /* For some strange reason our cookie token is too big to fit in the
          * session. This should never happen outside of absurd configurations.
          */
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Unable to store cookie token in new session.");
         t->key[0] = '\0'; /* Mark the entry as free. */
         apr_global_mutex_unlock(mod_cfg->lock);
@@ -572,7 +572,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
                 value = am_cache_entry_get_string(t, &t->env[i].value);
                 status = am_cache_entry_store_string(t, &t->user, value);
                 if (status != 0) {
-                    ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
+                    AM_LOG_RERROR(APLOG_MARK, APLOG_NOTICE, 0, r,
                                   "Unable to store the user name because there"
                                   " is no more space in the session. "
                                   "Username = \"%s\".", value);
@@ -611,7 +611,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
             (strcasecmp(varname, d->userattr) == 0)) {
             status = am_cache_entry_store_string(t, &t->user, value);
             if (status != 0) {
-                ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
+                AM_LOG_RERROR(APLOG_MARK, APLOG_NOTICE, 0, r,
                               "Unable to store the user name because there"
                               " is no more space in the session. "
                               "Username = \"%s\".", value);
@@ -679,7 +679,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
         r->ap_auth_type = apr_pstrdup(r->pool, "Mellon");
     } else {
         /* We don't have a user-"name". Log error. */
-        ap_log_rerror(APLOG_MARK, APLOG_NOTICE, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_NOTICE, 0, r,
                       "Didn't find the attribute \"%s\" in the attributes"
                       " which were received from the IdP. Cannot set a user"
                       " for this request without a valid user attribute.",
