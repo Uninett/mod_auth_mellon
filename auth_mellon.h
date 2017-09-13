@@ -589,6 +589,15 @@ am_diag_rerror(const char *file, int line, int module_index,
 char *
 am_diag_time_t_to_8601(request_rec *r, apr_time_t t);
 
+/* Define AM_LOG_RERROR log to both the Apache log and diagnostics log */
+#define AM_LOG_RERROR(...) AM_LOG_RERROR__(__VA_ARGS__)
+/* need additional step to expand macros */
+#define AM_LOG_RERROR__(file, line, mi, level, status, r, ...)          \
+{                                                                       \
+    ap_log_rerror(file, line, mi, level, status, r, __VA_ARGS__);       \
+    am_diag_rerror(file, line, mi, level, status, r, __VA_ARGS__);      \
+}
+
 #else  /* WITH_DIAGNOSTICS */
 
 #define am_diag_log_cache_entry(...) do {} while(0)
@@ -596,6 +605,12 @@ am_diag_time_t_to_8601(request_rec *r, apr_time_t t);
 #define am_diag_log_lasso_node(...) do {} while(0)
 #define am_diag_log_profile(...) do {} while(0)
 #define am_diag_printf(...) do {} while(0)
+
+/* Define AM_LOG_RERROR log only to the Apache log */
+#define AM_LOG_RERROR(...) AM_LOG_RERROR__(__VA_ARGS__)
+/* need additional step to expand macros */
+#define AM_LOG_RERROR__(file, line, mi, level, status, r, ...)  \
+ap_log_rerror(file, line, mi, level, status, r, __VA_ARGS__);
 
 #endif /* WITH_DIAGNOSTICS */
 

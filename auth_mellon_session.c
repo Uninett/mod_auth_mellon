@@ -57,7 +57,7 @@ am_cache_entry_t *am_lock_and_validate(request_rec *r,
         session, &session->cookie_token);
     const char *cookie_token_target = am_cookie_token(r);
     if (strcmp(cookie_token_session, cookie_token_target)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Session cookie parameter mismatch. "
                       "Session created with {%s}, but current "
                       "request has {%s}.",
@@ -123,7 +123,7 @@ am_cache_entry_t *am_new_request_session(request_rec *r)
     /* Generate session id. */
     session_id = am_generate_id(r);
     if(session_id == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error creating session id.");
         return NULL;
     }
