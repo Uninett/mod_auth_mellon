@@ -1,0 +1,18 @@
+This is the mod_auth_mellon User Guide. It is written in AsciiDoc
+which is a popular plaintext markup language much like markdown or
+reStructuredText. You can find extensive documentation on AsciiDoc and
+AsciiDoctor on the web. AsciiDoc can be rendered into a variety of
+formats, but one of it's great advantages is the ability to produece
+DocBook.
+
+There are many ways to render AsciiDoc, but the simplest to produce
+html is this:
+
+% asciidoctor mellon_user_guide.adoc
+
+If you want to edit the source it can be very useful to be able to see
+the rendered version as you work. This link is a guide on how to do
+that. Included in this directory is a Guardfile which can be used in
+conjuction with the live preview discussed in the link.
+
+http://asciidoctor.org/docs/editing-asciidoc-with-live-preview/
