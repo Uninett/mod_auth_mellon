@@ -39,22 +39,31 @@ am_cache_entry_t *am_lock_and_validate(request_rec *r,
                                        am_cache_key_t type,
                                        const char *key)
 {
-    am_cache_entry_t *session = am_cache_lock(r->server, type, key);
+    am_cache_entry_t *session = NULL;
+
+    am_diag_printf(r, "searching for session with key %s (%s) ... ",
+                   key, am_diag_cache_key_type_str(type));
+
+    session = am_cache_lock(r, type, key);
     if (session == NULL) {
+        am_diag_printf(r, "not found\n");
         return NULL;
+    } else {
+        am_diag_printf(r, "found.\n");
+        am_diag_log_cache_entry(r, 0, session, "Session Cache Entry");
     }
 
     const char *cookie_token_session = am_cache_entry_get_string(
         session, &session->cookie_token);
     const char *cookie_token_target = am_cookie_token(r);
     if (strcmp(cookie_token_session, cookie_token_target)) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Session cookie parameter mismatch. "
                       "Session created with {%s}, but current "
                       "request has {%s}.",
                       cookie_token_session,
                       cookie_token_target);
-        am_cache_unlock(r->server, session);
+        am_cache_unlock(r, session);
         return NULL;
     }
 
@@ -114,17 +123,20 @@ am_cache_entry_t *am_new_request_session(request_rec *r)
     /* Generate session id. */
     session_id = am_generate_id(r);
     if(session_id == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error creating session id.");
         return NULL;
     }
-
 
     /* Set session id. */
     am_cookie_set(r, session_id);
 
     const char *cookie_token = am_cookie_token(r);
-    return am_cache_new(r->server, session_id, cookie_token);
+
+    am_diag_printf(r, "%s id=%s cookie_token=\"%s\"\n",
+                   __func__, session_id, cookie_token);
+
+    return am_cache_new(r, session_id, cookie_token);
 }
 
 
@@ -140,7 +152,7 @@ am_cache_entry_t *am_new_request_session(request_rec *r)
  */
 void am_release_request_session(request_rec *r, am_cache_entry_t *session)
 {
-    am_cache_unlock(r->server, session);
+    am_cache_unlock(r, session);
 }
 
 
@@ -156,6 +168,8 @@ void am_release_request_session(request_rec *r, am_cache_entry_t *session)
  */
 void am_delete_request_session(request_rec *r, am_cache_entry_t *session)
 {
+    am_diag_log_cache_entry(r, 0, session, "delete session");
+
     /* Delete the cookie. */
     am_cookie_delete(r);
 
@@ -164,5 +178,5 @@ void am_delete_request_session(request_rec *r, am_cache_entry_t *session)
     }
 
     /* Delete session from the session store. */
-    am_cache_delete(r->server, session);
+    am_cache_delete(r, session);
 }

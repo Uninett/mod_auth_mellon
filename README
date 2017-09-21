@@ -132,6 +132,24 @@ MellonPostSize 1048576
 # Default: MellonPostCount 100
 MellonPostCount 100
 
+# MellonDiagnosticsFile If Mellon was built with diagnostic capability
+# then diagnostic is written here, it may be either a filename or a pipe.
+# If it's a filename then the resulting path is  relative to the ServerRoot.
+# If the value is preceeded by the pipe character "|" it should be followed
+# by a path to a program to receive the log information on its standard input.
+# This is a server context directive, hence it may be specified in the
+# main server config area or within a <VirtualHost> directive.
+# Default: logs/mellon_diagnostics
+MellonDiagnosticsFile logs/mellon_diagnostics
+
+# MellonDiagnosticsEnable If Mellon was built with diagnostic capability
+# then this is a list of words controlling diagnostic output.
+# Currently only On and Off are supported.
+# This is a server context directive, hence it may be specified in the
+# main server config area or within a <VirtualHost> directive.
+# Default: Off
+MellonDiagnosticsEnable Off
+
 ###########################################################################
 # End of global configuration for mod_auth_mellon.
 ###########################################################################

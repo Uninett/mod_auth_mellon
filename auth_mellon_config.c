@@ -78,6 +78,15 @@ static const apr_size_t post_size = 1024 * 1024;
  */
 static const int post_count = 100;
 
+#ifdef WITH_DIAGNOSTICS
+/* Default filename for mellon diagnostics log file.
+ * Relative pathname is relative to server root. */
+static const char *default_diag_filename = "logs/mellon_diagnostics";
+
+/* Default state for diagnostics is off */
+static am_diag_flags_t default_diag_flags = AM_DIAG_FLAG_DISABLE;
+#endif
+
 /* whether to merge env. vars or not
  * the MellonMergeEnvVars configuration directive if you change this.
  */
@@ -176,9 +185,8 @@ static const char *am_set_table_string_slot(cmd_parms *cmd,
     return NULL;
 }
 
-/* This function handles configuration directives which set a file
- * slot in the module configuration. If lasso is recent enough, it
- * attempts to read the file immediatly.
+/* This function handles configuration directives which set a file slot
+ * in the module configuration. The file contents are immediately read.
  *
  * Parameters:
  *  cmd_parms *cmd       The command structure for this configuration
@@ -192,12 +200,15 @@ static const char *am_set_table_string_slot(cmd_parms *cmd,
  * Returns:
  *  NULL on success or an error string on failure.
  */
-static const char *am_set_filestring_slot(cmd_parms *cmd,
+static const char *am_set_file_contents_slot(cmd_parms *cmd,
                                           void *struct_ptr,
                                           const char *arg)
 {
-    const char *data;
     const char *path;
+    apr_status_t rv;
+    am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
+    int offset;
+    am_file_data_t **p_file_data, *file_data;
 
     path = ap_server_root_relative(cmd->pool, arg);
     if (!path) {
@@ -205,29 +216,64 @@ static const char *am_set_filestring_slot(cmd_parms *cmd,
                            ": Invalid file path ", arg, NULL);
     }
 
-#ifdef HAVE_lasso_server_new_from_buffers
-    data = am_getfile(cmd->pool, cmd->server, path);
-    if (!data) {
-        return apr_pstrcat(cmd->pool, cmd->cmd->name,
-                           ": Cannot read file ", path, NULL);
+    offset = (int)(long)cmd->info;
+    p_file_data = (am_file_data_t **)((char *)cfg + offset);
+    *p_file_data = am_file_data_new(cmd->pool, path);
+    file_data = *p_file_data;
+    rv = am_file_read(file_data);
+    if (rv != APR_SUCCESS) {
+        return file_data->strerror;
     }
-#else
-    apr_finfo_t finfo;
+
+    return NULL;
+}
+
+/* This function handles configuration directives which set a file
+ * pathname in the module configuration. The file is checked for
+ * existence.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *                       This value isn't used by this function.
+ *  const char *arg      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_file_pathname_slot(cmd_parms *cmd,
+                                             void *struct_ptr,
+                                             const char *arg)
+{
+    const char *path;
     apr_status_t rv;
-    char error[64];
+    am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
+    int offset;
+    am_file_data_t **p_file_data, *file_data;
 
-    rv = apr_stat(&finfo, path, APR_FINFO_SIZE, cmd->pool);
-    if(rv != 0) {
-        apr_strerror(rv, error, sizeof(error));
-        return apr_psprintf(cmd->pool,
-                            "%s - Cannot read file \"%s\" [%d] \"%s\"",
-                            cmd->cmd->name, path, rv, error);
+    path = ap_server_root_relative(cmd->pool, arg);
+    if (!path) {
+        return apr_pstrcat(cmd->pool, cmd->cmd->name,
+                           ": Invalid file_data path ", arg, NULL);
     }
 
-    data = path;
-#endif
+    offset = (int)(long)cmd->info;
+    p_file_data = (am_file_data_t **)((char *)cfg + offset);
+    *p_file_data = am_file_data_new(cmd->pool, path);
+    file_data = *p_file_data;
+    rv = am_file_stat(file_data);
+    if (rv != APR_SUCCESS) {
+        return file_data->strerror;
+    }
+    if (file_data->finfo.filetype != APR_REG) {
+        return apr_psprintf(cmd->pool, "file \"%s\" is not a regular file",
+                            file_data->path);
+    }
 
-    return ap_set_string_slot(cmd, struct_ptr, data);
+    return NULL;
 }
 
 
@@ -305,6 +351,8 @@ static const char *am_set_idp_string_slot(cmd_parms *cmd,
     server_rec *s = cmd->server;
     apr_pool_t *pconf = s->process->pconf;
     am_dir_cfg_rec *cfg = (am_dir_cfg_rec *)struct_ptr;
+    am_file_data_t *idp_file_data = NULL;
+    am_file_data_t *chain_file_data = NULL;
 
 #ifndef HAVE_lasso_server_load_metadata
     if (chain != NULL)
@@ -313,9 +361,23 @@ static const char *am_set_idp_string_slot(cmd_parms *cmd,
                             "lasso_server_load_metadata()", cmd->cmd->name);
 #endif /* HAVE_lasso_server_load_metadata */
 
+    idp_file_data = am_file_data_new(pconf, metadata);
+    if (am_file_stat(idp_file_data) != APR_SUCCESS) {
+        return idp_file_data->strerror;
+    }
+
+    if (chain) {
+        chain_file_data = am_file_data_new(pconf, chain);
+        if (am_file_stat(chain_file_data) != APR_SUCCESS) {
+            return chain_file_data->strerror;
+        }
+    } else {
+        chain_file_data = NULL;
+    }
+
     am_metadata_t *idp_metadata = apr_array_push(cfg->idp_metadata);
-    idp_metadata->file = apr_pstrdup(pconf, metadata);
-    idp_metadata->chain = apr_pstrdup(pconf, chain);
+    idp_metadata->metadata = idp_file_data;
+    idp_metadata->chain = chain_file_data;
 
     return NULL;
 }
@@ -415,6 +477,78 @@ static const char *am_set_module_config_int_slot(cmd_parms *cmd,
                                                  const char *arg)
 {
     return ap_set_int_slot(cmd, am_get_mod_cfg(cmd->server), arg);
+}
+
+/* This function handles the MellonDiagnosticsFile configuration directive.
+ * It emits as warning in the log file if Mellon is not built with
+ * diagnostics enabled.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *  const char *arg      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_module_diag_file_slot(cmd_parms *cmd,
+                                                    void *struct_ptr,
+                                                    const char *arg)
+{
+#ifdef WITH_DIAGNOSTICS
+    return ap_set_file_slot(cmd, am_get_diag_cfg(cmd->server), arg);
+#else
+    ap_log_error(APLOG_MARK, APLOG_WARNING, 0, cmd->server,
+                 "%s has no effect because Mellon was not compiled with"
+                 " diagnostics enabled, use ./configure --with-diagnostics"
+                 " at build time to turn this feature on.",
+                 cmd->directive->directive);
+    return NULL;
+#endif
+}
+
+/* This function handles configuration directives which sets the
+ * diagnostics flags in the module configuration.
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *                       NULL if we are not in a directory configuration.
+ *  const char *arg      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *
+ * Returns:
+ *  NULL on success or an error string on failure.
+ */
+static const char *am_set_module_diag_flags_slot(cmd_parms *cmd,
+                                                 void *struct_ptr,
+                                                 const char *arg)
+{
+#ifdef WITH_DIAGNOSTICS
+    am_diag_cfg_rec *diag_cfg = am_get_diag_cfg(cmd->server);
+
+    if (strcasecmp(arg, "on") == 0) {
+        diag_cfg->flags = AM_DIAG_FLAG_ENABLE_ALL;
+    }
+    else if (strcasecmp(arg, "off") == 0) {
+        diag_cfg->flags = AM_DIAG_FLAG_DISABLE;
+    } else {
+        return apr_psprintf(cmd->pool, "%s: must be one of: 'on', 'off'",
+                            cmd->cmd->name);
+    }
+    return NULL;
+#else
+    ap_log_error(APLOG_MARK, APLOG_WARNING, 0, cmd->server,
+                 "%s has no effect because Mellon was not compiled with"
+                 " diagnostics enabled, use ./configure --with-diagnostics"
+                 " at build time to turn this feature on.",
+                 cmd->directive->directive);
+    return NULL;
+#endif
 }
 
 /* This function handles the MellonCookieSameSite configuration directive.
@@ -631,7 +765,7 @@ static const char *am_set_setenv_no_prefix_slot(cmd_parms *cmd,
 static int am_cond_flags(const char *arg)
 {
     int flags = AM_COND_FLAG_NULL; 
-    static const char const *options[] = { 
+    static const char * const options[] = {
         "OR",  /* AM_EXPIRE_FLAG_OR */
         "NOT", /* AM_EXPIRE_FLAG_NOT */
         "REG", /* AM_EXPIRE_FLAG_REG */
@@ -1070,6 +1204,30 @@ const command_rec auth_mellon_commands[] = {
         "The maximum size of a saved POST, in bytes."
         " Default value is 1048576 (1 MB)."
         ), 
+    AP_INIT_TAKE1(
+        "MellonDiagnosticsFile",
+        am_set_module_diag_file_slot,
+#ifdef WITH_DIAGNOSTICS
+        (void *)APR_OFFSETOF(am_diag_cfg_rec, filename),
+#else
+        NULL,
+#endif
+        RSRC_CONF,
+        "Dianostics log file. [file|pipe] "
+        "If file then file is a filename, relative to the ServerRoot."
+        "If pipe then the filename is a pipe character \"|\", "
+        "followed by the path to a program to receive the log information "
+        "on its standard input. "
+        " Default value is \"logs/mellon_diagnostics\"."
+        ),
+    AP_INIT_ITERATE(
+        "MellonDiagnosticsEnable",
+        am_set_module_diag_flags_slot,
+        NULL,
+        RSRC_CONF,
+        "Dianostics flags. [on|off] "
+        " Default value is \"off\"."
+        ),
 
 
     /* Per-location configuration directives. */
@@ -1230,21 +1388,21 @@ const command_rec auth_mellon_commands[] = {
         ),
     AP_INIT_TAKE1(
         "MellonSPMetadataFile",
-        am_set_filestring_slot,
+        am_set_file_contents_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_metadata_file),
         OR_AUTHCFG,
         "Full path to xml file with metadata for the SP."
         ),
     AP_INIT_TAKE1(
         "MellonSPPrivateKeyFile",
-        am_set_filestring_slot,
+        am_set_file_contents_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_private_key_file),
         OR_AUTHCFG,
         "Full path to pem file with the private key for the SP."
         ),
     AP_INIT_TAKE1(
         "MellonSPCertFile",
-        am_set_filestring_slot,
+        am_set_file_contents_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, sp_cert_file),
         OR_AUTHCFG,
         "Full path to pem file with certificate for the SP."
@@ -1267,14 +1425,14 @@ const command_rec auth_mellon_commands[] = {
         ),
     AP_INIT_TAKE1(
         "MellonIdPPublicKeyFile",
-        ap_set_file_slot,
+        am_set_file_pathname_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, idp_public_key_file),
         OR_AUTHCFG,
         "Full path to pem file with the public key for the IdP."
         ),
     AP_INIT_TAKE1(
         "MellonIdPCAFile",
-        ap_set_file_slot,
+        am_set_file_pathname_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, idp_ca_file),
         OR_AUTHCFG,
         "Full path to pem file with CA chain for the IdP."
@@ -1679,7 +1837,6 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                                      add_cfg->no_success_error_page :
                                      base_cfg->no_success_error_page);
 
-
     new_cfg->sp_metadata_file = (add_cfg->sp_metadata_file ?
                                  add_cfg->sp_metadata_file :
                                  base_cfg->sp_metadata_file);
@@ -1803,6 +1960,13 @@ void *auth_mellon_server_config(apr_pool_t *p, server_rec *s)
 
     srv = apr_palloc(p, sizeof(*srv));
 
+#ifdef WITH_DIAGNOSTICS
+    srv->diag_cfg.filename = default_diag_filename;
+    srv->diag_cfg.fd = NULL;
+    srv->diag_cfg.flags = default_diag_flags;
+    srv->diag_cfg.dir_cfg_emitted = apr_table_make(p, 0);
+#endif
+
     /* we want to keeep our global configuration of shared memory and
      * mutexes, so we try to find it in the userdata before doing anything
      * else */
@@ -1834,6 +1998,45 @@ void *auth_mellon_server_config(apr_pool_t *p, server_rec *s)
     apr_pool_userdata_set(mod, key, apr_pool_cleanup_null, p);
 
     srv->mc = mod;
+
     return srv;
 }
 
+/* This function merges two am_srv_cfg_rec structures.
+ * It will try to inherit from the base where possible.
+ *
+ * Parameters:
+ *  apr_pool_t *p        The pool we should allocate memory from.
+ *  void *base           The original structure.
+ *  void *add            The structure we should add to base.
+ *
+ * Returns:
+ *  The merged structure.
+ */
+void *auth_mellon_srv_merge(apr_pool_t *p, void *base, void *add)
+{
+    am_srv_cfg_rec *base_cfg = (am_srv_cfg_rec *)base;
+    am_srv_cfg_rec *new_cfg;
+
+    new_cfg = (am_srv_cfg_rec *)apr_palloc(p, sizeof(*new_cfg));
+
+    new_cfg->mc = base_cfg->mc;
+
+#ifdef WITH_DIAGNOSTICS
+    am_srv_cfg_rec *add_cfg = (am_srv_cfg_rec *)add;
+    new_cfg->diag_cfg.filename = (add_cfg->diag_cfg.filename !=
+                                  default_diag_filename ?
+                                  add_cfg->diag_cfg.filename :
+                                  base_cfg->diag_cfg.filename);
+
+    new_cfg->diag_cfg.flags = (add_cfg->diag_cfg.flags !=
+                               default_diag_flags ?
+                               add_cfg->diag_cfg.flags :
+                               base_cfg->diag_cfg.flags);
+
+    new_cfg->diag_cfg.dir_cfg_emitted = apr_table_make(p, 0);
+
+#endif
+
+    return new_cfg;
+}
