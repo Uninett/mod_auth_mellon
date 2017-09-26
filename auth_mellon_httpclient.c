@@ -255,7 +255,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
     /* Initialize the curl object. */
     curl = curl_easy_init();
     if(curl == NULL) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to initialize a curl object.");
         return NULL;
     }
@@ -264,7 +264,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
     /* Set up error reporting. */
     res = curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_error);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to set curl error buffer: [%u]\n", res);
         goto cleanup_fail;
     }
@@ -272,7 +272,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
     /* Disable progress reporting. */
     res = curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to disable curl progress reporting: [%u] %s",
                       res, curl_error);
         goto cleanup_fail;
@@ -281,7 +281,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
     /* Disable use of signals. */
     res = curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to disable signals in curl: [%u] %s",
                       res, curl_error);
         goto cleanup_fail;
@@ -290,7 +290,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
     /* Set the timeout of the transfer. It is currently set to two minutes. */
     res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to set the timeout of the curl download:"
                       " [%u] %s", res, curl_error);
         goto cleanup_fail;
@@ -298,11 +298,11 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
 
     /* If we have a CA configured, try to use it */
     if (cfg->idp_ca_file != NULL) {
-        res = curl_easy_setopt(curl, CURLOPT_CAINFO, cfg->idp_ca_file);
+        res = curl_easy_setopt(curl, CURLOPT_CAINFO, cfg->idp_ca_file->path);
         if(res != CURLE_OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Failed to set SSL CA info %s:"
-                          " [%u] %s", cfg->idp_ca_file, res, curl_error);
+                          " [%u] %s", cfg->idp_ca_file->path, res, curl_error);
             goto cleanup_fail;
         }
     }
@@ -310,7 +310,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
     /* Enable fail on http error. */
     res = curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to enable failure on http error: [%u] %s",
                       res, curl_error);
         goto cleanup_fail;
@@ -319,7 +319,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
     /* Select which uri we should download. */
     res = curl_easy_setopt(curl, CURLOPT_URL, uri);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to set curl download uri to \"%s\": [%u] %s",
                       uri, res, curl_error);
         goto cleanup_fail;
@@ -331,7 +331,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
     /* Set curl write function. */
     res = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, am_hc_data_write);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to set the curl write function: [%u] %s",
                       res, curl_error);
         goto cleanup_fail;
@@ -340,7 +340,7 @@ static CURL *am_httpclient_init_curl(request_rec *r, const char *uri,
     /* Set the curl write function parameter. */
     res = curl_easy_setopt(curl, CURLOPT_WRITEDATA, bh);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to set the curl write function data: [%u] %s",
                       res, curl_error);
         goto cleanup_fail;
@@ -394,7 +394,7 @@ int am_httpclient_get(request_rec *r, const char *uri,
 
     res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)timeout);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to download data from the uri \"%s\", "
                       "cannot set timeout to %ld: [%u] %s",
                       uri, (long)timeout, res, curl_error);
@@ -403,7 +403,7 @@ int am_httpclient_get(request_rec *r, const char *uri,
     
     res = curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, (long)timeout);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to download data from the uri \"%s\", "
                       "cannot set connect timeout to %ld: [%u] %s",
                       uri, (long)timeout,  res, curl_error);
@@ -413,7 +413,7 @@ int am_httpclient_get(request_rec *r, const char *uri,
     /* Do the download. */
     res = curl_easy_perform(curl);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to download data from the uri \"%s\", "
                       "transaction aborted: [%u] %s",
                       uri, res, curl_error);
@@ -423,7 +423,7 @@ int am_httpclient_get(request_rec *r, const char *uri,
     if (status != NULL) {
         res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, status);
         if(res != CURLE_OK) {
-            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+            AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                           "Failed to download data from the uri \"%s\", "
                           "no status report: [%u] %s",
                           uri, res, curl_error);
@@ -496,7 +496,7 @@ int am_httpclient_post(request_rec *r, const char *uri,
     /* Enable POST request. */
     res = curl_easy_setopt(curl, CURLOPT_POST, 1L);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to enable POST request: [%u] %s",
                       res, curl_error);
         goto cleanup_fail;
@@ -505,7 +505,7 @@ int am_httpclient_post(request_rec *r, const char *uri,
     /* Set POST data size. */
     res = curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, post_length);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to set the POST data length: [%u] %s",
                       res, curl_error);
         goto cleanup_fail;
@@ -514,7 +514,7 @@ int am_httpclient_post(request_rec *r, const char *uri,
     /* Set POST data. */
     res = curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to set the POST data: [%u] %s",
                       res, curl_error);
         goto cleanup_fail;
@@ -540,7 +540,7 @@ int am_httpclient_post(request_rec *r, const char *uri,
     /* Set headers. */
     res = curl_easy_setopt(curl, CURLOPT_HTTPHEADER, ctheader);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to set content-type header to \"%s\": [%u] %s",
                       content_type, res, curl_error);
         goto cleanup_fail;
@@ -550,7 +550,7 @@ int am_httpclient_post(request_rec *r, const char *uri,
     /* Do the download. */
     res = curl_easy_perform(curl);
     if(res != CURLE_OK) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+        AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to download data from the uri \"%s\": [%u] %s",
                       uri, res, curl_error);
         goto cleanup_fail;

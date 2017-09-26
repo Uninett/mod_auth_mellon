@@ -85,6 +85,14 @@
 #define AM_ERROR_MISSING_PAOS_MEDIA_TYPE 3
 
 
+#ifdef ENABLE_DIAGNOSTICS
+typedef enum {
+    AM_DIAG_FLAG_ENABLED       = (1 << 0),
+    AM_DIAG_FLAG_DISABLE       = 0,
+    AM_DIAG_FLAG_ENABLE_ALL    = ~0,
+} am_diag_flags_t;
+#endif
+
 /* This is the length of the id we use (for session IDs and
  * replaying POST data).
  */
@@ -100,6 +108,9 @@
 
 #define am_get_req_cfg(r) (am_req_cfg_rec *)ap_get_module_config((r)->request_config, &auth_mellon_module)
 
+#ifdef ENABLE_DIAGNOSTICS
+#define am_get_diag_cfg(s) (&(am_get_srv_cfg((s)))->diag_cfg)
+#endif
 
 typedef struct am_mod_cfg_rec {
     int cache_size;
@@ -124,8 +135,20 @@ typedef struct am_mod_cfg_rec {
 } am_mod_cfg_rec;
 
 
+#ifdef ENABLE_DIAGNOSTICS
+typedef struct am_diag_cfg_rec {
+    const char *filename;
+    apr_file_t *fd;
+    am_diag_flags_t flags;
+    apr_table_t *dir_cfg_emitted;
+} am_diag_cfg_rec;
+#endif
+
 typedef struct am_srv_cfg_rec {
     am_mod_cfg_rec *mc;
+#ifdef ENABLE_DIAGNOSTICS
+    am_diag_cfg_rec diag_cfg;
+#endif
 } am_srv_cfg_rec;
 
 typedef enum {
@@ -159,6 +182,30 @@ typedef enum {
 
 extern const char *am_cond_options[];
 
+/*
+ * am_file_data_t is used to maintain information about a file:
+ *
+ * * The filesystem pathname
+ * * Stat information about the file (e.g. type, size, times, etc.)
+ * * If and when the file was stat'ed or read
+ * * Error code of failed operation and error string description
+ * * Contents of the file
+ * * Flag indicating if contents were generated instead of being read
+ *   from a file.
+ */
+typedef struct am_file_data_t {
+    apr_pool_t *pool;     /* allocation pool */
+    const char *path;     /* filesystem pathname, NULL for generated file */
+    apr_time_t stat_time; /* when stat was performed, zero indicates never */
+    apr_finfo_t finfo;    /* stat data */
+    char *contents;       /* file contents */
+    apr_time_t read_time; /* when contents was read, zero indicates never */
+    apr_status_t rv;      /* most recent result value */
+    const char *strerror; /* if rv is error then this is error description */
+    bool generated;       /* true if contents generated instead of being
+                             read from path */
+} am_file_data_t;
+
 typedef struct {
     const char *varname;
     int flags;
@@ -168,8 +215,8 @@ typedef struct {
 } am_cond_t;
 
 typedef struct am_metadata {
-    const char *file;    /* Metadata file with one or many IdP */
-    const char *chain;   /* Validating chain */
+    am_file_data_t *metadata; /* Metadata file with one or many IdP */
+    am_file_data_t *chain;    /* Validating chain */
 } am_metadata_t;
 
 typedef struct am_dir_cfg_rec {
@@ -201,12 +248,12 @@ typedef struct am_dir_cfg_rec {
     const char *endpoint_path;
 
     /* Lasso configuration variables. */
-    const char *sp_metadata_file;
-    const char *sp_private_key_file;
-    const char *sp_cert_file;
+    am_file_data_t *sp_metadata_file;
+    am_file_data_t *sp_private_key_file;
+    am_file_data_t *sp_cert_file;
     apr_array_header_t *idp_metadata;
-    const char *idp_public_key_file;
-    const char *idp_ca_file;
+    am_file_data_t *idp_public_key_file;
+    am_file_data_t *idp_ca_file;
     GList *idp_ignore;
 
     /* metadata autogeneration helper */
@@ -260,7 +307,6 @@ typedef struct am_dir_cfg_rec {
 
     /* List of domains we can redirect to. */
     const char * const *redirect_domains;
-
 } am_dir_cfg_rec;
 
 /* Bitmask for PAOS service options */
@@ -277,6 +323,9 @@ typedef struct am_req_cfg_rec {
     bool ecp_authn_req;
     ECPServiceOptions ecp_service_options;
 #endif /* HAVE_ECP */
+#ifdef ENABLE_DIAGNOSTICS
+    bool diag_emitted;
+#endif
 } am_req_cfg_rec;
 
 typedef struct am_cache_storage_t {
@@ -369,6 +418,7 @@ static const int inherit_ecp_send_idplist = -1;
 void *auth_mellon_dir_config(apr_pool_t *p, char *d);
 void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add);
 void *auth_mellon_server_config(apr_pool_t *p, server_rec *s);
+void *auth_mellon_srv_merge(apr_pool_t *p, void *base, void *add);
 
 
 const char *am_cookie_get(request_rec *r);
@@ -378,23 +428,23 @@ const char *am_cookie_token(request_rec *r);
 
 
 void am_cache_init(am_mod_cfg_rec *mod_cfg);
-am_cache_entry_t *am_cache_lock(server_rec *s, 
+am_cache_entry_t *am_cache_lock(request_rec *r, 
                                 am_cache_key_t type, const char *key);
 const char *am_cache_entry_get_string(am_cache_entry_t *e,
                                       am_cache_storage_t *slot);
-am_cache_entry_t *am_cache_new(server_rec *s,
+am_cache_entry_t *am_cache_new(request_rec *r,
                                const char *key,
                                const char *cookie_token);
-void am_cache_unlock(server_rec *s, am_cache_entry_t *entry);
+void am_cache_unlock(request_rec *r, am_cache_entry_t *entry);
 
-void am_cache_update_expires(am_cache_entry_t *t, apr_time_t expires);
+void am_cache_update_expires(request_rec *r, am_cache_entry_t *t, apr_time_t expires);
 
 void am_cache_env_populate(request_rec *r, am_cache_entry_t *session);
 int am_cache_env_append(am_cache_entry_t *session,
                         const char *var, const char *val);
 const char *am_cache_env_fetch_first(am_cache_entry_t *t,
                                      const char *var);
-void am_cache_delete(server_rec *s, am_cache_entry_t *session);
+void am_cache_delete(request_rec *r, am_cache_entry_t *session);
 
 int am_cache_set_lasso_state(am_cache_entry_t *session,
                              const char *lasso_identity,
@@ -424,7 +474,11 @@ char *am_urlencode(apr_pool_t *pool, const char *str);
 int am_urldecode(char *data);
 int am_check_url(request_rec *r, const char *url);
 char *am_generate_id(request_rec *r);
-char *am_getfile(apr_pool_t *conf, server_rec *s, const char *file);
+am_file_data_t *am_file_data_new(apr_pool_t *pool, const char *path);
+am_file_data_t *am_file_data_copy(apr_pool_t *pool,
+                                  am_file_data_t *src_file_data);
+apr_status_t am_file_read(am_file_data_t *file_data);
+apr_status_t am_file_stat(am_file_data_t *file_data);
 char *am_get_endpoint_url(request_rec *r);
 int am_postdir_cleanup(request_rec *s);
 char *am_htmlencode(request_rec *r, const char *str);
@@ -474,5 +528,88 @@ int am_httpclient_post_str(request_rec *r, const char *uri,
 
 
 extern module AP_MODULE_DECLARE_DATA auth_mellon_module;
+
+#ifdef ENABLE_DIAGNOSTICS
+
+/* Initializing an apr_time_t to 0x7fffffffffffffffLL yields an
+ * iso 8601 time with 1 second precision of "294247-01-10T04:00:54Z"
+ * this is 22 characters, +1 for null terminator. */
+#define ISO_8601_BUF_SIZE 23
+
+typedef struct {
+    bool req_headers_written;
+} am_diag_request_data;
+
+const char *
+am_diag_cache_key_type_str(am_cache_key_t key_type);
+
+const char *
+am_diag_cond_str(request_rec *r, const am_cond_t *cond);
+
+int
+am_diag_finalize_request(request_rec *r);
+
+const char *
+am_diag_lasso_http_method_str(LassoHttpMethod http_method);
+
+void
+am_diag_log_cache_entry(request_rec *r, int level, am_cache_entry_t *entry,
+                        const char *fmt, ...)
+    __attribute__((format(printf,4,5)));
+
+void
+am_diag_log_file_data(request_rec *r, int level, am_file_data_t *file_data,
+                      const char *fmt, ...)
+    __attribute__((format(printf,4,5)));
+
+int
+am_diag_log_init(apr_pool_t *pc, apr_pool_t *p, apr_pool_t *pt, server_rec *s);
+
+void
+am_diag_log_lasso_node(request_rec *r, int level, LassoNode *node,
+                       const char *fmt, ...)
+    __attribute__((format(printf,4,5)));
+
+void
+am_diag_log_profile(request_rec *r, int level, LassoProfile *profile,
+                    const char *fmt, ...)
+    __attribute__((format(printf,4,5)));
+
+void
+am_diag_printf(request_rec *r, const char *fmt, ...)
+    __attribute__((format(printf,2,3)));
+
+void
+am_diag_rerror(const char *file, int line, int module_index,
+               int level, apr_status_t status,
+               request_rec *r, const char *fmt, ...);
+
+char *
+am_diag_time_t_to_8601(request_rec *r, apr_time_t t);
+
+/* Define AM_LOG_RERROR log to both the Apache log and diagnostics log */
+#define AM_LOG_RERROR(...) AM_LOG_RERROR__(__VA_ARGS__)
+/* need additional step to expand macros */
+#define AM_LOG_RERROR__(file, line, mi, level, status, r, ...)          \
+{                                                                       \
+    ap_log_rerror(file, line, mi, level, status, r, __VA_ARGS__);       \
+    am_diag_rerror(file, line, mi, level, status, r, __VA_ARGS__);      \
+}
+
+#else  /* ENABLE_DIAGNOSTICS */
+
+#define am_diag_log_cache_entry(...) do {} while(0)
+#define am_diag_log_file_data(...) do {} while(0)
+#define am_diag_log_lasso_node(...) do {} while(0)
+#define am_diag_log_profile(...) do {} while(0)
+#define am_diag_printf(...) do {} while(0)
+
+/* Define AM_LOG_RERROR log only to the Apache log */
+#define AM_LOG_RERROR(...) AM_LOG_RERROR__(__VA_ARGS__)
+/* need additional step to expand macros */
+#define AM_LOG_RERROR__(file, line, mi, level, status, r, ...)  \
+ap_log_rerror(file, line, mi, level, status, r, __VA_ARGS__);
+
+#endif /* ENABLE_DIAGNOSTICS */
 
 #endif /* MOD_AUTH_MELLON_H */

@@ -1,8 +1,11 @@
 
 # Source files. mod_auth_mellon.c must be the first file.
 SRC=mod_auth_mellon.c \
-	auth_mellon_cache.c auth_mellon_config.c \
-	auth_mellon_cookie.c auth_mellon_handler.c \
+	auth_mellon_cache.c \
+	auth_mellon_config.c \
+	auth_mellon_cookie.c \
+	auth_mellon_diagnostics.c \
+	auth_mellon_handler.c \
 	auth_mellon_util.c \
 	auth_mellon_session.c \
 	auth_mellon_httpclient.c
@@ -25,7 +28,7 @@ DISTFILES=$(SRC) \
 all:	mod_auth_mellon.la
 
 mod_auth_mellon.la: $(SRC) auth_mellon.h auth_mellon_compat.h
-	@APXS2@ -Wc,"-std=c99 @OPENSSL_CFLAGS@ @LASSO_CFLAGS@ @CURL_CFLAGS@ @GLIB_CFLAGS@ @CFLAGS@" -Wl,"@OPENSSL_LIBS@ @LASSO_LIBS@ @CURL_LIBS@ @GLIB_LIBS@" -Wc,-Wall -Wc,-g -c $(SRC)
+	@APXS2@ -Wc,"-std=c99 @MELLON_CFLAGS@ @OPENSSL_CFLAGS@ @LASSO_CFLAGS@ @CURL_CFLAGS@ @GLIB_CFLAGS@ @CFLAGS@" -Wl,"@OPENSSL_LIBS@ @LASSO_LIBS@ @CURL_LIBS@ @GLIB_LIBS@" -Wc,-Wall -Wc,-g -c $(SRC)
 
 
 # Building configure (for distribution)
@@ -46,6 +49,7 @@ distfile:	@NAMEVER@.tar.gz
 .PHONY:	clean
 clean:
 	rm -f mod_auth_mellon.la
+	rm -f $(SRC:%.c=%.o)
 	rm -f $(SRC:%.c=%.lo)
 	rm -f $(SRC:%.c=%.slo)
 	rm -rf .libs/

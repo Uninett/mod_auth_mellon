@@ -195,6 +195,9 @@ static int am_create_request(request_rec *r)
 #ifdef HAVE_ECP
     req_cfg->ecp_authn_req = false;
 #endif /* HAVE_ECP */
+#ifdef ENABLE_DIAGNOSTICS
+    req_cfg->diag_emitted = false;
+#endif
 
     ap_set_module_config(r->request_config, &auth_mellon_module, req_cfg);
 
@@ -220,7 +223,11 @@ static void register_hooks(apr_pool_t *p)
      * r->handler and decide that it is the only handler for this URL.
      */
     ap_hook_handler(am_handler, NULL, NULL, APR_HOOK_FIRST);
-    return;
+
+#ifdef ENABLE_DIAGNOSTICS
+    ap_hook_open_logs(am_diag_log_init,NULL,NULL,APR_HOOK_MIDDLE);
+    ap_hook_log_transaction(am_diag_finalize_request,NULL,NULL,APR_HOOK_REALLY_LAST);
+#endif
 }
 
 
@@ -230,7 +237,7 @@ module AP_MODULE_DECLARE_DATA auth_mellon_module =
     auth_mellon_dir_config,
     auth_mellon_dir_merge,
     auth_mellon_server_config,
-    NULL,
+    auth_mellon_srv_merge,
     auth_mellon_commands,
     register_hooks
 };
