@@ -1,4 +1,5 @@
 AC_INIT([mod_auth_mellon],[0.13.1],[olav.morken@uninett.no])
+AC_CONFIG_HEADERS([config.h])
 
 # We require support for C99.
 AC_PROG_CC_C99
@@ -49,7 +50,7 @@ AC_ARG_ENABLE(
         [enable_diagnostics=no])
 
 AS_IF([test "x$enable_diagnostics" != xno],
-      [MELLON_CFLAGS="$MELLON_CFLAGS -DENABLE_DIAGNOSTICS"])
+      [AC_DEFINE([ENABLE_DIAGNOSTICS],[],[build with diagnostics])])
 
 # Replace any occurances of @APXS2@ with the value of $APXS2 in the Makefile.
 AC_SUBST(APXS2)
@@ -58,13 +59,17 @@ AC_SUBST(APXS2)
 PKG_CHECK_MODULES(LASSO, lasso)
 saved_LIBS=$LIBS; LIBS="$LIBS $LASSO_LIBS";
 AC_CHECK_LIB(lasso, lasso_server_new_from_buffers,
-	     LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_lasso_server_new_from_buffers")
+	     [AC_DEFINE([HAVE_lasso_server_new_from_buffers],[],
+             [lasso library exports lasso_server_new_from_buffers])])
 AC_CHECK_LIB(lasso, lasso_server_load_metadata,
-             LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_lasso_server_load_metadata")
+             [AC_DEFINE([HAVE_lasso_server_load_metadata],[],
+             [lasso library exports lasso_server_load_metadata])])
 AC_CHECK_LIB(lasso, lasso_profile_set_signature_verify_hint,
-             LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_lasso_profile_set_signature_verify_hint")
+             [AC_DEFINE([HAVE_lasso_profile_set_signature_verify_hint],[],
+             [lasso library exports lasso_profile_set_signature_verify_hint])])
 AC_CHECK_LIB(lasso, lasso_ecp_request_new,
-             LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_ECP")
+             [AC_DEFINE([HAVE_ECP],[],
+             [lasso library supports ECP profile])])
 LIBS=$saved_LIBS;
 AC_SUBST(LASSO_CFLAGS)
 AC_SUBST(LASSO_LIBS)

@@ -1,4 +1,3 @@
-
 # Source files. mod_auth_mellon.c must be the first file.
 SRC=mod_auth_mellon.c \
 	auth_mellon_cache.c \
@@ -9,6 +8,18 @@ SRC=mod_auth_mellon.c \
 	auth_mellon_util.c \
 	auth_mellon_session.c \
 	auth_mellon_httpclient.c
+
+# Documentation files
+USER_GUIDE_FILES=\
+	doc/user_guide/mellon_user_guide.adoc \
+	doc/user_guide/Guardfile \
+	doc/user_guide/README \
+	doc/user_guide/images/chrome_SAML_Chrome_Panel.png \
+	doc/user_guide/images/chrome_SAML_Chrome_Panel.svg \
+	doc/user_guide/images/saml-tracer.png \
+	doc/user_guide/images/saml-tracer.svg \
+	doc/user_guide/images/saml-web-sso.svg
+
 
 # Files to include when making a .tar.gz-file for distribution
 DISTFILES=$(SRC) \
@@ -22,8 +33,8 @@ DISTFILES=$(SRC) \
 	README \
 	ECP.rst \
 	COPYING \
-	NEWS
-
+	NEWS \
+	$(USER_GUIDE_FILES)
 
 all:	mod_auth_mellon.la
 

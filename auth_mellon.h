@@ -22,6 +22,8 @@
 #ifndef MOD_AUTH_MELLON_H
 #define MOD_AUTH_MELLON_H
 
+#include "config.h"
+
 #include <stdbool.h>
 
 #include <lasso/lasso.h>
