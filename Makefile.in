@@ -23,6 +23,7 @@ USER_GUIDE_FILES=\
 
 # Files to include when making a .tar.gz-file for distribution
 DISTFILES=$(SRC) \
+	config.h.in \
 	auth_mellon.h \
 	auth_mellon_compat.h \
 	lasso_compat.h \
