@@ -1461,8 +1461,8 @@ static int am_validate_conditions(request_rec *r,
 
         if (ar->Audience == NULL || strcmp(ar->Audience, providerID)) {
             AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
-                          "Invalid Audience in Conditions. Should be: %s",
-                          providerID);
+                          "Invalid Audience in Conditions. Should be '%s', but was '%s'",
+                          providerID, ar->Audience ? ar->Audience : "");
             return HTTP_BAD_REQUEST;
         }
     }
@@ -1791,8 +1791,8 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     if (response->parent.Destination) {
         if (strcmp(response->parent.Destination, url)) {
             AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
-                          "Invalid Destination on Response. Should be: %s",
-                          url);
+                          "Invalid Destination on Response. Should be '%s', but was '%s'",
+                          url, response->parent.Destination);
             lasso_login_destroy(login);
             return HTTP_BAD_REQUEST;
         }
