@@ -1,13 +1,23 @@
 = mod_auth_mellon User Guide
 John Dennis <jdennis@redhat.com>
-v1.2, 2017-06-15
+v1.2, 2017-10-6
 :toc: left
 :toclevels: 3
 :numbered:
 :icons: font
 :imagesdir: images
 
-. Example Data used in this document
+== Colophon
+
+Author: {author} {email}
+
+Version: {revnumber}
+
+Date: {revdate}
+
+== Document Conventions
+
+.Example Data used in this document
 ****
 
 This document contains many examples of SAML data. For consistency we
@@ -364,21 +374,217 @@ metadata would be `https://bigcorp.com/saml/metadata`. The only reason
 why "metadata" appears in the `entityID` is because that is Mellon's
 URL endpoint for metadata publication.
 
-=== Username, NameID [[name_id]]
+=== Username, userid, SAML NameID [[name_id]]
+
+==== Userid vs. Identity (or why userid is so last millennium)
+
+Many people struggle with the notion of _userid_ when working with
+SAML (or any other federated identity system). That's because
+historically _userid_ has been used to describe _identity_. The two
+are not the same. _Identity_ identifies who or what something is for
+the purpose of authentication and authorization as well as binding
+attributes to that identity. In most of the literature the terms
+_subject_ and _principal_ are used interchangeably to encapsulate the
+concept of who or what is being identified. Although although a
+subject is often a person it need not be, it might also be an
+inanimate object. A good example of a non-human subject would be a
+computer service needing to be authenticated in order to perform
+an operation.
+
+Userid's grew out of the early days of computing when all computing
+was local and users were given accounts on a local system. The userid
+was how operating systems tracked who a user was, in most cases it was
+an integer. Clearly the integer userid only had meaning in the context
+of the local system. As systems became networked integer userid's
+would be shared between systems but fundamentally nothing had changed,
+the userid was still meaningful only among a group of cooperating
+computers. Tools such as Yellow Pages, NIS, LDAP and Active Directory
+were developed to provide a centralized repository of userid's that
+could be shared between cooperating networked computers. Along the way
+the integer userid morphed into a string often partitioned into a
+local part and a domain part. The domain part is used to identify the
+realm. Realms are nothing other than collections of _unique_ userid's
+often serving the needs of a organizational unit (e.g. company or
+institution).
+
+A key concept is whoever is providing the userid, whether it be local
+accounts created by the host operating system or a network provider of
+userid's such as NIS or LDAP each of these is an *identity provider*
+(i.e. IdP) with the _userid_ being the *key* used by _that_ specific
+*identity provider* to lookup the *identity*. Hence _userid's are only
+meaningful in the context of a specific IdP!_.
+
+By definition _federated identity_ is amalgamation of diverse
+unrelated identity providers each of which utilizes it's own userid as
+a key to lookup an identity. Therefore while deploying federated
+identity if you cling to concept of a single userid you are likely to
+be frustrated because you are abusing the concept.
+
+==== How SAML identifies a subject
 
 In SAML the user name (e.g. principal or subject) is conveyed as part of
-the `<Subject>` element of the assertion in the `<NameID>`
-element. The `NameID` can be in a variety of formats (`NameIDFormat`)
-controlled by the `NameIDPolicy`
+the `<Subject>` element in the assertion. The subject identifier can
+be any one of these elements:
 
-NOTE: Mellon extracts the `<NameID>` element from the
-assertions `<Subject>` element and sets this to `NAME_ID` attribute. If
+* `<BaseID>`
+* `<NameID>`
+* `<EncryptedID>`
+
+The most common is `<NameID>` and it usually includes a `Format`
+attribute. If the `Format` attribute is absent then it defaults to the
+unspecified `Format`. The `Format` attribute tells you how to interpret
+the `NameID` value. For example if the subject's `NameID` format is
+`urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress` you know the
+subject is being identified by their email address.
+
+The currently defined `NameID` formats are:
+
+Unspecified::
+This is used when you don't care what the `NameID` `Format` is, you're
+willing to accept whatever it defaults to by the provider.
+(`urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified`)
+
+Email Address::
+The `NameID` is an email address as specified in RFC 2822 as a
+`addr-spec` in the form `local-part@domain`. No common name
+or other text is included and it is not enclosed in `<` and `>`.
+(`urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress`)
+
+X.509 Subject Name::
+The `NameID` is an X.509 subject name in form specified for the
+`<ds:X509SubjectName>` element in the XML Signature Recommendation.
+(`urn:oasis:names:tc:SAML:1.1:nameid-format:X509SubjectName`)
+
+Windows Domain Qualified Name::
+The `NameID` is a Windows domain qualified name. A Windows domain
+qualified user name is a string of the form "DomainName\UserName". The
+domain name and "\" separator MAY be omitted.
+(`urn:oasis:names:tc:SAML:1.1:nameid-format:WindowsDomainQualifiedName`)
+
+Kerberos Principal Name::
+The `NameID` is in the form of a Kerberos principal name using the
+format name[/instance]@REALM.
+(`urn:oasis:names:tc:SAML:2.0:nameid-format:kerberos`)
+
+Persistent Identifier:: The `NameID` is a _persistent_ opaque
+identifier for a principal that is specific to an identity provider
+and a service provider or affiliation of service providers. Opaque
+means you cannot (easily) map the id to a user. In many cases the
+persistent id is implemented as a random number or random
+string. Persistent means you'll always get the exact same `NameID` for
+the same subject. Refer to <<nameid_policy,NameIDPolicy>> and it's
+`AllowCreate` attribute to understand if the IdP is allowed to create
+a persistent id for the subject if it has not already done so.
+(`urn:oasis:names:tc:SAML:2.0:nameid-format:persistent`)
+
+Transient Identifier::
+The `NameID` is an opaque _temporary_ id. Opaque means you cannot
+(easily) map the id to a user, in many cases it's implemented as a
+random number or random string. Temporary means the id is valid _only_ in the
+context of the assertion response which contains it. Think of a
+transient id as a one-time id that cannot be used again or referred to
+again.
+(`urn:oasis:names:tc:SAML:2.0:nameid-format:transient`)
+
+IMPORTANT: The important concept here is SAML's `NameID` as used to
+identify a subject is not the traditional userid you are probably
+used to. Furthermore SAML's `NameID` _may_ only be meaningful to the IdP
+which issued it.
+
+==== Burden of interpretation NameID falls to the relying party [[nameid_interpretation]]
+
+Ultimately the SP needs to provide some sort of _userid_ the
+application it is hosting can utilize. _Only the application knows what it
+needs!_
+
+Let's take the example of an application which wishes to
+identify it's users by email address. There are two basic ways you can
+do this with SAML.
+
+1. Specify a `NameIDPolicy` of
+`urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress` when the SP
+submits a `<AuthnRequest>` to the IdP. This tells the IdP you want the
+subject's `NameID` to be their email address.
+
+2. Ignore the `NameID` returned in the assertion entirely, instead use
+the assertion's `email` attribute.
+
+Solution #2 is very important to understand as it illustrates how many
+organizations utilize SAML, they _build an identity from the
+attributes bound to a subject_. They can use one or more attributes to
+build a userid meaningful to the application. They may even require
+the IdP return an attribute unique to the subject across a federation,
+in this instance all IdP's in the federation must support that
+attribute (this is just one approach). The `NameID` is *not* utilized
+in solution #2 in large part because the `NameID` likely to be
+uniquely bound to the given IdP. This is why SAML's _transient_
+identifiers are often used, it simply does not matter what the
+`NameID` is because the SP is not utilizing it therefore it can be any
+random one-time value.
+
+It is also important to understand either the `NameID` _or_ the set of
+attributes _or both_ can be used to ultimately derive an identity to
+pass to the application.
+
+Another approach is to utilize SAML's _persistent id_ with the
+observation the two-tuple (IdP, persistent id) always uniquely
+and repeatably identifies the subject. The SP can maintain a table
+that maps the two-tuple of (IdP, persistent id) to an application
+specific _identity_ using this technique.
+
+==== How Mellon handles the NameID
+
+Mellon extracts the `<NameID>` element from the
+assertion's `<Subject>` element and sets this to `NAME_ID` attribute. If
 `<NameID>` is absent in the assertion you can change what Mellon
 considers the user name to be to another value in one of the
 assertions attributes if you wish. `MellonUser` names the attribute
 you wish to use instead.. If you want to export the username as
 `REMOTE_USER` so your web app can process this very common CGI
 variable see <<set_remote_user>>
+
+NOTE: Please be aware blindly exporting the SAML `NameID` to the
+application may or may not be appropriate for the application. See the
+explanation of <<nameid_interpretation,NameID interpretation>> to
+understand the issues.
+
+==== How do you specify the NameID format in SAML?
+
+In SAML there are 2 configuration options related to the use of
+`NameID`:
+
++1.+ A provider declares which `NamdID` formats it supports in it's
+<<metadata,metadata>> via the `<NameIDFormat>` element.
+The following metadata excerpt illustrates a provider
+which supports the `transient`, `persistent` and `X509SubjectName`
+formats:
+
+[source,xml]
+----
+<NameIDFormat>
+  urn:oasis:names:tc:SAML:2.0:nameid-format:transient
+</NameIDFormat>
+<NameIDFormat>
+    urn:oasis:names:tc:SAML:2.0:nameid-format:persistent
+</NameIDFormat>
+<NameIDFormat>
+    urn:oasis:names:tc:SAML:1.1:nameid-format:X509SubjectName
+</NameIDFormat>
+----
+
++2.+ The SP indicates to the IdP in it's `<AuthnRequest>` what `NameID`
+format it wants returned via the `<NameIDPolicy>` element.  The
+`<NameIDPolicy>` should be one of the `NameIDFormat` elements
+enumerated in the IdP's metadata. The IdP is free to substitute
+another `NameID` format or to return an `InvalidNameIDPolicy` error
+status response if it can't satisfy the request. [[nameid_policy]]
+
+IMPORTANT: Mellon defaults to a `NameIDFormat` of `transient` when it
+<<metadata_creation,generates it's metadata>>. You will need to
+manually edit the `NameIDFormat` in your Mellon SP metadata if you
+wish to use a `NameIDFormat` other than `transient`. When Mellon
+generates it's `<AuthnRequest>` it selects the _first_ `NameIDFormat`
+found in it's metadata as the `NameIDPolicy`.
 
 
 === <AuthnRequest> Example [[authentication_request]]
@@ -429,7 +635,9 @@ for HTTP-POST binding>> to see where this was defined.
 <<sp_metadata_entityid, SP metadata Issuer>> to see where this was
 defined. Also see the general description of <<entityId,SAML Entity ID's>>
 
-<8> `NameIDPolicy`: The SP requests a transient name.
+<8> `NameIDPolicy`: The SP requests the Subject returned in the
+assetion be identified by a transient name. See <<name_id>> for more
+details.
 
 <9> `AllowCreate`: If true then the IdP is allowed to create a new
 identifier for the principal.
@@ -671,7 +879,7 @@ the principal being authenticated in this `<Assertion>`.
 <15> `NameID`: *This is where Mellon obtains the username in the
 assertion.* Because the format is `transient` it is a random value
 assigned by the IdP. Note the `MELLON_NAME_ID` in the Apache
-environment exactly matches this. See <<name_id>>.
+environment exactly matches this. See <<name_id>> for more details.
 
 <16> `AttributeStatement`: This begins the *set of attributes* supplied
 by the IdP.
@@ -965,7 +1173,8 @@ this URL location.
 are sent to this URL location.
 
 <11> Zero or more `<NameIDFormat>` elements enumerate the name
-identifier formats supported by this entity.
+identifier formats supported by this entity. See <<name_id>>  for
+details.
 
 <12> [[sp_metadata_acs]] SAML endpoint, assertions using the HTTP-POST binding are
 delivered to this URL location.
@@ -1072,7 +1281,8 @@ sent to this URL location.
 sent to this URL location.
 
 <10> Zero or more `<NameIDFormat>` elements enumerate the name
-identifier formats supported by this entity.
+identifier formats supported by this entity. See <<name_id>> for more
+details.
 
 <11> SAML endpoint, <AuthnRequest> messages using the HTTP-POST
 binding are sent by the SP to this URL location to establish a Single
