@@ -1,6 +1,6 @@
-#ifdef ENABLE_DIAGNOSTICS
-
 #include "auth_mellon.h"
+
+#ifdef ENABLE_DIAGNOSTICS
 
 #if APR_HAVE_UNISTD_H
 #include <unistd.h>
