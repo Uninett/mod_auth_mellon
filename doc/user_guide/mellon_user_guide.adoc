@@ -88,10 +88,10 @@ discussing entity behavior. The defined SAML roles are:
 Of these we are only interested in Service Providers (SP) and Identity
 Providers (IdP). Mellon is a Service Provider because it provides a
 service to client. Authentication and user information is provided by
-an Identity Provider. The SP relies on the IdP for it's authentication
+an Identity Provider. The SP relies on the IdP for its authentication
 needs. In SAML literature you will often see the term _attesting
 party_ or _asserting party_ which in most contexts means an IdP
-because the IdP attests to, or asserts certain claims in it's role as
+because the IdP attests to, or asserts certain claims in its role as
 an _authority_. On the other hand Service Providers are often referred
 to as a _relying party_ because it _relies_ on the _assertions_
 provided by an _authority_.
@@ -137,7 +137,7 @@ are utilized in each step define what is called a SAML
 <<saml_profiles, SAML profile>>. For example web-sso is defined by the
 _Web Browser SSO Profile_.
 
-SAML data, and it's XML schema are defined in the https://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf[Assertions and Protocols for the OASIS
+SAML data, and its XML schema are defined in the https://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf[Assertions and Protocols for the OASIS
 Security Assertion Markup Language
 (SAML) V2.0] _core_ specification.
 
@@ -176,7 +176,7 @@ the user at the IdP it immediately responds with a `<Assertion>`
 response unless the `<AuthnRequest>` has enabled `ForceAuthn` which
 requires the user to be re-authenticated. See the
 <<authentication_request, AuthnRequest example>> to better understand
-it's contents and how it appears as HTTP data. Part of the data
+its contents and how it appears as HTTP data. Part of the data
 communicated along with the `<AuthnRequest>` is an item known as the
 <<relaystate, RelayState>>. The `RelayState` is the mechanism which
 permits the flow to return to the original requested resource.
@@ -236,13 +236,13 @@ valid session for that user, if so it can skip authenticating the user
 again and instead just issue an `<Assertion>` based on the existing
 session. However the SP can force the IdP to always re-authenticate if
 it passes a `ForceAuthn` value of `True` in the `<AuthnRequest>`. The
-IdP may further be restricted from interacting with the if the
+IdP may further be restricted from interacting with the SP if the
 request contains a `isPassive` value of `True`.
 
 The IdP can inform the SP how long it wishes a SP session to be valid
 by passing the `SessionNotOnOrAfter` attribute in a
 `<AuthnStatement>`. Mellon respects the `SessionNotOnOrAfter`
-attribute and will limit it's session duration based on it.
+attribute and will limit its session duration based on it.
 
 The SP also maintains a session for the user. The SP session is
 communicated between the browser and the SP using a cookie containing
@@ -268,7 +268,7 @@ various provider URL <<endpoints,endpoints>> where SAML communication
 occurs. The `<Assertion>` needs to be sent to one of the SP's
 _AssertionConsumerService_ endpoints, specifically the
 _AssertionConsumerService_ endpoint URL supporting the _HTTP-POST_
-binding. The SP's _AssertionConsumerService_ URL as read from it's
+binding. The SP's _AssertionConsumerService_ URL as read from its
 metadata is set to the action attribute of the HTTP form. _The action
 URL is *not* read from any data in the <AuthnRequest>_, this is one
 safeguard to prevent SAML messages from being sent to a unintended
@@ -295,7 +295,7 @@ data.
 
 === entityID [[entityID]]
 
-Each SAML provider (e.g. a SP or IdP) is identified by it's
+Each SAML provider (e.g. a SP or IdP) is identified by its
 `entityID`. You should think of the `entityID` as the globally unique
 name of the provider. The `entityID` appears in most SAML messages and
 in the providers metadata. This is the mechanism by which a SAML
@@ -319,7 +319,7 @@ SAML places two requirements on the `entityID`:
 A wise administrator will also seek to fulfill this additional
 requirement when choosing an `entityID`:
 
-* It should identity the organization instead of a specific node
+* It should identify the organization instead of a specific node
   within the organization.
 
 When migration time arrives it is far easier to move resources around
@@ -369,8 +369,8 @@ use of MellonEndpointPath. This is why most of the tools surrounding
 Mellon generate an `entityID` as the concatenation of the https
 scheme, the hostname, the MellonEndpointPath and "metadata".  Thus for
 example if the `MellonEndpointPath` for `bigcorp.com` was set to
-`saml` the `entityID` the the URL location for downloading it's
-metadata would be `https://bigcorp.com/saml/metadata`. The only reason
+`saml`, the `entityID` (the URL location for downloading its
+metadata) would be `https://bigcorp.com/saml/metadata`. The only reason
 why "metadata" appears in the `entityID` is because that is Mellon's
 URL endpoint for metadata publication.
 
@@ -415,7 +415,7 @@ userid's such as NIS or LDAP each of these is an *identity provider*
 meaningful in the context of a specific IdP!_.
 
 By definition _federated identity_ is amalgamation of diverse
-unrelated identity providers each of which utilizes it's own userid as
+unrelated identity providers each of which utilizes its own userid as
 a key to lookup an identity. Therefore while deploying federated
 identity if you cling to concept of a single userid you are likely to
 be frustrated because you are abusing the concept.
@@ -472,7 +472,7 @@ and a service provider or affiliation of service providers. Opaque
 means you cannot (easily) map the id to a user. In many cases the
 persistent id is implemented as a random number or random
 string. Persistent means you'll always get the exact same `NameID` for
-the same subject. Refer to <<nameid_policy,NameIDPolicy>> and it's
+the same subject. Refer to <<nameid_policy,NameIDPolicy>> and its
 `AllowCreate` attribute to understand if the IdP is allowed to create
 a persistent id for the subject if it has not already done so.
 (`urn:oasis:names:tc:SAML:2.0:nameid-format:persistent`)
@@ -498,7 +498,7 @@ application it is hosting can utilize. _Only the application knows what it
 needs!_
 
 Let's take the example of an application which wishes to
-identify it's users by email address. There are two basic ways you can
+identify its users by email address. There are two basic ways you can
 do this with SAML.
 
 1. Specify a `NameIDPolicy` of
@@ -553,7 +553,7 @@ understand the issues.
 In SAML there are 2 configuration options related to the use of
 `NameID`:
 
-+1.+ A provider declares which `NamdID` formats it supports in it's
++1.+ A provider declares which `NameID` formats it supports in its
 <<metadata,metadata>> via the `<NameIDFormat>` element.
 The following metadata excerpt illustrates a provider
 which supports the `transient`, `persistent` and `X509SubjectName`
@@ -572,7 +572,7 @@ formats:
 </NameIDFormat>
 ----
 
-+2.+ The SP indicates to the IdP in it's `<AuthnRequest>` what `NameID`
++2.+ The SP indicates to the IdP in its `<AuthnRequest>` what `NameID`
 format it wants returned via the `<NameIDPolicy>` element.  The
 `<NameIDPolicy>` should be one of the `NameIDFormat` elements
 enumerated in the IdP's metadata. The IdP is free to substitute
@@ -580,11 +580,11 @@ another `NameID` format or to return an `InvalidNameIDPolicy` error
 status response if it can't satisfy the request. [[nameid_policy]]
 
 IMPORTANT: Mellon defaults to a `NameIDFormat` of `transient` when it
-<<metadata_creation,generates it's metadata>>. You will need to
+<<metadata_creation,generates its metadata>>. You will need to
 manually edit the `NameIDFormat` in your Mellon SP metadata if you
 wish to use a `NameIDFormat` other than `transient`. When Mellon
-generates it's `<AuthnRequest>` it selects the _first_ `NameIDFormat`
-found in it's metadata as the `NameIDPolicy`.
+generates its `<AuthnRequest>` it selects the _first_ `NameIDFormat`
+found in its metadata as the `NameIDPolicy`.
 
 
 === <AuthnRequest> Example [[authentication_request]]
@@ -648,7 +648,7 @@ data embedded as query parameters. You can see the "on the wire" HTTP
 data for this `<AuthnRequest>` in
 <<authentication_request_wire>>. This illustrates the need for SAML
 diagnostic tools because you cannot see the `<AuthnRequest>` XML
-message and it's assocated data (e.g. signature, <<relaystate,
+message and its assocated data (e.g. signature, <<relaystate,
 RelayState>>) by looking at the HTTP protocol.
 
 
@@ -894,17 +894,17 @@ instance there are 2 values, _ipausers_ and _openstack-users_.
 
 The above `<Assertion>` response is conveyed back to the SP using the
 _HTTP Post Binding_. You may wish to review <<http_post>>. The "on the
-wire" version of this `<Assertion>` response and it and it's
-associated parameter can be seen in <<assertion_response_wire>>. Once
-again we see the need for SAML tools because it is impossible to view
-the XML message and it's associated parameters give the contents of
-the HTTP response.
+wire" version of this `<Assertion>` response and its associated 
+parameters can be seen in <<assertion_response_wire>>. Once again we see
+the need for SAML tools because it is impossible to view the XML 
+message and its associated parameters give the contents of the HTTP 
+response.
 
 === SAML Endpoints [[endpoints]]
 
 When two SAML providers communicate they must know the URL to send a
 given SAML message to. The set of URL's a provider receives SAML
-messages is often referred to as it's SAML endpoints. Although a SAML
+messages is often referred to as its SAML endpoints. Although a SAML
 endpoint may appear in a SAML message this is *not sufficient* to
 identify where a response should be sent. This is because a nefarious
 sender could insert a bogus location in the message. To assure SAML
@@ -927,7 +927,7 @@ are:
 
 SingleSignOnService:: 
 Authenticate a user and establish a session for them. This is an IdP
-service, it's where a SP sends it's <AuthnRequest> message.
+service, it's where a SP sends its <AuthnRequest> message.
 
 AssertionConsumerService::
 This is where SP's receive <Assertion> messages from an IdP in
@@ -941,14 +941,14 @@ The binding component of a (service,binding) pair identifies the format
 of the message. Recall that SAML offers many different ways to encode
 the XML of a SAML message. The binding component allows the receiver
 to know how to decode and parse the SAML message back into an XML SAML
-document received at it's service endpoint.
+document received at its service endpoint.
 
 It's important to understand there is no requirement for a SAML
-provider to locate all it's (service,binding) pairs on distinct
+provider to locate all its (service,binding) pairs on distinct
 URL's. It is possible to apply heuristics to a SAML message to
 identify the binding of the message arriving on a given URL. This
-allows a provider to collapse it's set of endpoints into a smaller set
-of URL's The choice of how a provider maps it's endpoints to URL's is
+allows a provider to collapse its set of endpoints into a smaller set
+of URL's The choice of how a provider maps its endpoints to URL's is
 entirely up to the to provider. A common mistake is to assume because
 one provider does it one way all providers follow the same model. The
 only way for you to know is to examine the providers metadata (see
@@ -975,13 +975,13 @@ When your are examining SAML messages the `RelayState` will be the
 original URL and depending on the SAML binding it may be
 URL-encoded. _Just be aware there is no requirement the `RelayState` be
 the original URL, it can be any string which the client can use
-to establish the context._ At some future data Mellon may alter it's
+to establish the context._ At some future data Mellon may alter its
 `RelayState` handling.
 
 === The Role of Metadata [[metadata]]
 
 When a SAML provider needs to interact with another SAML provider they
-must know various properties of the foreign provider (e.g. it's
+must know various properties of the foreign provider (e.g. its
 configuration). SAML provider properties are encapsulated in an XML
 document called SAML metadata. Examples of the provider properties
 conveyed in metadata include:
@@ -994,7 +994,7 @@ conveyed in metadata include:
 * Should messages be signed
 * Attributes and attribute profiles
 
-Typically at start-up a provider loads it's own metadata (to configure
+Typically at start-up a provider loads its own metadata (to configure
 itself) and then loads the metadata of all providers it interacts
 with.
 
@@ -1024,8 +1024,8 @@ integrity protection and to encrypt data to provide
 confidentiality. In order for two SAML providers to successfully
 exchange SAML messages between themselves they must know the public
 keys of the other party. The provider's public keys are declared in
-it's metadata and are always encapsulated inside a
-`<md:KeyDescriptor>` element that defines it's intended use (signing
+its metadata and are always encapsulated inside a
+`<md:KeyDescriptor>` element that defines its intended use (signing
 or encryption). Furthermore one or more of the following
 representations within a `<ds:KeyInfo>` element *MUST* be present:
 
@@ -1042,7 +1042,7 @@ several implications:
 * Certification extensions that define key usage, etc. are never
   checked.
 * The certificate validity period is never checked, thus a cert
-  contained in metadata never expires as a consequence of it's
+  contained in metadata never expires as a consequence of its
   certificate validity period. Instead the validity period of the
   *key* is controlled by the `<md:validUntil>` or `<md:cacheDuration>`
   metadata attribute associated with the key.
@@ -1156,7 +1156,7 @@ example there is only one role. See <<saml_roles>>.
 <AuthnRequest> to the IdP.
 
 <6> `WantAssertionsSigned`, if true then the SP desires the IdP to
-sign it's assertions. Assertions should always be signed.
+sign its assertions. Assertions should always be signed.
 
 <7> X509 certificate information. The `use` attribute of `signing`
 identifies that this certificate will be used for signing data.
@@ -1386,8 +1386,8 @@ to read Mellon configuration directives when it initializes. The
 preferred mechanism is to place those directives in a file located in
 the Apache `conf.d` directory, Apache will read all `.conf` files in
 this directory at start-up. Although you could place the Mellon
-directives in any config file a good practice to follow is keep the
-Mellon directives in their own file, see <<mellon_config_file>> for
+directives in any config file, a good practice to follow is keep the
+Mellon directives in their own file. See <<mellon_config_file>> for
 more information.
 
 Mellon relies on SAML specific files as well, for example:
@@ -1494,7 +1494,7 @@ is _all_ the protected locations are positioned below it so they may
 inherit those values. footnote:[When you are protecting just one
 location with Mellon there isn't much added value in splitting the
 configuration directives. But when you need to protect many distinct
-locations it's repetitive and error prone to cut and paste common
+locations, it's repetitive and error prone to cut and paste common
 values in each `<Location>` block. It makes maintaining the
 configuration that much more difficult because you will need to edit
 each and every `<Location>` directive to change something like the
@@ -1511,7 +1511,7 @@ that location either explicitly or via inheritance. See
 is a *critical* value to properly specify and is one of the *_most
 common Mellon configuration errors_* leading to a failed deployment,
 please refer to <<mellon_endpoint_path,MellonEndpointPath>> to
-understand it's requirements and what it influences. Also see
+understand its requirements and what it influences. Also see
 <<incorrect_mellon_endpoint_path>> for a discussion of this common
 error. The important thing to note in this example is the
 `MellonEndpointPath` is located *inside* the containing location
@@ -1525,16 +1525,16 @@ your IdP *MUST* have loaded exactly the same Mellon metadata in other
 to interoperate. Out of sync metadata is a very common deployment
 error. See <<metadata_creation, Metadata Creation>> for how Mellon
 metadata is created. `MellonSPMetadataFile` is optional, Mellon can
-create it's own metadata from it's initial configuration parameters.
+create its own metadata from its initial configuration parameters.
 
-<5> The private cryptographic key used by Mellon to sign it's SAML
+<5> The private cryptographic key used by Mellon to sign its SAML
 data. See <<metadata_keys>> for more detail.
 
 <6> The public cryptographic key associated with the private key. This
 public key is embedded in Mellon's metadata so that an IdP can
 validate Mellon's signed data. See <<metadata_keys>> for more detail.
 
-<7> The IdP used to authenticate is specified by it's metadata
+<7> The IdP used to authenticate is specified by its metadata
 file. See <<obtain_idp_metadata>> for how to obtain this data.
 
 <8> This is a URL location protected by Mellon. For our example we've
@@ -1550,7 +1550,7 @@ sharing the same common Mellon directives via inheritance.
 authentication module will perform the authentication for this
 location. Obviously we want to use Mellon.
 
-<10> Instruct Mellon this location (and all it's descendants) will be
+<10> Instruct Mellon this location (and all its descendants) will be
 authenticated. See <<mellon_modes>>.
 
 <11> `Require` is an Apache directive that instructs Apache's
@@ -1641,9 +1641,9 @@ multiple ways one can create Mellon metadata:
 installs this script in
 `/usr/libexec/mod_auth_mellon/mellon_create_metadata.sh`.
 
-. Allow Mellon to dynamically generate it's metadata based on it's
+. Allow Mellon to dynamically generate its metadata based on its
 configuration options. The metadata can be downloaded from the
-`$MellonEndpointPath/metadata` URL. Mellon only self-generates it's
+`$MellonEndpointPath/metadata` URL. Mellon only self-generates its
 metadata if the `MellonSPMetadataFile` configuration parameter is not
 defined, otherwise if the `MellonSPMetadataFile` is defined the 
 `$MellonEndpointPath/metadata` download URL will return the contents
@@ -1665,7 +1665,7 @@ essential you understand the <<MellonEndpointPath>>.
 * endpoint_url
 
 The entityID is the unique name of the Mellon SP. The entityID plays
-an important role in SAML and you may wish to review it's description
+an important role in SAML and you may wish to review its description
 in <<entityID>>.
 
 The endpoint_url is the concatenation of the `https` scheme, the Mellon
@@ -1706,9 +1706,9 @@ configuration as these Mellon directives:
 * `MellonSPCertFile`
 * `MellonSPMetadataFile`
 
-==== Using Mellon to generate it's own metadata [[using_mellon_to_create_metadata]]
+==== Using Mellon to generate its own metadata [[using_mellon_to_create_metadata]]
 
-Mellon has the built-in capability to generate it's own metadata as
+Mellon has the built-in capability to generate its own metadata as
 long as you provide a few necessary Mellon configuration directives.
 
 * `MellonSPentityId`
@@ -1718,11 +1718,11 @@ long as you provide a few necessary Mellon configuration directives.
 
 When Mellon initializes it will check the value of the
 `MellonSPMetadataFile`, if it does not exist Mellon will self generate
-it's own metadata. If `MellonSPMetadataFile` exists that metadata will
-always be used. If Mellon self generates it's own metadata it does not
+its own metadata. If `MellonSPMetadataFile` exists that metadata will
+always be used. If Mellon self generates its own metadata it does not
 write the metadata back to a file, rather it's held in memory.
 
-Irrespective of whether Mellon self generates it's metadata or if it
+Irrespective of whether Mellon self generates its metadata or if it
 loads it from a file specified by `MellonSPMetadataFile` the metadata
 is made available for download at the `$MellonEndpointPath/metadata`
 URL. You can perform a GET on this URL to capture the SP metadata and
@@ -1769,8 +1769,8 @@ metadata.
 ===== Using xmlsec to sign metadata [[xmlsec_metadata_signing]]
 
 The `xmlsec` tools are commonly available on most Linux based
-system. In fact the `Lasso` library which supplies Mellon with it's
-SAML implementation uses the `xmlsec` library to perform all of it's
+system. In fact the `Lasso` library which supplies Mellon with its
+SAML implementation uses the `xmlsec` library to perform all of its
 XML signing and signature verification. `xmlsec` usually ships with an
 `xmlsec` command line utility, this utility can perform XML signing
 and verification from the command line.
@@ -1840,7 +1840,7 @@ xmlsec \\ <1>
 
 === MellonEndpointPath [[mellon_endpoint_path]]
 
-Mellon reserves a number of URL's for it's use. Some of these
+Mellon reserves a number of URL's for its use. Some of these
 URL's are the public SAML <<endpoints, endpoints>> advertised in the
 <<sp_metadata, SP metadata>>. Others are for Mellon's private use.
 The best way to think of these Mellon endpoints is as a way of binding a
@@ -1850,7 +1850,7 @@ endpoints a dedicated handler processes the request.
 The way Mellon identifies a URL as being one of its endpoints is by
 looking at the beginning of the URL path. If everything in the path
 except the last path component matches the `MellonEndpointPath` then
-Mellon recognizes the URL as being one of it's endpoints. The last
+Mellon recognizes the URL as being one of its endpoints. The last
 path component is used to bind to the handler.
 
 Let's use an example. If the `MellonEndpointPath` is `/foo/bar` then
@@ -1864,13 +1864,13 @@ Mellon enforces 2 strict requirements on the `MellonEndpointPath`.
 * The directory *must* be a sub-directory of the Mellon `<Location>`
   directive that defines it. The reason for this is simple. Mellon
   ignores locations which are not configured for Mellon. Therefore for
-  Mellon to respond to a request on one of it's SAML endpoints has to
+  Mellon to respond to a request on one of its SAML endpoints has to
   be inside a directory Mellon is watching.
 
 === Mellon Endpoints [[mellon_endpoints]]
 
 Mellon endpoints are hung off of the <<mellon_endpoint_path>>.
-Mellon reserves a number of URL's for it's use. Some of these
+Mellon reserves a number of URL's for its use. Some of these
 URL's are the public SAML <<endpoints, endpoints>> advertised in the
 <<sp_metadata, SP metadata>>. Others are for Mellon's private use.
 The best way to think of these Mellon endpoints is a way of binding a
@@ -1941,7 +1941,7 @@ is 86400 seconds which is 24 hours.
 The IdP can inform the SP how long it wishes a SP session to be valid
 by passing the `SessionNotOnOrAfter` attribute in a
 `<AuthnStatement>`. Mellon respects the `SessionNotOnOrAfter`
-attribute and will limit it's session duration based on it. Thus the
+attribute and will limit its session duration based on it. Thus the
 validity period for a Mellon session is the lesser of the
 `MellonSessionLength` or the optional IdP `SessionNotOnOrAfter`
 attribute if the IdP supplied it.
@@ -1971,7 +1971,7 @@ as the value of the Mellon cookie. When Mellon receives a request for
 a protected resource it looks for the Mellon cookie in the HTTP
 request headers. Mellon then uses the Mellon cookie value as a session
 ID and attempts to look-up that session using that ID. If the session
-is found and it's remains valid Mellon immediately grants access. A
+is found and it remains valid, Mellon immediately grants access. A
 Mellon session will expire, see <<mellon_session>> for information
 concerning session lifetime.
 
@@ -1989,7 +1989,7 @@ to review your IdP's documentation or examine a returned assertion to
 determine the possible attributes. See <<inspect_saml_messages>> for the
 various ways you can examine the contents of a returned assertion.
 
-Mellon communicates it's results via Apache environment variables. For
+Mellon communicates its results via Apache environment variables. For
 every attribute received in the assertion Mellon will insert an Apache
 environment variable. You have some flexibility on how Mellon adds
 these environment variables which derive from the assertion
@@ -2014,7 +2014,7 @@ attributes.
 Using the <<assertion_response,assertion example>> Mellon places these
 environment variables in the Apache environment. See
 <<multiple_attribute_values>> for an explanation of
-`MellonMergeEnvVars` and it's effect.
+`MellonMergeEnvVars` and its effect.
 
 .MellonMergeEnvVars Off
 ----
@@ -2138,8 +2138,8 @@ MellonCond attr_name value [options]
 
 The 1st `attr_name` parameter is the name of the SAML assertion
 attribute the condition applies to. If an attribute with this name is
-found it's value is retrieved and becomes the data the condition is
-evaluated against. If `attr_name` is not found the condition evaluates
+found, its value is retrieved and becomes the data the condition is
+evaluated against. If `attr_name` is not found, the condition evaluates
 to `False`.
 
 The 2nd value parameter is the value applied to the attribute
@@ -2185,7 +2185,7 @@ performing any match operation.
 SUB:: Substring match. If value is included anywhere in the attribute
 value as a substring the condition evaluates to `True`, `False`
 otherwise. If `SUB` is not specified then the condition value and
-attribute value must match in it's entirety.
+attribute value must match in its entirety.
 
 REG:: Regular expression match. The value is interpreted as a regular
 expression. If the regular expression is found in the attribute value
@@ -2291,7 +2291,7 @@ is where the host and port are evaluated and most of the problems
 occur. The backend server need to know:
 
 * The URL of the request (including host & port)
-* It's own host & port
+* Its own host & port
 
 Apache supports virtual name hosting. This allows a single server to
 host multiple domains. For example a server running on example.com
@@ -2307,7 +2307,7 @@ are configured inside a server configuration block, for example::
 
 When Apache receives a request it deduces the host from the `HOST`
 HTTP header. It then tries to match the host to the `ServerName` in
-it's collection of virtual hosts.
+its collection of virtual hosts.
 
 The Apache `ServerName` directive sets the request scheme, hostname
 and port that the server uses to identify itself. The behavior of the
@@ -2408,11 +2408,11 @@ it is much more accurate.
 
 Persistence is implemented though the use of cookies. The HAProxy
 `cookie` directive names the cookie which will be used for
-persistence along with parameters controlling it's use. The HAProxy
+persistence along with parameters controlling its use. The HAProxy
 `server` directive has a `cookie` option that sets the value of
 the cookie, it should be set to the name of the server. If an incoming
 request does not have a cookie identifying the backend server then
-HAProxy selects a server based on it's configured balancing
+HAProxy selects a server based on its configured balancing
 algorithm. HAProxy assures the cookie is set to the name of the
 selected server in the response. If the incoming request has a cookie
 identifying a backend server then HAProxy automatically selects that
@@ -2472,7 +2472,7 @@ scheme of the request. This is why it is *essential* to have the
 as Mellon will not function properly behind a proxy.
 
 But what about web apps hosted by Apache behind a proxy? It turns out
-it's the web app (or rather the web app framework) responsibility to
+it's the web app's (or rather the web app framework's) responsibility to
 process the forwarded header. Thus apps handle the protocol scheme of
 a forwarded request differently than Apache extension modules do.
 
@@ -2593,7 +2593,7 @@ image::chrome_SAML_Chrome_Panel.svg[]
 Data in a SAML response may be encrypted for confidentiality (usually
 encryption is not needed because SAML transactions should be occurring
 over a secure TLS channel). Decrypting the data requires access to the
-IdP's public encryption key contained in it's metadata. Most SAML
+IdP's public encryption key contained in its metadata. Most SAML
 browser tools do not support decryption. If you discover your tool is
 showing you encrypted data you have a few options:
 
@@ -2601,7 +2601,7 @@ showing you encrypted data you have a few options:
   to enable/disable encryption.
 
 * Use <<mellon_diagnostics>>. The diagnostics support in Mellon
-operates after the SAML message is decoded from it's SAML binding
+operates after the SAML message is decoded from its SAML binding
 transport and after it's been decrypted into a final plaintext SAML
 XML document. Most people will find Mellon diagnostics to be the
 easiest and most complete capture of SAML data and Mellon's processing
@@ -2790,7 +2790,7 @@ back to metadata.*
 
 === Behavior does not change after modifying any SAML file
 
-Mellon reads it's configuration at Apache start-up. If you make any
+Mellon reads its configuration at Apache start-up. If you make any
 change to any file Mellon reads you will not see those changes
 reflected until after you restart Apache.
 
@@ -2814,7 +2814,7 @@ Mellon implements sessions. The session identifier is communicated in
 the cookie `mellon-cookie` (or whatever is the current value of the
 Mellon directive `MellonVariable`). If you had previously
 successfully authenticated against the IdP the browser will have been
-sent the Mellon session ID in it's cookie. When Mellon gets a request
+sent the Mellon session ID in its cookie. When Mellon gets a request
 to authenticate a resource it first checks to see if it has a valid
 session based on the identifier passed as the Mellon cookie. If there
 is a valid session Mellon will use that cached session information
@@ -2921,7 +2921,7 @@ more detail.
 
 === Mellon metadata out of sync with Mellon configuration
 
-Mellon's metadata and it's Apache configuration directives
+Mellon's metadata and its Apache configuration directives
 have data elements in common but are maintained independently. The
 Apache configuration directives in common with the metadata are:
 
