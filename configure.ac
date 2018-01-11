@@ -102,6 +102,14 @@ AC_CHECK_HEADER([lasso/utils.h], LASSO_CFLAGS="$LASSO_CFLAGS -DHAVE_LASSO_UTILS_
 CFLAGS=$saved_CFLAGS
 CPPFLAGS=$saved_CPPFLAGS
 
+# Determine what definitions exist in Lasso
+saved_CFLAGS=$CFLAGS
+CFLAGS="$CFLAGS $pkg_cv_LASSO_CFLAGS"
+AC_CHECK_DECLS([LASSO_SIGNATURE_METHOD_RSA_SHA256,
+                LASSO_SIGNATURE_METHOD_RSA_SHA384,
+                LASSO_SIGNATURE_METHOD_RSA_SHA512,
+               ], [], [], [#include <lasso/xml/xml.h>])
+CFLAGS=$saved_CFLAGS
 
 # Create Makefile from Makefile.in
 AC_CONFIG_FILES([Makefile])

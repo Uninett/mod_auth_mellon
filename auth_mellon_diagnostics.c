@@ -39,14 +39,17 @@ static const char *
 am_diag_cond_flag_str(request_rec *r, am_cond_flag_t flags);
 
 static const char *
-am_diag_enable_str(am_enable_t enable);
+am_diag_enable_str(request_rec *r, am_enable_t enable);
 
 static const char *
-am_diag_samesite_str(am_samesite_t samesite);
+am_diag_samesite_str(request_rec *r, am_samesite_t samesite);
 
 static const char *
 am_diag_httpd_error_level_str(request_rec *r, int level);
 
+static const char *
+am_diag_signature_method_str(request_rec *r,
+                             LassoSignatureMethod signature_method);
 static apr_size_t
 am_diag_time_t_to_8601_buf(char *buf, apr_size_t buf_size, apr_time_t t);
 
@@ -191,26 +194,28 @@ am_diag_cond_flag_str(request_rec *r, am_cond_flag_t flags)
 }
 
 static const char *
-am_diag_enable_str(am_enable_t enable)
+am_diag_enable_str(request_rec *r, am_enable_t enable)
 {
     switch(enable) {
     case am_enable_default: return "default";
     case am_enable_off:     return "off";
     case am_enable_info:    return "info";
     case am_enable_auth:    return "auth";
-    default:                return "unknown";
+    default:
+        return apr_psprintf(r->pool, "unknown (%d)", enable);
     }
 
 }
 
 static const char *
-am_diag_samesite_str(am_samesite_t samesite)
+am_diag_samesite_str(request_rec *r, am_samesite_t samesite)
 {
     switch(samesite) {
     case am_samesite_default: return "default";
     case am_samesite_lax:     return "lax";
     case am_samesite_strict:  return "strict";
-    default:                  return "unknown";
+    default:
+        return apr_psprintf(r->pool, "unknown (%d)", samesite);
     }
 }
 
@@ -236,6 +241,26 @@ am_diag_httpd_error_level_str(request_rec *r, int level)
     case APLOG_TRACE8:  return "APLOG_TRACE8";
     default:
         return apr_psprintf(r->pool, "APLOG_%d", level);
+    }
+}
+
+static const char *
+am_diag_signature_method_str(request_rec *r,
+                             LassoSignatureMethod signature_method)
+{
+    switch(signature_method) {
+    case LASSO_SIGNATURE_METHOD_RSA_SHA1:    return "rsa-sha1";
+#if HAVE_DECL_LASSO_SIGNATURE_METHOD_RSA_SHA256
+    case LASSO_SIGNATURE_METHOD_RSA_SHA256:  return "rsa-sha256";
+#endif
+#if HAVE_DECL_LASSO_SIGNATURE_METHOD_RSA_SHA384
+    case LASSO_SIGNATURE_METHOD_RSA_SHA384:  return "rsa-sha384";
+#endif
+#if HAVE_DECL_LASSO_SIGNATURE_METHOD_RSA_SHA512
+    case LASSO_SIGNATURE_METHOD_RSA_SHA512:  return "rsa-sha512";
+#endif
+    default:
+        return apr_psprintf(r->pool, "unknown (%d)", signature_method);
     }
 }
 
@@ -388,7 +413,7 @@ am_diag_log_dir_cfg(request_rec *r, int level, am_dir_cfg_rec *cfg,
 
     apr_file_printf(diag_cfg->fd,
                     "%sMellonEnable (enable): %s\n",
-                    indent(level+1), am_diag_enable_str(cfg->enable_mellon));
+                    indent(level+1), am_diag_enable_str(r, cfg->enable_mellon));
     apr_file_printf(diag_cfg->fd,
                     "%sMellonVariable (varname): %s\n",
                     indent(level+1), cfg->varname);
@@ -416,7 +441,7 @@ am_diag_log_dir_cfg(request_rec *r, int level, am_dir_cfg_rec *cfg,
     apr_file_printf(diag_cfg->fd,
                     "%sMellonCookieSameSite (cookie_samesite): %s\n",
                     indent(level+1),
-                    am_diag_samesite_str(cfg->cookie_samesite));
+                    am_diag_samesite_str(r, cfg->cookie_samesite));
 
     apr_file_printf(diag_cfg->fd,
                     "%sMellonCond (cond): %d items\n",
@@ -597,7 +622,7 @@ am_diag_log_dir_cfg(request_rec *r, int level, am_dir_cfg_rec *cfg,
                     "%sMellonSubjectConfirmationDataAddressCheck"
                     " (subject_confirmation_data_address_check): %s\n",
                     indent(level+1),
-                    cfg->subject_confirmation_data_address_check ? "On":"Off");
+                    CFG_VALUE(cfg, subject_confirmation_data_address_check) ? "On":"Off");
 
     apr_file_printf(diag_cfg->fd,
                     "%sMellonDoNotVerifyLogoutSignature"
@@ -622,13 +647,13 @@ am_diag_log_dir_cfg(request_rec *r, int level, am_dir_cfg_rec *cfg,
                     "%sMellonSendCacheControlHeader"
                     " (send_cache_control_header): %s\n",
                     indent(level+1),
-                    cfg->send_cache_control_header ? "On":"Off");
+                    CFG_VALUE(cfg, send_cache_control_header) ? "On":"Off");
     apr_file_printf(diag_cfg->fd,
                     "%sMellonPostReplay (post_replay): %s\n",
-                    indent(level+1), cfg->post_replay ? "On":"Off");
+                    indent(level+1), CFG_VALUE(cfg, post_replay) ? "On":"Off");
     apr_file_printf(diag_cfg->fd,
                     "%sMellonECPSendIDPList (ecp_send_idplist): %s\n",
-                    indent(level+1), cfg->ecp_send_idplist ? "On":"Off");
+                    indent(level+1), CFG_VALUE(cfg, ecp_send_idplist) ? "On":"Off");
 
     for (n_items = 0; cfg->redirect_domains[n_items] != NULL; n_items++);
     apr_file_printf(diag_cfg->fd,
@@ -639,6 +664,11 @@ am_diag_log_dir_cfg(request_rec *r, int level, am_dir_cfg_rec *cfg,
                         "%s%s\n",
                         indent(level+2), cfg->redirect_domains[i]);
     }
+
+    apr_file_printf(diag_cfg->fd,
+                    "%sMellonSignatureMethod (signature_method): %s\n",
+                    indent(level+1),
+                    am_diag_signature_method_str(r, CFG_VALUE(cfg, signature_method)));
 
     apr_file_flush(diag_cfg->fd);
 }

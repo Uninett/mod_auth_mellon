@@ -105,6 +105,7 @@ static const int default_env_vars_count_in_n = -1;
 /* The default list of trusted redirect domains. */
 static const char * const default_redirect_domains[] = { "[self]", NULL };
 
+
 /* This function handles configuration directives which set a 
  * multivalued string slot in the module configuration (the destination
  * strucure is a hash).
@@ -1139,6 +1140,63 @@ static const char *am_set_redirect_domains(cmd_parms *cmd,
     return NULL;
 }
 
+/* This function handles the MellonSignatureMethod configuration directive.
+ * This directive can be set to one of:
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *  const char *arg      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *
+ * Returns:
+ *  NULL on success or an error string if the argument is wrong.
+ */
+static const char *am_set_signature_method_slot(cmd_parms *cmd,
+                                                void *struct_ptr,
+                                                const char *arg)
+{
+    am_dir_cfg_rec *d = (am_dir_cfg_rec *)struct_ptr;
+    char *valid_methods = "rsa-sha1"
+#if HAVE_DECL_LASSO_SIGNATURE_METHOD_RSA_SHA256
+        " rsa-sha256"
+#endif
+#if HAVE_DECL_LASSO_SIGNATURE_METHOD_RSA_SHA384
+        " rsa-sha384"
+#endif
+#if HAVE_DECL_LASSO_SIGNATURE_METHOD_RSA_SHA512
+        " rsa-sha512"
+#endif
+        ;
+
+    if (!strcasecmp(arg, "rsa-sha1")) {
+        d->signature_method = LASSO_SIGNATURE_METHOD_RSA_SHA1;
+    }
+#if HAVE_DECL_LASSO_SIGNATURE_METHOD_RSA_SHA256
+    else if (!strcasecmp(arg, "rsa-sha256")) {
+        d->signature_method = LASSO_SIGNATURE_METHOD_RSA_SHA256;
+    }
+#endif
+#if HAVE_DECL_LASSO_SIGNATURE_METHOD_RSA_SHA384
+    else if (!strcasecmp(arg, "rsa-sha384")) {
+        d->signature_method = LASSO_SIGNATURE_METHOD_RSA_SHA384;
+    }
+#endif
+#if HAVE_DECL_LASSO_SIGNATURE_METHOD_RSA_SHA512
+    else if (!strcasecmp(arg, "rsa-sha512")) {
+        d->signature_method = LASSO_SIGNATURE_METHOD_RSA_SHA512;
+    }
+#endif
+    else {
+        return apr_psprintf(cmd->pool,
+                            "%s: Invalid method \"%s\", must be one of: %s",
+                            cmd->cmd->name, arg, valid_methods);
+    }
+
+    return NULL;
+}
+
 /* This array contains all the configuration directive which are handled
  * by auth_mellon.
  */    
@@ -1587,6 +1645,13 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "List of domains we can redirect to."
         ),
+    AP_INIT_TAKE1(
+        "MellonSignatureMethod",
+        am_set_signature_method_slot,
+        NULL,
+        OR_AUTHCFG,
+        "Signature method used to sign SAML messages sent by Mellon"
+        ),
     {NULL}
 };
 
@@ -1651,6 +1716,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->envattr   = apr_hash_make(p);
     dir->userattr  = default_user_attribute;
     dir->idpattr  = NULL;
+    dir->signature_method = inherit_signature_method;
     dir->dump_session = default_dump_session;
     dir->dump_saml_response = default_dump_saml_response;
 
@@ -1809,6 +1875,8 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->idpattr = (add_cfg->idpattr != NULL ?
                         add_cfg->idpattr :
                         base_cfg->idpattr);
+
+    new_cfg->signature_method = CFG_MERGE(add_cfg, base_cfg, signature_method);
 
     new_cfg->dump_session = (add_cfg->dump_session != default_dump_session ?
                              add_cfg->dump_session :

@@ -239,6 +239,7 @@ typedef struct am_dir_cfg_rec {
     apr_hash_t *envattr;
     const char *userattr;
     const char *idpattr;
+    LassoSignatureMethod signature_method;
     int dump_session;
     int dump_saml_response;
 
@@ -416,6 +417,14 @@ static const int inherit_post_replay = -1;
 static const int default_ecp_send_idplist = 0;
 static const int inherit_ecp_send_idplist = -1;
 
+/* Algorithm to use when signing Mellon SAML messages */
+static const LassoSignatureMethod default_signature_method =
+#if HAVE_DECL_LASSO_SIGNATURE_METHOD_RSA_SHA256
+    LASSO_SIGNATURE_METHOD_RSA_SHA256;
+#else
+    LASSO_SIGNATURE_METHOD_RSA_SHA1;
+#endif
+static const int inherit_signature_method = -1;
 
 void *auth_mellon_dir_config(apr_pool_t *p, char *d);
 void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add);
