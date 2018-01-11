@@ -177,6 +177,10 @@ MellonDiagnosticsEnable Off
         #           the user. If the user isn't authorized, then we won't
         #           populate the environment, but we won't deny the user
         #           access either.
+        #
+        #           You can also use this to set up the Mellon SSO paramaters
+        #           transparently at the top level of your site, and then use
+        #           "auth" to protect individual paths elsewhere in the site.
         #   "auth": We will populate the environment with information about
         #           the user if he is authorized. If he is authenticated
         #           (logged in), but not authorized (according to the
