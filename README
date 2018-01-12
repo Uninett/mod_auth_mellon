@@ -798,6 +798,37 @@ requests that trigger authentication should now be stored while the
 user logs in.
 
 ===========================================================================
+ Example to support both SAML and Basic Auth
+===========================================================================
+
+The below snippet will allow for preemptive basic auth (such as from a REST client)
+for the "/auth" path, but if accessed interactively will trigger SAML auth with
+mod_auth_mellon. 
+
+<Location />
+  MellonEnable "info"
+  MellonVariable "cookie"
+  MellonEndpointPath "/sso"
+  Mellon... # Other parameters as needed
+</Location>
+
+<Location /auth>
+  <If "-n req('Authorization')">
+    AuthName "My Auth"
+    AuthBasicProvider ldap
+    AuthType basic
+    AuthLDAP* # Other basic auth config parms as needed
+
+    require ldap-group ....
+  </If>
+  <Else>
+    Require valid-user
+    AuthType "Mellon"
+    MellonEnable "auth"
+  </Else>
+</Location>
+
+===========================================================================
  Mellon & User Agent Caching behavior
 ===========================================================================
 
