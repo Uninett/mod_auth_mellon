@@ -607,10 +607,7 @@ am_diag_time_t_to_8601(request_rec *r, apr_time_t t);
 #define am_diag_printf(...) do {} while(0)
 
 /* Define AM_LOG_RERROR log only to the Apache log */
-#define AM_LOG_RERROR(...) AM_LOG_RERROR__(__VA_ARGS__)
-/* need additional step to expand macros */
-#define AM_LOG_RERROR__(file, line, mi, level, status, r, ...)  \
-ap_log_rerror(file, line, mi, level, status, r, __VA_ARGS__);
+#define AM_LOG_RERROR(...) ap_log_rerror(__VA_ARGS__)
 
 #endif /* ENABLE_DIAGNOSTICS */
 
