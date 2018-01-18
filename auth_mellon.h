@@ -533,6 +533,11 @@ extern module AP_MODULE_DECLARE_DATA auth_mellon_module;
 
 #ifdef ENABLE_DIAGNOSTICS
 
+#if AP_SERVER_MAJORVERSION_NUMBER < 2 || \
+    (AP_SERVER_MAJORVERSION_NUMBER == 2 && AP_SERVER_MINORVERSION_NUMBER < 4)
+#error "Diagnostics requires Apache version 2.4 or newer."
+#endif
+
 /* Initializing an apr_time_t to 0x7fffffffffffffffLL yields an
  * iso 8601 time with 1 second precision of "294247-01-10T04:00:54Z"
  * this is 22 characters, +1 for null terminator. */
@@ -607,10 +612,7 @@ am_diag_time_t_to_8601(request_rec *r, apr_time_t t);
 #define am_diag_printf(...) do {} while(0)
 
 /* Define AM_LOG_RERROR log only to the Apache log */
-#define AM_LOG_RERROR(...) AM_LOG_RERROR__(__VA_ARGS__)
-/* need additional step to expand macros */
-#define AM_LOG_RERROR__(file, line, mi, level, status, r, ...)  \
-ap_log_rerror(file, line, mi, level, status, r, __VA_ARGS__);
+#define AM_LOG_RERROR(...) ap_log_rerror(__VA_ARGS__)
 
 #endif /* ENABLE_DIAGNOSTICS */
 
