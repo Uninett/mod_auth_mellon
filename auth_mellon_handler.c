@@ -826,6 +826,8 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
 
     res = lasso_logout_process_response_msg(logout, r->args);
+    am_diag_log_lasso_node(r, 0, LASSO_PROFILE(logout)->response,
+                           "SAML Response (%s):", __func__);
 #ifdef HAVE_lasso_profile_set_signature_verify_hint
     if(res != 0 && res != LASSO_DS_ERROR_SIGNATURE_NOT_FOUND &&
        logout->parent.remote_providerID != NULL) {
@@ -841,7 +843,10 @@ static int am_handle_logout_response(request_rec *r, LassoLogout *logout)
     if(res != 0) {
         AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Unable to process logout response."
-                      " Lasso error: [%i] %s", res, lasso_strerror(res));
+                      " Lasso error: [%i] %s, SAML Response: %s",
+                      res, lasso_strerror(res),
+                      am_saml_response_status_str(r,
+                        LASSO_PROFILE(logout)->response));
 
         lasso_logout_destroy(logout);
         return HTTP_BAD_REQUEST;
@@ -1760,9 +1765,6 @@ static int am_handle_reply_common(request_rec *r, LassoLogin *login,
     int rc;
     const char *idp;
 
-    am_diag_log_lasso_node(r, 0, LASSO_PROFILE(login)->response,
-                           "SAMLResponse:");
-
     url = am_reconstruct_url(r);
     chr = strchr(url, '?');
     if (! chr) {
@@ -2039,10 +2041,15 @@ static int am_handle_post_reply(request_rec *r)
 
     /* Process login responce. */
     rc = lasso_login_process_authn_response_msg(login, saml_response);
+    am_diag_log_lasso_node(r, 0, LASSO_PROFILE(login)->response,
+                           "SAML Response (%s):", __func__);
     if (rc != 0) {
         AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error processing authn response."
-                      " Lasso error: [%i] %s", rc, lasso_strerror(rc));
+                      " Lasso error: [%i] %s, SAML Response: %s",
+                      rc, lasso_strerror(rc),
+                      am_saml_response_status_str(r,
+                        LASSO_PROFILE(login)->response));
 
         lasso_login_destroy(login);
         err = HTTP_BAD_REQUEST;
@@ -2134,10 +2141,15 @@ static int am_handle_paos_reply(request_rec *r)
 
     /* Process login response. */
     rc = lasso_login_process_paos_response_msg(login, post_data);
+    am_diag_log_lasso_node(r, 0, LASSO_PROFILE(login)->response,
+                           "SAML Response (%s):", __func__);
     if (rc != 0) {
         AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Error processing ECP authn response."
-                      " Lasso error: [%i] %s", rc, lasso_strerror(rc));
+                      " Lasso error: [%i] %s, SAML Response: %s",
+                      rc, lasso_strerror(rc),
+                      am_saml_response_status_str(r,
+                        LASSO_PROFILE(login)->response));
 
         lasso_login_destroy(login);
         err = HTTP_BAD_REQUEST;
@@ -2275,10 +2287,16 @@ static int am_handle_artifact_reply(request_rec *r)
     }
 
     rc = lasso_login_process_response_msg(login, response);
+    am_diag_log_lasso_node(r, 0, LASSO_PROFILE(login)->response,
+                           "SAML Response (%s):", __func__);
     if(rc != 0) {
         AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
                       "Failed to handle HTTP-Artifact response data."
-                      " Lasso error: [%i] %s", rc, lasso_strerror(rc));
+                      " Lasso error: [%i] %s, SAML Response: %s",
+                      rc, lasso_strerror(rc),
+                      am_saml_response_status_str(r,
+                        LASSO_PROFILE(login)->response));
+
         lasso_login_destroy(login);
         return HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -2947,8 +2965,9 @@ static int am_set_authn_request_content(request_rec *r, LassoLogin *login)
 {
 
     am_diag_log_lasso_node(r, 0, LASSO_PROFILE(login)->request,
-                           "SAML AuthnRequest: http_method=%s",
-                           am_diag_lasso_http_method_str(login->http_method));
+                           "SAML AuthnRequest: http_method=%s URL=%s",
+                           am_diag_lasso_http_method_str(login->http_method),
+                           LASSO_PROFILE(login)->msg_url);
 
     switch (login->http_method) {
     case LASSO_HTTP_METHOD_REDIRECT:

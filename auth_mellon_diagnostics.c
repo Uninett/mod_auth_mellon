@@ -867,7 +867,9 @@ am_diag_log_lasso_node(request_rec *r, int level, LassoNode *node,
         write_indented_text(diag_cfg->fd, level+1, xml);
         lasso_release_string(xml);
     } else {
-        apr_file_printf(diag_cfg->fd, "node is NULL\n");
+        apr_file_printf(diag_cfg->fd,
+                        "%snode is NULL\n",
+                        indent(level+1));
     }
     apr_file_flush(diag_cfg->fd);
 }
@@ -917,6 +919,99 @@ am_diag_log_file_data(request_rec *r, int level, am_file_data_t *file_data,
     }
 
     apr_file_flush(diag_cfg->fd);
+}
+
+void
+am_diag_log_saml_status_response(request_rec *r, int level, LassoNode *node,
+                                 const char *fmt, ...)
+{
+    va_list ap;
+    am_diag_cfg_rec *diag_cfg = am_get_diag_cfg(r->server);
+    am_req_cfg_rec *req_cfg = am_get_req_cfg(r);
+
+    LassoSamlp2StatusResponse *response = (LassoSamlp2StatusResponse*)node;
+    LassoSamlp2Status *status = NULL;
+    const char *status_code1 = NULL;
+    const char *status_code2 = NULL;
+
+    if (!AM_DIAG_ENABLED(diag_cfg)) return;
+    if (!am_diag_initialize_req(r, diag_cfg, req_cfg)) return;
+
+    va_start(ap, fmt);
+    am_diag_format_line(r->pool, diag_cfg->fd, level, fmt, ap);
+    va_end(ap);
+
+    if (response == NULL) {
+        apr_file_printf(diag_cfg->fd,
+                        "%sresponse is NULL\n", indent(level+1));
+        return;
+    }
+
+
+    if (!LASSO_IS_SAMLP2_STATUS_RESPONSE(response)) {
+        apr_file_printf(diag_cfg->fd,
+                        "%sERROR, expected LassoSamlp2StatusResponse "
+                        "but got %s\n",
+                        indent(level+1),
+                        lasso_node_get_name((LassoNode*)response));
+        return;
+    }
+
+    status = response->Status;
+    if (status == NULL                  ||
+        !LASSO_IS_SAMLP2_STATUS(status) ||
+        status->StatusCode == NULL      ||
+        status->StatusCode->Value == NULL) {
+        apr_file_printf(diag_cfg->fd,
+                        "%sStatus missing\n",
+                        indent(level+1));
+        return;
+    }
+
+    status_code1 = status->StatusCode->Value;
+    if (status->StatusCode->StatusCode) {
+        status_code2 = status->StatusCode->StatusCode->Value;
+    }
+
+
+    apr_file_printf(diag_cfg->fd,
+                    "%sID: %s\n",
+                    indent(level+1), response->ID);
+    apr_file_printf(diag_cfg->fd,
+                    "%sInResponseTo: %s\n",
+                    indent(level+1), response->InResponseTo);
+    apr_file_printf(diag_cfg->fd,
+                    "%sVersion: %s\n",
+                    indent(level+1), response->Version);
+    apr_file_printf(diag_cfg->fd,
+                    "%sIssueInstant: %s\n",
+                    indent(level+1), response->IssueInstant);
+    apr_file_printf(diag_cfg->fd,
+                    "%sConsent: %s\n",
+                    indent(level+1), response->Consent);
+    apr_file_printf(diag_cfg->fd,
+                    "%sIssuer: %s\n",
+                    indent(level+1), response->Issuer->content);
+    apr_file_printf(diag_cfg->fd,
+                    "%sDestination: %s\n",
+                    indent(level+1), response->Destination);
+
+    apr_file_printf(diag_cfg->fd,
+                    "%sStatus:\n", indent(level+1));
+    apr_file_printf(diag_cfg->fd,
+                    "%sTop Level Status code: %s\n",
+                    indent(level+2), status_code1);
+    apr_file_printf(diag_cfg->fd,
+                    "%s2nd Level Status code: %s\n",
+                    indent(level+2), status_code2);
+    apr_file_printf(diag_cfg->fd,
+                    "%sStatus Message: %s\n",
+                    indent(level+2), status->StatusMessage);
+    am_diag_log_lasso_node(r, level+2, (LassoNode*)status->StatusDetail,
+                           "Status Detail:");
+
+    return;
+
 }
 
 void
