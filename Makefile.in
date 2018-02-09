@@ -30,7 +30,7 @@ DISTFILES=$(SRC) \
 	configure.ac \
 	Makefile.in \
 	autogen.sh \
-	README \
+	README.md \
 	ECP.rst \
 	COPYING \
 	NEWS \
