@@ -511,6 +511,9 @@ char *am_ecp_service_options_str(apr_pool_t *pool, ECPServiceOptions options);
 bool am_is_paos_request(request_rec *r, int *error_code);
 #endif /* HAVE_ECP */
 
+char *
+am_saml_response_status_str(request_rec *r, LassoNode *node);
+
 int am_auth_mellon_user(request_rec *r);
 int am_check_uid(request_rec *r);
 int am_handler(request_rec *r);
@@ -578,6 +581,11 @@ am_diag_log_lasso_node(request_rec *r, int level, LassoNode *node,
     __attribute__((format(printf,4,5)));
 
 void
+am_diag_log_saml_status_response(request_rec *r, int level, LassoNode *node,
+                                 const char *fmt, ...)
+    __attribute__((format(printf,4,5)));
+
+void
 am_diag_log_profile(request_rec *r, int level, LassoProfile *profile,
                     const char *fmt, ...)
     __attribute__((format(printf,4,5)));
@@ -608,6 +616,7 @@ am_diag_time_t_to_8601(request_rec *r, apr_time_t t);
 #define am_diag_log_cache_entry(...) do {} while(0)
 #define am_diag_log_file_data(...) do {} while(0)
 #define am_diag_log_lasso_node(...) do {} while(0)
+#define am_diag_log_saml_status_response(...) do {} while(0)
 #define am_diag_log_profile(...) do {} while(0)
 #define am_diag_printf(...) do {} while(0)
 
