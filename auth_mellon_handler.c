@@ -372,6 +372,8 @@ static LassoServer *am_get_lasso_server(request_rec *r)
 	    apr_thread_mutex_unlock(cfg->server_mutex);
 	    return NULL;
 	}
+
+        cfg->server->signature_method = CFG_VALUE(cfg, signature_method);
     }
 
     apr_thread_mutex_unlock(cfg->server_mutex);
