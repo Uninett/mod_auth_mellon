@@ -8,7 +8,10 @@ DocBook.
 There are many ways to render AsciiDoc, but the simplest to produce
 html is this:
 
-% asciidoctor mellon_user_guide.adoc
+% asciidoctor -a data-uri mellon_user_guide.adoc
+
+Note: the "-a data-uri" causes the images to be inlined in the HTML
+output so that everything is contained in one HTML file.
 
 If you want to edit the source it can be very useful to be able to see
 the rendered version as you work. This link is a guide on how to do
