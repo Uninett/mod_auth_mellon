@@ -2488,7 +2488,7 @@ header techniques be utilized.
 SAML is a request/response protocol much like HTTP. In fact the two
 major SAML datatypes are `Request` and `Response`. A `Response`
 contains a `Status` element which includes a `StatusCode` indicating
-if the `Request` succeeded or failed and if it failed the reason
+if the `Request` succeeded or failed, and if it failed, the reason
 why. The `StatusCode` element may contain additional nested
 `StatusCode` elements providing additional details, but typically
 there is usually only one or two `StatusCode` elements. The outermost
@@ -2498,17 +2498,17 @@ values *must* be a URI. The top-level status codes *must* be one of
 one of the top-level status codes defined by the SAML specification. The
 second-level status code must also be a URI and should be one of the
 second-level status codes defined by SAML but a system entity may
-define it's own non-top-level status codes.
+define its own non-top-level status codes.
 
 In addition to the `StatusCode` elements a `Status` element may also
 contain an optional `StatusMessage` with greater detail and/or a
 `StatusDetail` whose format is not defined by SAML.
 
-In most scenarios Mellon acting as a relying party issues a
-`Request` to an IdP acting as an asserting party which then replies
+In most scenarios Mellon, acting as a relying party, issues a
+`Request` to an IdP acting as an asserting party, which then replies
 with a `Response` containing a `Status`. Occasionally Mellon will
 receive a `Request` from an IdP for which Mellon will respond with a
-`Response` and `Status`, a good example of this IdP is initiated
+`Response` and `Status`; a good example of this is IdP-initiated
 logout.
 
 *When diagnosing problems you should examine the `StatusCode` values
@@ -2670,12 +2670,12 @@ protocol binding specified in the request.
 
 <1> _Top-level status code:_ Because the top-level status code is
 *not* `Success` this top-level status code indicates a *failure* and
-the _primary_ reason for the failure. In this instance the requester
+the _primary_ reason for the failure. In this instance, the requester
 sent a value the receiver was unable to process.
 
 <2> _Second-level status code:_ This second-level status code provides
 the additional information describing what the requester sent that
-could not be acted upon. In this case the requester sent a
+could not be acted upon. In this case, the requester sent a
 `NameIDPolicy` the IdP was unable to fulfill.
 
 === Finding the `StatusCode` [[find_status_code]]
@@ -3170,14 +3170,14 @@ NOTE: ADFS calls SPs a "Relying Party" and the SP configuration a
 One of the `Relying Party Trust` options is the "Secure Hash
 Algorithm" which controls the signature algorithm used to produce an
 XML signature on the SAML message. This is the signature algorithm
-ADFS will use to sign a SAML message it emits. SAML does not require
-both parties to use the same signature algorithm, in theory its fine
+ADFS will use to sign the SAML messages it emits. SAML does not require
+both parties to use the same signature algorithm; in theory, it's fine
 if Mellon as the SP signs with one algorithm and ADFS as the IdP signs
 with a different algorithm. But ADFS enforces the requirement that the
 SP signs with same algorithm as set in the `Relying Party Trust`. If
-ADFS receives a SAML message signed with a different algorithm then
-what is specified in the `Relying Party Trust` configuration you will
-get a message in the ADFS log something like this:
+ADFS receives a SAML message signed with a different algorithm than
+what is specified in the `Relying Party Trust` configuration, you will
+get a message in the ADFS log like this:
 
 ----
 SAML request is not signed with expected signature algorithm. SAML
@@ -3186,15 +3186,15 @@ http://www.w3.org/2001/04/xmldsig-more#rsa-sha1 . Expected signature
 algorithm is http://www.w3.org/2000/09/xmldsig#rsa-sha256 
 ----
 
-Since SHA-1 is no longer considered secure many ADFS administrators set
+Since SHA-1 is no longer considered secure, many ADFS administrators set
 their `Relying Party Trust` secure hash algorithm to SHA-256. This
-causes problems for Mellon because Mellon versions less than 0.13.1
-always signed it's message with the SHA-1 hash (specifically the
-algorithm was RSA-SHA1) and there was no mechanism to specify a
+causes problems for Mellon versions earlier than 0.13.1, which
+always signed its messages with the SHA-1 hash (specifically the
+RSA-SHA1 algorithm) and there was no mechanism to specify a
 different signing algorithm. See <<adfs_blog>> for how to modify the
 `Relying Party Trust` Secure Hash Algorithm.
 
-Mellon versions greater than 0.13.1 added a new configuration options
+Mellon versions greater than 0.13.1 added a new configuration option
 called `MellonSignatureMethod` which allows you to match the signature
 algorithm emitted by Mellon to the one specified in the ADFS `Relying
 Party Trust` for the Mellon SP. For example:
@@ -3209,23 +3209,23 @@ MellonSignatureMethod rsa-sha256
 By default ADFS cannot handle many of the SAML NameID formats without
 additional configuration in the `Relying Party Trust`. Please make
 sure you are familiar with the material in the section <<name_id>>. By
-default Mellon will generate a SP metadata with a
+default, Mellon will generate SP metadata with a
 <<nameid_policy,NameIDPolicy>> of `transient`, see
 <<specify_mellon_nameid>> for how to modify this in Mellon.
 
 When ADFS receives a SAML message with a `NameIDPolicy` set to a
-specific format it is supposed to respond with a `NameID` matching that
-format. Because of the architecture of ADFS it may not have access to
+specific format, it is supposed to respond with a `NameID` matching that
+format. Because of the architecture of ADFS, it may not have access to
 the data needed to generate that `NameID`. The necessary data is
 contained in a _Claim_ controlled by a _Claim Rule_. To get the
-contents of the _Claim_ being used to populate the SAML `NameID` you
+contents of the _Claim_ being used to populate the SAML `NameID`, you
 must also add a `Claim Rule Transform` that maps the desired _Claim_
-data into a SAML data element, in this case the `NameID`.
+data into a SAML data element, which in this case is the `NameID`.
 
 Examples of the `NameID` formats which require this additional
 configuration in ADFS are `transient`, `persistent`, `email` and
 possibly others. If the _Claim Rule_ and _Claim Rule Transform_ are
-not configured for the `NameIDPolicy` in the request ADFS will respond
+not configured for the `NameIDPolicy` in the request, ADFS will respond
 with a `InvalidNameIDPolicy` error status because it cannot provide
 the requested `NameID` format. See <<invalid_nameid_example, NameID
 error example>> in the <<error_response, error response section>> for
