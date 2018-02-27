@@ -1,11 +1,12 @@
 = mod_auth_mellon User Guide
 John Dennis <jdennis@redhat.com>
-v1.2, 2017-10-6
+v1.3, 2018-02-22
 :toc: left
 :toclevels: 3
 :numbered:
 :icons: font
 :imagesdir: images
+:data-uri:
 
 == Colophon
 
@@ -420,7 +421,7 @@ a key to look up an identity. Therefore while deploying federated
 identity if you cling to the concept of a single userid you are likely to
 be frustrated because you are abusing the concept.
 
-==== How SAML identifies a subject
+==== How SAML identifies a subject [[saml_nameid]]
 
 In SAML the user name (principal or subject) is conveyed as part of
 the `<Subject>` element in the assertion. The subject identifier can
@@ -548,7 +549,7 @@ application may or may not be appropriate for the application. See the
 explanation of <<nameid_interpretation,NameID interpretation>> to
 understand the issues.
 
-==== How do you specify the NameID format in SAML?
+==== How do you specify the NameID format in SAML? [[specify_mellon_nameid]]
 
 In SAML there are 2 configuration options related to the use of
 `NameID`:
@@ -2482,7 +2483,215 @@ apps process the request scheme of a forwarded request differently,
 demanding that *both* the `ServerName` and `X-Forwarded-Proto` HTTP
 header techniques be utilized.
 
-== Gathering run-time information
+== When a SAML party responds with an error [[error_response]]
+
+SAML is a request/response protocol much like HTTP. In fact the two
+major SAML datatypes are `Request` and `Response`. A `Response`
+contains a `Status` element which includes a `StatusCode` indicating
+if the `Request` succeeded or failed, and if it failed, the reason
+why. The `StatusCode` element may contain additional nested
+`StatusCode` elements providing additional details, but typically
+there is usually only one or two `StatusCode` elements. The outermost
+`StatusCode` is called the top-level status code, the next nested
+`StatusCode` is called the second-level status code. `StatusCode`
+values *must* be a URI. The top-level status codes *must* be one of
+one of the top-level status codes defined by the SAML specification. The
+second-level status code must also be a URI and should be one of the
+second-level status codes defined by SAML but a system entity may
+define its own non-top-level status codes.
+
+In addition to the `StatusCode` elements a `Status` element may also
+contain an optional `StatusMessage` with greater detail and/or a
+`StatusDetail` whose format is not defined by SAML.
+
+In most scenarios Mellon, acting as a relying party, issues a
+`Request` to an IdP acting as an asserting party, which then replies
+with a `Response` containing a `Status`. Occasionally Mellon will
+receive a `Request` from an IdP for which Mellon will respond with a
+`Response` and `Status`; a good example of this is IdP-initiated
+logout.
+
+*When diagnosing problems you should examine the `StatusCode` values
+ and any additional information in the `Status` element.*
+
+=== Top-level status codes
+
+Below are top-level status codes as defined by SAML.
+
+.Top-level status codes
+
+urn:oasis:names:tc:SAML:2.0:status:Success::
+
+The request succeeded. Additional information MAY be returned in the
+<StatusMessage> and/or <StatusDetail> elements.
+
+urn:oasis:names:tc:SAML:2.0:status:Requester::
+
+The request could not be performed due to an error on the part of the
+requester.
+
+urn:oasis:names:tc:SAML:2.0:status:Responder::
+
+The request could not be performed due to an error on the part of the
+SAML responder or SAML authority.
+
+urn:oasis:names:tc:SAML:2.0:status:VersionMismatch::
+
+The SAML responder could not process the request because the version
+of the request message was incorrect.
+
+=== Second-level status codes
+
+Below are second-level status codes as defined by SAML.
+
+.Second-level status codes
+
+urn:oasis:names:tc:SAML:2.0:status:AuthnFailed::
+
+The responding provider was unable to successfully authenticate the
+principal.
+
+urn:oasis:names:tc:SAML:2.0:status:InvalidAttrNameOrValue::
+
+Unexpected or invalid content was encountered within a
+<saml:Attribute> or <saml:AttributeValue> element.
+
+urn:oasis:names:tc:SAML:2.0:status:InvalidNameIDPolicy::
+
+The responding provider cannot or will not support the requested name
+identifier policy.
+
+urn:oasis:names:tc:SAML:2.0:status:NoAuthnContext::
+
+The specified authentication context requirements cannot be met by the
+responder.
+
+urn:oasis:names:tc:SAML:2.0:status:NoAvailableIDP::
+
+Used by an intermediary to indicate that none of the supported
+identity provider <Loc> elements in an <IDPList> can be resolved or
+that none of the supported identity providers are available.
+
+urn:oasis:names:tc:SAML:2.0:status:NoPassive::
+
+Indicates the responding provider cannot authenticate the principal
+passively, as has been requested.
+
+urn:oasis:names:tc:SAML:2.0:status:NoSupportedIDP::
+
+Used by an intermediary to indicate that none of the identity
+providers in an <IDPList> are supported by the intermediary.
+
+urn:oasis:names:tc:SAML:2.0:status:PartialLogout::
+
+Used by a session authority to indicate to a session participant that
+it was not able to propagate logout to all other session participants.
+
+urn:oasis:names:tc:SAML:2.0:status:ProxyCountExceeded::
+
+Indicates that a responding provider cannot authenticate the principal
+directly and is not permitted to proxy the request further.
+
+urn:oasis:names:tc:SAML:2.0:status:RequestDenied::
+
+The SAML responder or SAML authority is able to process the request
+but has chosen not to respond.  This status code MAY be used when
+there is concern about the security context of the request message or
+the sequence of request messages received from a particular requester.
+
+urn:oasis:names:tc:SAML:2.0:status:RequestUnsupported::
+
+The SAML responder or SAML authority does not support the request.
+
+urn:oasis:names:tc:SAML:2.0:status:RequestVersionDeprecated::
+
+The SAML responder cannot process any requests with the protocol
+version specified in the request.
+
+urn:oasis:names:tc:SAML:2.0:status:RequestVersionTooHigh::
+
+The SAML responder cannot process the request because the protocol
+version specified in the request message is a major upgrade from the
+highest protocol version supported by the responder.
+
+urn:oasis:names:tc:SAML:2.0:status:RequestVersionTooLow::
+
+The SAML responder cannot process the request because the protocol
+version specified in the request message is too low.
+
+urn:oasis:names:tc:SAML:2.0:status:ResourceNotRecognized::
+
+The resource value provided in the request message is invalid or
+unrecognized.
+
+urn:oasis:names:tc:SAML:2.0:status:TooManyResponses::
+
+The response message would contain more elements than the SAML
+responder is able to return.
+
+urn:oasis:names:tc:SAML:2.0:status:UnknownAttrProfile::
+
+An entity that has no knowledge of a particular attribute profile has
+been presented with an attribute drawn from that profile.
+
+urn:oasis:names:tc:SAML:2.0:status:UnknownPrincipal::
+
+The responding provider does not recognize the principal specified or
+implied by the request.
+
+urn:oasis:names:tc:SAML:2.0:status:UnsupportedBinding::
+
+The SAML responder cannot properly fulfill the request using the
+protocol binding specified in the request.
+
+=== Status code examples
+
+.Example of a `Status` indicating success.
+[source,xml]
+----
+<samlp:Status>
+  <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>  <!--1-->
+</samlp:Status>
+----
+
+<1> _Top-level status code:_ Because the top-level status code is
+`Success` no other status information is included.
+
+[[invalid_nameid_example]]
+.Example of a `Status` indicating failure due to invalid NameIDPolicy.
+[source,xml]
+----
+<samlp:Status>
+  <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Requester">  <!--1-->
+    <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:InvalidNameIDPolicy"/>   <!--2-->
+  </samlp:StatusCode>
+</samlp:Status>
+----
+
+<1> _Top-level status code:_ Because the top-level status code is
+*not* `Success` this top-level status code indicates a *failure* and
+the _primary_ reason for the failure. In this instance, the requester
+sent a value the receiver was unable to process.
+
+<2> _Second-level status code:_ This second-level status code provides
+the additional information describing what the requester sent that
+could not be acted upon. In this case, the requester sent a
+`NameIDPolicy` the IdP was unable to fulfill.
+
+=== Finding the `StatusCode` [[find_status_code]]
+
+Recent versions of Mellon (>= 0.13.1) will log any non-success status
+in both the Apache error log and in the Mellon diagnostics log (if
+enabled). The log message for the above `InvalidNameIDPolicy` error
+will look like this:
+
+----
+"StatusCode1="urn:oasis:names:tc:SAML:2.0:status:Requester", StatusCode2="urn:oasis:names:tc:SAML:2.0:status:InvalidNameIDPolicy", "StatusMessage="(null)"
+----
+
+Or you have the option to examine the SAML message as described in <<gather_runtime_info>>.
+
+== Gathering run-time information [[gather_runtime_info]]
 
 === Apache log files
 
@@ -2945,6 +3154,86 @@ This can lead to problems if you:
 
 You may wish to review <<metadata_creation>> and <<mellon_endpoint_path>>.
 
+=== Microsoft ADFS issues
+
+It is common to have problems when using Microsoft ADFS as a SAML IdP.
+
+This blog post from Microsoft contains many of the ADFS configuration
+issues encountered when adding an SP to ADFS: 
+[[adfs_blog,ADFS Deep Dive Blog]]https://blogs.technet.microsoft.com/askpfeplat/2015/03/01/adfs-deep-dive-onboarding-applications/[ADFS Deep Dive Onboarding Applications]
+
+NOTE: ADFS calls SPs a "Relying Party" and the SP configuration a
+"Relying Party Trust". 
+
+==== ADFS Signature Algorithm [[adfs_sig_alg]]
+
+One of the `Relying Party Trust` options is the "Secure Hash
+Algorithm" which controls the signature algorithm used to produce an
+XML signature on the SAML message. This is the signature algorithm
+ADFS will use to sign the SAML messages it emits. SAML does not require
+both parties to use the same signature algorithm; in theory, it's fine
+if Mellon as the SP signs with one algorithm and ADFS as the IdP signs
+with a different algorithm. But ADFS enforces the requirement that the
+SP signs with same algorithm as set in the `Relying Party Trust`. If
+ADFS receives a SAML message signed with a different algorithm than
+what is specified in the `Relying Party Trust` configuration, you will
+get a message in the ADFS log like this:
+
+----
+SAML request is not signed with expected signature algorithm. SAML
+request is signed with signature algorithm
+http://www.w3.org/2001/04/xmldsig-more#rsa-sha1 . Expected signature
+algorithm is http://www.w3.org/2000/09/xmldsig#rsa-sha256 
+----
+
+Since SHA-1 is no longer considered secure, many ADFS administrators set
+their `Relying Party Trust` secure hash algorithm to SHA-256. This
+causes problems for Mellon versions earlier than 0.13.1, which
+always signed its messages with the SHA-1 hash (specifically the
+RSA-SHA1 algorithm) and there was no mechanism to specify a
+different signing algorithm. See <<adfs_blog>> for how to modify the
+`Relying Party Trust` Secure Hash Algorithm.
+
+Mellon versions greater than 0.13.1 added a new configuration option
+called `MellonSignatureMethod` which allows you to match the signature
+algorithm emitted by Mellon to the one specified in the ADFS `Relying
+Party Trust` for the Mellon SP. For example:
+
+----
+MellonSignatureMethod rsa-sha256
+----
+
+
+==== ADFS NameIDPolicy [[adfs_nameid_policy]]
+
+By default ADFS cannot handle many of the SAML NameID formats without
+additional configuration in the `Relying Party Trust`. Please make
+sure you are familiar with the material in the section <<name_id>>. By
+default, Mellon will generate SP metadata with a
+<<nameid_policy,NameIDPolicy>> of `transient`, see
+<<specify_mellon_nameid>> for how to modify this in Mellon.
+
+When ADFS receives a SAML message with a `NameIDPolicy` set to a
+specific format, it is supposed to respond with a `NameID` matching that
+format. Because of the architecture of ADFS, it may not have access to
+the data needed to generate that `NameID`. The necessary data is
+contained in a _Claim_ controlled by a _Claim Rule_. To get the
+contents of the _Claim_ being used to populate the SAML `NameID`, you
+must also add a `Claim Rule Transform` that maps the desired _Claim_
+data into a SAML data element, which in this case is the `NameID`.
+
+Examples of the `NameID` formats which require this additional
+configuration in ADFS are `transient`, `persistent`, `email` and
+possibly others. If the _Claim Rule_ and _Claim Rule Transform_ are
+not configured for the `NameIDPolicy` in the request, ADFS will respond
+with a `InvalidNameIDPolicy` error status because it cannot provide
+the requested `NameID` format. See <<invalid_nameid_example, NameID
+error example>> in the <<error_response, error response section>> for
+an example of this error and how to identify it.
+
+This Microsoft blog discusses `NameID` configuration in ADFS:
+[[adfs_nameid,ADFS NameID Configuration]]https://blogs.msdn.microsoft.com/card/2010/02/17/name-identifiers-in-saml-assertions/[ADFS
+- Name Identifiers in SAML assertions]
 
 === Time Sync
 
