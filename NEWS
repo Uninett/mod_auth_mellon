@@ -33,6 +33,7 @@ Bug fixes:
 * Fix segmentation fault if MellonPostReplay is enabled but
   MellonPostDirectory is not set.
 
+
 Version 0.13.0
 ---------------------------------------------------------------------------
 
@@ -100,6 +101,7 @@ In addition this release contains the following new features and fixes:
 
 * Fix AssertionConsumerService lookup for PAOS requests.
 
+
 Version 0.11.1
 ---------------------------------------------------------------------------
 
@@ -111,6 +113,7 @@ Security fixes:
 * [CVE-2016-2146] Fix DOS attack (Apache worker process crash /
   resource exhaustion) due to missing size checks when reading
   POST data.
+
 
 Version 0.11.0
 ---------------------------------------------------------------------------
@@ -139,6 +142,7 @@ Version 0.11.0
   * Fix error about missing authentication with DirectoryIndex in
     Apache 2.4.
 
+
 Version 0.10.0
 ---------------------------------------------------------------------------
 
@@ -157,6 +161,7 @@ Version 0.10.0
   * Fix cookie deletion for the session cookie. (Logout is not dependent
     on the cookie being deleted, so this only fixes the cookie showing
     up after the session is deleted.)
+
 
 Version 0.9.1
 ---------------------------------------------------------------------------
@@ -245,6 +250,7 @@ Version 0.7.0
 * Add MellonSetEvnNoPrefix directive to set environment variables
   without "MELLON_"-prefix.
 
+
 Version 0.6.1
 ---------------------------------------------------------------------------
 
@@ -253,6 +259,7 @@ Version 0.6.1
 
 * Add a fallback for the case where the POST replay data has expired
   before the user logs in.
+
 
 Version 0.6.0
 ---------------------------------------------------------------------------
@@ -308,6 +315,7 @@ Other changes:
 
   * Some code cleanups.
 
+
 Version 0.5.0
 ---------------------------------------------------------------------------
 
@@ -332,6 +340,7 @@ Version 0.5.0
 
   * Several cleanups in the code that starts authentication.
 
+
 Version 0.4.0
 ---------------------------------------------------------------------------
 
@@ -355,6 +364,7 @@ Version 0.4.0
 
 * Several bugfixes.
 
+
 Version 0.3.0
 ---------------------------------------------------------------------------
 
@@ -366,6 +376,7 @@ Version 0.3.0
 
 * Various bugfixes.
 
+
 Version 0.2.7
 ---------------------------------------------------------------------------
 
@@ -373,10 +384,12 @@ Version 0.2.7
 
 * Shibboleth 2 interoperability
 
+
 Version 0.2.6
 ---------------------------------------------------------------------------
 
 * Fix XSS/DOS vulnerability in repost handler.
+
 
 Version 0.2.5
 ---------------------------------------------------------------------------
@@ -384,6 +397,7 @@ Version 0.2.5
 * Replay POST requests after been sent to the IdP
 
 * Fix HTTP response splitting vulnerability.
+
 
 Version 0.2.4
 ---------------------------------------------------------------------------
@@ -393,11 +407,13 @@ Version 0.2.4
 * Mark session as disabled as soon as logout starts, in case the IdP
   doesn't respond.
 
+
 Version 0.2.3
 ---------------------------------------------------------------------------
 
 * Bugfix for session lifetime. Take the session lifetime from the
   SessionNotOnOrAfter attribute if it is present.
+
 
 Version 0.2.2
 ---------------------------------------------------------------------------
@@ -405,11 +421,13 @@ Version 0.2.2
 * Improve metadata autogeneration: cleanup certificate, allow Organizarion
   element data to be supplied from Apache configuration
 
+
 Version 0.2.1
 ---------------------------------------------------------------------------
 
 * Make SAML authentication assertion and Lasso session available in the
   environment.
+
 
 Version 0.2.0
 ---------------------------------------------------------------------------
