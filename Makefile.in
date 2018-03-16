@@ -26,6 +26,7 @@ DISTFILES=$(SRC) \
 	auth_mellon.h \
 	auth_mellon_compat.h \
 	lasso_compat.h \
+	config.h.in \
 	configure \
 	configure.ac \
 	Makefile.in \
