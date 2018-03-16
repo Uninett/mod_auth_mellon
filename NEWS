@@ -1,3 +1,38 @@
+Version 0.14.0
+---------------------------------------------------------------------------
+
+Backwards incompatible changes:
+
+This version switches the default signature algorithm used when
+signing messages from rsa-sha1 to rsa-sha256. If your IdP does not
+allow messages to be signed with that algorithm, you need to add a
+setting switching back to the old algorithm:
+
+  MellonSignatureMethod rsa-sha1
+
+Note that this only affects messages sent from mod_auth_mellon to your
+IdP. It does not affect authentication responses or other messages
+sent from your IdP to mod_auth_mellon.
+
+New features:
+
+* Many improvements in what is logged during various errors.
+
+* Diagnostics logging, which creates a detailed log during request
+  processing.
+
+* Add support for selecting which signature algorithm is used when
+  signing messages, and switch to rsa-sha256 by default.
+
+Bug fixes:
+
+* Fix segmentation fault in POST replay functionality on empty value.
+
+* Fix incorrect error check for many `lasso_*`-functions.
+
+* Fix case sensitive match on MellonUser attribute name.
+
+
 Version 0.13.1
 ---------------------------------------------------------------------------
 
