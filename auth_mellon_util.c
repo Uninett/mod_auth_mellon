@@ -211,9 +211,8 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
     size_t i;
 
     c = (am_cond_t *)apr_pmemdup(r->pool, ce, sizeof(*ce));
-    c->str = outstr;
     last = 0;
-    
+
     for (i = strcspn(instr, "%"); i < inlen; i += strcspn(instr + i, "%")) {
         const char *fstr;
         const char *ns;
@@ -268,7 +267,7 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
         }
 
         value = NULL;
-        if ((*ns == '\0') && (strspn(fstr, "0123456789") == flen)) {
+        if ((*ns == '\0') && (strspn(fstr, "0123456789") == flen) && (backrefs != NULL)) {
             /*
              * If fstr has only digits, this is a regexp backreference
              */
@@ -285,9 +284,20 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
 
         } else if (strcmp(ns, "ENV") == 0) {
             /*
-             * ENV namespace. Get value from apache environment
+             * ENV namespace. Get value from apache environment.
+             * This is akin to how Apache itself does it during expression evaluation.
              */
-            value = getenv(name);
+            value = apr_table_get(r->subprocess_env, name);
+            if (value == NULL) {
+                value = apr_table_get(r->notes, name);
+            }
+            if (value == NULL) {
+                value = getenv(name);
+            }
+
+            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                          "Resolving \"%s\" from ENV to \"%s\"",
+                          name, value == NULL ? "(nothing)" : value);
         }
 
         /*
@@ -318,6 +328,7 @@ const am_cond_t *am_cond_substitue(request_rec *r, const am_cond_t *ce,
     outstr = apr_pstrcat(r->pool, outstr,
                          apr_pstrndup(r->pool, instr + last, i - last), 
                          NULL);
+    c->str = outstr;
 
     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
                   "Directive %s, \"%s\" substituted into \"%s\"",
@@ -433,7 +444,7 @@ int am_check_permissions(request_rec *r, am_cache_entry_t *session)
             /*
              * Substiture backrefs if available
              */
-            if ((ce->flags & AM_COND_FLAG_FSTR) && (backrefs != NULL))
+            if (ce->flags & AM_COND_FLAG_FSTR)
                 ce = am_cond_substitue(r, ce, backrefs);
 
             ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
