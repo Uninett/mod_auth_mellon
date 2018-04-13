@@ -40,7 +40,7 @@ will use the following:
 
 mod_auth_mellon is an Apache (httpd) authentication module
 providing authentication and authorization services via SAML. Mellon
-plays the role of a _Service Provder_ (SP) in SAML.
+plays the role of a _Service Provider_ (SP) in SAML.
 
 
 == SAML Overview
@@ -314,7 +314,7 @@ failures. A common mistake is to modify a producer's metadata
 
 SAML places two requirements on the `entityID`:
 
-* It *must* be a URI
+* It *must* be an URI
 * It *must* be unique within the federation
 
 A wise administrator will also seek to fulfill this additional
@@ -335,7 +335,7 @@ for the OASIS Security Assertion Markup Language (SAML)] specification
 in section 4, _Metadata Publication and Resolution_ is to use the
 `entityID` as a _well-known-location_ for retrieving the provider's
 metadata. In other words the `entityID` is the URL which returns the
-provider's XML metadata document when an HTTP GET is performed on that
+provider's XML metadata document when a HTTP GET is performed on that
 URL. _It is not a requirement the `entityID` be the URL for metadata
 download_ rather it is one common convention. As discussed in the SAML
 metadata specification other mechanisms can be established for
