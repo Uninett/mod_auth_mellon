@@ -3658,11 +3658,11 @@ int am_auth_mellon_user(request_rec *r)
              * If this is an AJAX request, we cannot proceed to the IdP,
              * Just fail early to save our resources
              */
-            ajax_header = apr_table_get(r->headers_in, "X-Request-With");
+            ajax_header = apr_table_get(r->headers_in, "X-Requested-With");
             if (ajax_header != NULL &&
                 strcmp(ajax_header, "XMLHttpRequest") == 0) {
                     AM_LOG_RERROR(APLOG_MARK, APLOG_INFO, 0, r,
-                      "Deny unauthenticated X-Request-With XMLHttpRequest "
+                      "Deny unauthenticated X-Requested-With XMLHttpRequest "
                       "(AJAX) request");
                     return HTTP_FORBIDDEN;
             }

@@ -180,7 +180,7 @@ MellonDiagnosticsEnable Off
         #           then we will redirect him to the login page of the IdP.
         #
         #           There is a special handling of AJAX requests, that are
-        #           identified by the "X-Request-With: XMLHttpRequest" HTTP
+        #           identified by the "X-Requested-With: XMLHttpRequest" HTTP
         #           header. Since no user interaction can happen there,
         #           we always fail unauthenticated (not logged in) requests
         #           with a 403 Forbidden error without redirecting to the IdP.
