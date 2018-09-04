@@ -33,7 +33,7 @@ if ! echo "$BASEURL" | grep -q '^https\?://'; then
     exit 1
 fi
 
-HOST="$(echo "$BASEURL" | sed 's#^[a-z]*://\([^/]*\).*#\1#')"
+HOST="$(echo "$BASEURL" | sed 's#^[a-z]*://\([^:/]*\).*#\1#')"
 BASEURL="$(echo "$BASEURL" | sed 's#/$##')"
 
 OUTFILE="$(echo "$ENTITYID" | sed 's/[^0-9A-Za-z.]/_/g' | sed 's/__*/_/g')"
