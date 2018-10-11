@@ -2,7 +2,7 @@
 
 #include <lasso/utils.h>
 
-#else
+#else  /* HAVE_LASSO_UTILS_H */
 
 #define lasso_assign_string(dest,src)           \
 {                                               \
@@ -47,7 +47,15 @@
 	lasso_release_list_of_full(dest, g_free)
 
 
-#endif
+#ifndef __LASSO_TOOLS_H__
+
+LASSO_EXPORT char* lasso_build_unique_id(unsigned int size);
+LASSO_EXPORT guint lasso_log_set_handler(GLogLevelFlags log_levels, GLogFunc log_func, gpointer user_data);
+LASSO_EXPORT void lasso_log_remove_handler(guint handler_id);
+
+#endif  /* __LASSO_TOOLS_H__ */
+
+#endif  /* HAVE_LASSO_UTILS_H */
 
 #ifndef LASSO_SAML2_ECP_PROFILE_WANT_AUTHN_SIGNED
 #define LASSO_SAML2_ECP_PROFILE_WANT_AUTHN_SIGNED "urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp:2.0:WantAuthnRequestsSigned"
