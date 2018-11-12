@@ -59,6 +59,9 @@ static const char *am_cookie_params(request_rec *r)
     const char *cookie_domain = ap_get_server_name(r);
     const char *cookie_path = "/";
     const char *cookie_samesite = "";
+    const char *cookie_expires = "";
+    char rbuf[APR_RFC822_DATE_LEN + 1];
+    
     am_dir_cfg_rec *cfg = am_get_dir_cfg(r);
 
     if (cfg->cookie_domain) {
@@ -78,12 +81,18 @@ static const char *am_cookie_params(request_rec *r)
     secure_cookie = cfg->secure;
     http_only_cookie = cfg->http_only;
 
+    if ( cfg->cookie_expires > -1 ) {
+      apr_rfc822_date(rbuf, apr_time_now() + (APR_USEC_PER_SEC * cfg->cookie_expires));
+      cookie_expires = apr_psprintf(r->pool, "; Expires=%s", rbuf);
+    }
+
     return apr_psprintf(r->pool,
-                        "Version=1; Path=%s; Domain=%s%s%s%s;",
+                        "Version=1; Path=%s; Domain=%s%s%s%s%s;",
                         cookie_path, cookie_domain,
                         http_only_cookie ? "; HttpOnly" : "",
                         secure_cookie ? "; secure" : "",
-                        cookie_samesite);
+                        cookie_samesite,
+                        cfg->cookie_expires > -1 ? cookie_expires : "");
 }
 
 

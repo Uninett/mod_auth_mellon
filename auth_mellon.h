@@ -268,6 +268,9 @@ typedef struct am_dir_cfg_rec {
     /* Maximum number of seconds a session is valid for. */
     int session_length;
 
+    /* When cookie expires */
+    int cookie_expires;
+
     /* No cookie error page. */
     const char *no_cookie_error_page;
 

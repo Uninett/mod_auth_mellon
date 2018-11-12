@@ -1427,6 +1427,14 @@ const command_rec auth_mellon_commands[] = {
         " to 86400 seconds (1 day)."
         ),
     AP_INIT_TAKE1(
+        "MellonCookieExpires",
+        ap_set_int_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, cookie_expires),
+        OR_AUTHCFG,
+        "Maximum number of seconds a cookie will be valid for"
+        "Defaults to browser session"
+        ),
+    AP_INIT_TAKE1(
         "MellonNoCookieErrorPage",
         ap_set_string_slot,
         (void *)APR_OFFSETOF(am_dir_cfg_rec, no_cookie_error_page),
@@ -1723,6 +1731,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->endpoint_path = default_endpoint_path;
 
     dir->session_length = -1; /* -1 means use default. */
+    dir->cookie_expires = -1; /* -1 means use default. */
 
     dir->no_cookie_error_page = NULL;
     dir->no_success_error_page = NULL;
@@ -1896,6 +1905,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->session_length = (add_cfg->session_length != -1 ?
                                add_cfg->session_length :
                                base_cfg->session_length);
+
+    new_cfg->cookie_expires = (add_cfg->cookie_expires != -1 ?
+                               add_cfg->cookie_expires :
+                               base_cfg->cookie_expires);
 
     new_cfg->no_cookie_error_page = (add_cfg->no_cookie_error_page != NULL ?
                                      add_cfg->no_cookie_error_page :

@@ -1948,8 +1948,6 @@ validity period for a Mellon session is the lesser of the
 `MellonSessionLength` or the optional IdP `SessionNotOnOrAfter`
 attribute if the IdP supplied it.
 
-
-
 === Mellon Cookie [[mellon_cookie]]
 
 <<mellon_session>> information is communicated via a cookie. The
@@ -1976,6 +1974,10 @@ ID and attempts to look-up that session using that ID. If the session
 is found and it remains valid, Mellon immediately grants access. A
 Mellon session will expire, see <<mellon_session>> for information
 concerning session lifetime.
+
+MellonCookieExpires can change how long the cookie lives.  By default cookie
+lives as long as browser session, but using MellonCookieExpires directive
+it's possible to set cookie expiry that many seconds into the future
 
 == Working with SAML attributes and exporting values to web apps
 

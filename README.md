@@ -216,6 +216,11 @@ MellonDiagnosticsEnable Off
         # Default: /
         MellonCookiePath /
 
+        # MellonCookieExpires seconds into the future the cookie will expire
+        # the date will be now() + MellonCookieExpires
+        # Default: Unset (Browser Session)
+        # MellonCookieExpires 86400
+
         # MellonCookieSameSite allows control over the SameSite value used
         # for the authentication cookie.
         # The setting accepts values of "Strict" or "Lax"
