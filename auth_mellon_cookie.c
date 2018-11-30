@@ -79,7 +79,7 @@ static const char *am_cookie_params(request_rec *r)
     http_only_cookie = cfg->http_only;
 
     return apr_psprintf(r->pool,
-                        "Version=1; Path=%s; Domain=%s%s%s%s;",
+                        "Version=1; Path=%s; Domain=%s%s%s%s",
                         cookie_path, cookie_domain,
                         http_only_cookie ? "; HttpOnly" : "",
                         secure_cookie ? "; secure" : "",
