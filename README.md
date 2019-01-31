@@ -77,7 +77,7 @@ enabled. Most likely you also want authz_user to be enabled.
 After you have added the LoadModule directive, you must add configuration
 for mod_auth_mellon. The following is an example configuration:
 
-```
+```ApacheConf
 ###########################################################################
 # Global configuration for mod_auth_mellon. This configuration is shared by
 # every virtual server and location in this instance of apache.
@@ -741,7 +741,7 @@ mod_auth_mellon has an IdP probe discovery service that sends HTTP GET
 to IdP and picks the first that answers. This can be used as a poor
 man's failover setup that redirects to your organisation internal IdP. 
 Here is a sample configuration:
-```
+```ApacheConf
 MellonEndpointPath "/saml"
 (...)
 MellonDiscoveryUrl "/saml/probeDisco"
@@ -759,7 +759,7 @@ you will want to configure external IdP in mod_auth_mellon, but not
 use them for IdP probe discovery. The MellonProbeDiscoveryIdP 
 directive can be used to limit the usable IdP for probe discovery:
 
-```
+```ApacheConf
 MellonEndpointPath "/saml"
 (...)
 MellonDiscoveryUrl "/saml/probeDisco"
@@ -810,7 +810,7 @@ The below snippet will allow for preemptive basic auth (such as from a REST clie
 for the "/auth" path, but if accessed interactively will trigger SAML auth with
 mod_auth_mellon. 
 
-```
+```ApacheConf
 <Location />
   MellonEnable "info"
   MellonVariable "cookie"
