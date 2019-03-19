@@ -1,3 +1,48 @@
+Version 0.14.2
+---------------------------------------------------------------------------
+
+Security fixes:
+
+* [CVE-2019-3878] Authentication bypass when Apache is used as a
+  reverse proxy
+
+  If Apache is configured as a reverse proxy with mod_auth_mellon for
+  authentication, the authentication can be bypassed by adding SAML
+  2.0 ECP headers to the request.
+
+  This vulnerability affects mod_auth_mellon 0.11.0 and newer.
+
+  This vulnerability is due to both mod_auth_mellon and mod_proxy
+  registering as handlers for the requests, with the same
+  priority. When mod_auth_mellon handles the request first, it will
+  trigger a ECP authentication request. If mod_proxy handles it first,
+  it will forward it to the backend server.
+
+  Which module handles it first depends on the order modules are
+  loaded by Apache.
+
+  This vulnerability is fixes by specifically registering that the
+  mod_auth_mellon handler should run before mod_proxy.
+
+  Thanks to Jakub Hrozek and John Dennis at RedHat for fixing this
+  vulnerability.
+
+* [CVE-2019-3877] Redirect URL validation bypass
+
+  Version 0.14.1 and older of mod_auth_mellon allows the redirect URL
+  validation to be bypassed by specifying an URL with backslashes
+  instead of forward slashes. Browsers silently convert backslashes to
+  forward slashes, which allows an attacker to bypass the redirect URL
+  validation by using `%5c` in the ReturnTo-parameter. E.g.:
+
+    https://sp.example.org/mellon/logout?ReturnTo=https:%5c%5cmalicious.example.org/
+
+  This version fixes that issue by rejecting all URLs with
+  backslashes.
+
+  Thanks to Eric Chamberland for discovering this vulnerability.
+
+
 Version 0.14.1
 ---------------------------------------------------------------------------
 
