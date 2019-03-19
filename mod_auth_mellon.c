@@ -207,6 +207,12 @@ static int am_create_request(request_rec *r)
 
 static void register_hooks(apr_pool_t *p)
 {
+    /* Our handler needs to run before mod_proxy so that it can properly
+     * return ECP AuthnRequest messages when running as a reverse proxy.
+     * See: https://github.com/Uninett/mod_auth_mellon/pull/196
+     */
+    static const char * const run_handler_before[]={ "mod_proxy.c", NULL };
+
     ap_hook_access_checker(am_auth_mellon_user, NULL, NULL, APR_HOOK_MIDDLE);
     ap_hook_check_user_id(am_check_uid, NULL, NULL, APR_HOOK_MIDDLE);
     ap_hook_post_config(am_global_init, NULL, NULL, APR_HOOK_MIDDLE);
@@ -222,7 +228,7 @@ static void register_hooks(apr_pool_t *p)
      * Therefore this hook must run before any handler that may check
      * r->handler and decide that it is the only handler for this URL.
      */
-    ap_hook_handler(am_handler, NULL, NULL, APR_HOOK_FIRST);
+    ap_hook_handler(am_handler, NULL, run_handler_before, APR_HOOK_FIRST);
 
 #ifdef ENABLE_DIAGNOSTICS
     ap_hook_open_logs(am_diag_log_init,NULL,NULL,APR_HOOK_MIDDLE);
