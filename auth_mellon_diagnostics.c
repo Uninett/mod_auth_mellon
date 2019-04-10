@@ -442,6 +442,9 @@ am_diag_log_dir_cfg(request_rec *r, int level, am_dir_cfg_rec *cfg,
                     "%sMellonCookieSameSite (cookie_samesite): %s\n",
                     indent(level+1),
                     am_diag_samesite_str(r, cfg->cookie_samesite));
+    apr_file_printf(diag_cfg->fd,
+                    "%sMellonEnvPrefix (env_prefix): %s\n",
+                    indent(level+1), cfg->env_prefix);
 
     apr_file_printf(diag_cfg->fd,
                     "%sMellonCond (cond): %d items\n",
@@ -466,7 +469,7 @@ am_diag_log_dir_cfg(request_rec *r, int level, am_dir_cfg_rec *cfg,
         apr_hash_this(hash_item, (void *)&key, NULL, (void *)&envattr_conf);
 
         if (envattr_conf->prefixed) {
-            name = apr_pstrcat(r->pool, "MELLON_",
+            name = apr_pstrcat(r->pool, cfg->env_prefix,
                                envattr_conf->name, NULL);
         } else {
             name = envattr_conf->name;

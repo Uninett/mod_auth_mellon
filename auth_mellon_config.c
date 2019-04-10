@@ -36,6 +36,11 @@ static const char *default_endpoint_path = "/mellon/";
  */
 static const char *default_user_attribute = "NAME_ID";
 
+/* This is the default prefix to use for attributes received from the
+ * server. Customizable using the MellonEnvPrefix option
+ */
+static const char *default_env_prefix = "MELLON_";
+
 /* This is the default name of the cookie which mod_auth_mellon will set.
  * If you change this, then you should also update the description of the
  * MellonVar configuration directive.
@@ -1372,8 +1377,10 @@ const command_rec auth_mellon_commands[] = {
         am_set_setenv_slot,
         NULL,
         OR_AUTHCFG,
-        "Renames attributes received from the server while retaining prefix MELLON_. The format is"
-        " MellonSetEnv <old name> <new name>."
+        "Renames attributes received from the server while retaining the"
+        " prefix. The prefix defaults to MELLON_ but can be changed with"
+        " MellonEnvPrefix."
+        " The format is MellonSetEnv <old name> <new name>."
         ),
      AP_INIT_TAKE2(
         "MellonSetEnvNoPrefix",
@@ -1382,6 +1389,13 @@ const command_rec auth_mellon_commands[] = {
         OR_AUTHCFG,
         "Renames attributes received from the server without adding prefix. The format is"
         " MellonSetEnvNoPrefix <old name> <new name>."
+        ),
+    AP_INIT_TAKE1(
+        "MellonEnvPrefix",
+        ap_set_string_slot,
+        (void *)APR_OFFSETOF(am_dir_cfg_rec, env_prefix),
+        OR_AUTHCFG,
+        "The prefix to use for attributes received from the server."
         ),
     AP_INIT_FLAG(
         "MellonSessionDump",
@@ -1714,6 +1728,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->cookie_path = NULL;
     dir->cookie_samesite = am_samesite_default;
     dir->envattr   = apr_hash_make(p);
+    dir->env_prefix = default_env_prefix;
     dir->userattr  = default_user_attribute;
     dir->idpattr  = NULL;
     dir->signature_method = inherit_signature_method;
@@ -1867,6 +1882,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
                                      (apr_hash_count(add_cfg->envattr) > 0) ?
                                      add_cfg->envattr :
                                      base_cfg->envattr);
+
+    new_cfg->env_prefix = (add_cfg->env_prefix != default_env_prefix ?
+                           add_cfg->env_prefix :
+                           base_cfg->env_prefix);
 
     new_cfg->userattr = (add_cfg->userattr != default_user_attribute ?
                          add_cfg->userattr :

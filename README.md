@@ -253,6 +253,11 @@ MellonDiagnosticsEnable Off
         # Default. None set.
         MellonSetEnvNoPrefix "DISPLAY_NAME" "displayName"
 
+        # MellonEnvPrefix changes the string the variables passed from the
+        # IdP are prefixed with.
+        # Default: MELLON_
+        MellonEnvPrefix "NOLLEM_"
+
         # MellonMergeEnvVars merges multiple values of environment variables
         # set using MellonSetEnv into single variable:
         # ie: MYENV_VAR => val1;val2;val3 instead of default behaviour of:
