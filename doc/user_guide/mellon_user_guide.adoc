@@ -2117,6 +2117,11 @@ MellonSetEnvNoPrefix REMOTE_USER_LASTNAME sn
 Also see <<set_remote_user>> for an example of setting the `REMOTE_USER`
 environment variable using `MellonSetEnvNoPrefix`.
 
+If you recieved an attribute-map.xml from your IDP that uses the
+`urn:mace:shibboleth:2.0:attribute-map` namespace, it can be converted
+to `MellonSetEnvNoPrefix` entries with `docs/mellon-attribute-map.xsl`
+and loaded into your webserver configuration.
+
 === Using Mellon to apply constraints [[assertion_constraints]]
 
 SAML attributes can be used for more than exporting those values to a
