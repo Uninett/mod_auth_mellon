@@ -589,7 +589,7 @@ void am_cache_env_populate(request_rec *r, am_cache_entry_t *t)
      */
     for(i = 0; i < t->size; ++i) {
         varname = am_cache_entry_get_string(t, &t->env[i].varname);
-        varname_prefix = "MELLON_";
+        varname_prefix = d->env_prefix;
 
         /* Check if we should map this name into another name. */
         env_varname_conf = (am_envattr_conf_t *)apr_hash_get(

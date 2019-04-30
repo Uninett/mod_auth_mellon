@@ -237,6 +237,7 @@ typedef struct am_dir_cfg_rec {
     am_samesite_t cookie_samesite;
     apr_array_header_t *cond;
     apr_hash_t *envattr;
+    const char *env_prefix;
     const char *userattr;
     const char *idpattr;
     LassoSignatureMethod signature_method;
