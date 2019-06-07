@@ -25,6 +25,7 @@
 #include "config.h"
 
 #include <stdbool.h>
+#include <strings.h>
 
 #include <lasso/lasso.h>
 #include <lasso/xml/saml-2.0/samlp2_authn_request.h>
