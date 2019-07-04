@@ -3598,6 +3598,7 @@ Mellon Directory Configuration for URL: /saml-test/protected.html
   MellonProbeDiscoveryTimeout (probe_discovery_timeout): -1
   MellonProbeDiscoveryIdP (probe_discovery_idp): 0 items
   MellonAuthnContextClassRef (authn_context_class_ref): 0 items
+  MellonAuthnContextComparisonType (authn_context_comparison_type): (null)
   MellonSubjectConfirmationDataAddressCheck (subject_confirmation_data_address_check): On
   MellonDoNotVerifyLogoutSignature (do_not_verify_logout_signature): 0 items
   MellonPostReplay (post_replay): On

@@ -1,7 +1,7 @@
 /*
  *
  *   auth_mellon_config.c: an authentication apache module
- *   Copyright © 2003-2007 UNINETT (http://www.uninett.no/)
+ *   Copyright Â© 2003-2007 UNINETT (http://www.uninett.no/)
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -759,6 +759,42 @@ static const char *am_set_setenv_no_prefix_slot(cmd_parms *cmd,
     return NULL;
 }
 
+/* This function handles the MellonAuthnContextComparisonType option.
+ * It could be set to "exact", "minimum", "maximum" or "better"
+ *
+ * Parameters:
+ *  cmd_parms *cmd       The command structure for this configuration
+ *                       directive.
+ *  void *struct_ptr     Pointer to the current directory configuration.
+ *  const char *arg      The string argument following this configuration
+ *                       directive in the configuraion file.
+ *
+ * Returns:
+ *  NULL on success or an error string if the argument is wrong.
+ */
+static const char *am_set_authn_context_comparison_type_slot(cmd_parms *cmd,
+                                      void *struct_ptr,
+                                      const char *arg)
+{
+    am_dir_cfg_rec *d = (am_dir_cfg_rec *)struct_ptr;
+
+    if (!strcasecmp(arg, LASSO_LIB_AUTHN_CONTEXT_COMPARISON_EXACT)) {
+        d->authn_context_comparison_type =
+            LASSO_LIB_AUTHN_CONTEXT_COMPARISON_EXACT;
+    } else if (!strcasecmp(arg, LASSO_LIB_AUTHN_CONTEXT_COMPARISON_MINIMUM)) {
+        d->authn_context_comparison_type =
+            LASSO_LIB_AUTHN_CONTEXT_COMPARISON_MINIMUM;
+    } else if (!strcasecmp(arg, LASSO_LIB_AUTHN_CONTEXT_COMPARISON_MAXIMUM)) {
+        d->authn_context_comparison_type =
+            LASSO_LIB_AUTHN_CONTEXT_COMPARISON_MAXIMUM;
+    } else if (!strcasecmp(arg, LASSO_LIB_AUTHN_CONTEXT_COMPARISON_BETTER)) {
+        d->authn_context_comparison_type =
+            LASSO_LIB_AUTHN_CONTEXT_COMPARISON_BETTER;
+    } else {
+        return "parameter must be 'exact', 'minimum', 'maximum' or 'better'";
+    }
+    return NULL;
+}
 
 /* This function decodes MellonCond flags, such as [NOT,REG]
  *
@@ -1593,6 +1629,13 @@ const command_rec auth_mellon_commands[] = {
         "A list of AuthnContextClassRef to request in the AuthnRequest and "
         "to validate upon reception of an Assertion"
         ),
+    AP_INIT_TAKE1(
+        "MellonAuthnContextComparisonType",
+        am_set_authn_context_comparison_type_slot,
+        NULL,
+        OR_AUTHCFG,
+        "An AuthnContextComparisonType attribute as part of the AuthnRequest."
+        ),
     AP_INIT_FLAG(
         "MellonSubjectConfirmationDataAddressCheck",
         ap_set_flag_slot,
@@ -1763,6 +1806,7 @@ void *auth_mellon_dir_config(apr_pool_t *p, char *d)
     dir->inherit_server_from = dir;
     dir->server = NULL;
     dir->authn_context_class_ref = apr_array_make(p, 0, sizeof(char *));
+    dir->authn_context_comparison_type = NULL;
     dir->subject_confirmation_data_address_check = inherit_subject_confirmation_data_address_check;
     dir->send_cache_control_header = inherit_send_cache_control_header;
     dir->do_not_verify_logout_signature = apr_hash_make(p);
@@ -2003,6 +2047,10 @@ void *auth_mellon_dir_merge(apr_pool_t *p, void *base, void *add)
     new_cfg->authn_context_class_ref = (add_cfg->authn_context_class_ref->nelts ?
                              add_cfg->authn_context_class_ref :
                              base_cfg->authn_context_class_ref);
+
+    new_cfg->authn_context_comparison_type = (add_cfg->authn_context_comparison_type != NULL ?
+                        add_cfg->authn_context_comparison_type :
+                        base_cfg->authn_context_comparison_type);
 
     new_cfg->do_not_verify_logout_signature = apr_hash_copy(p, 
                              (apr_hash_count(add_cfg->do_not_verify_logout_signature) > 0) ?

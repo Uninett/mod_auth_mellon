@@ -620,7 +620,9 @@ am_diag_log_dir_cfg(request_rec *r, int level, am_dir_cfg_rec *cfg,
                         "%s[%2d]: %s\n",
                         indent(level+2), i, context_class);
     }
-
+    apr_file_printf(diag_cfg->fd,
+                    "%sMellonAuthnContextComparisonType (authn_context_comparison_type): %s\n",
+                    indent(level+1), cfg->authn_context_comparison_type);
     apr_file_printf(diag_cfg->fd,
                     "%sMellonSubjectConfirmationDataAddressCheck"
                     " (subject_confirmation_data_address_check): %s\n",

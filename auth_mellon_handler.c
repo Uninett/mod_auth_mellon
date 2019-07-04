@@ -1,7 +1,7 @@
 /*
  *
  *   auth_mellon_handler.c: an authentication apache module
- *   Copyright © 2003-2007 UNINETT (http://www.uninett.no/)
+ *   Copyright Â© 2003-2007 UNINETT (http://www.uninett.no/)
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -2894,6 +2894,11 @@ static int am_init_authn_request_common(request_rec *r,
             AM_LOG_RERROR(APLOG_MARK, APLOG_DEBUG, 0, r,
                           "adding AuthnContextClassRef %s to the "
                           "AuthnRequest", ref);
+        }
+
+        if (dir_cfg->authn_context_comparison_type != NULL) {
+            lasso_assign_string(request->RequestedAuthnContext->Comparison,
+                dir_cfg->authn_context_comparison_type);
         }
     }
 
