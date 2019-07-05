@@ -1,0 +1,10 @@
+*.lo
+*.la
+*.o
+*.slo
+aclocal.m4
+config.*
+configure
+Makefile
+.libs/
+.vscode/
