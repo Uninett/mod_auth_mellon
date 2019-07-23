@@ -532,6 +532,10 @@ MellonDiagnosticsEnable Off
         # MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport"
         # MellonAuthnContextClassRef "urn:oasis:names:tc:SAML:2.0:ac:classes:SoftwarePKI"
 
+        # This option will set the "Comparsion" attribute within the AuthnRequest
+        # It could be set to "exact", "minimum", "maximum" or "better"
+        # MellonAuthnContextComparisonType "minimum"
+
         # MellonSubjectConfirmationDataAddressCheck is used to control
         # the checking of client IP address against the address returned by the
         # IdP in Address attribute of the SubjectConfirmationData node. Can be useful if your SP is
