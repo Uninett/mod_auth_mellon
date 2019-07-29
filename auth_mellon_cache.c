@@ -235,7 +235,8 @@ static int am_cache_entry_store_string(am_cache_entry_t *entry,
 
     if (am_cache_entry_pool_left(entry) < str_len) {
         ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
-                     "apr_cache_entry_store_string() asked %zd available: %zd. "
+                     "apr_cache_entry_store_string() asked %" APR_SIZE_T_FMT 
+                     " available: %" APR_SIZE_T_FMT ". "
                      "It may be a good idea to increase MellonCacheEntrySize.",
                      str_len, am_cache_entry_pool_left(entry));
         return HTTP_INTERNAL_SERVER_ERROR;
