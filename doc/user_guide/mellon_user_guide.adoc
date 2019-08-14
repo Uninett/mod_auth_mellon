@@ -2960,7 +2960,7 @@ Currently Mellon diagnostics supports these new Mellon
 directives. These directives are module level and as such should be
 declared outside of any location blocks in your Apache configuration.
 
-MellonDiagnosticFile::
+MellonDiagnosticsFile::
 If Mellon was built with diagnostic capability then diagnostic is
 written here, it may be either a filename or a pipe.  If it's a
 filename then the resulting path is relative to the ServerRoot.  If
@@ -2968,7 +2968,7 @@ the value is preceeded by the pipe character "|" it should be followed
 by a path to a program to receive the log information on its standard
 input.  Default: `logs/mellon_diagnostics`
 
-MellonDiagnosticEnable::
+MellonDiagnosticsEnable::
 If Mellon was built with diagnostic capability then this is a list of
 words controlling diagnostic output.  Currently only `On` and `Off` are
 supported.  Default: `Off`
@@ -2977,12 +2977,12 @@ To enable diagnostic logging add this line to your Apache
 configuration file where you keep your Mellon configuration.
 
 ----
-MellonDiagnosticEnable On
+MellonDiagnosticsEnable On
 ----
 
 Restart Apache and perform some operation that involves Mellon. In
 your Apache log directory will be a file called `mellon_diagnostics`
-(or whatever `MellonDiagnosticFile` was set to).
+(or whatever `MellonDiagnosticsFile` was set to).
 
 IMPORTANT: Diagnostic logging may potentially contain security
 sensitive information. Diagnostic logging is verbose and will generate
