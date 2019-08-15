@@ -8,4 +8,8 @@ addons:
       - liblasso3-dev
       - libssl-dev
 
-script: ./autogen.sh && ./configure CFLAGS=-Werror && make && make distfile
+script:
+  - ./autogen.sh
+  - ./configure CFLAGS=-Werror
+  - make
+  - make distfile
