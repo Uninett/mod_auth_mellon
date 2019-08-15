@@ -1,6 +1,15 @@
 dist: bionic
 language: c
-install:
-  - sudo apt-get update -qq
-  - sudo apt-get install -qq apache2-dev libglib2.0-dev liblasso3-dev libssl-dev
-script: ./autogen.sh && ./configure CFLAGS=-Werror && make && make distfile
+addons:
+  apt:
+    packages:
+      - apache2-dev
+      - libglib2.0-dev
+      - liblasso3-dev
+      - libssl-dev
+
+script:
+  - ./autogen.sh
+  - ./configure CFLAGS=-Werror
+  - make
+  - make distfile
