@@ -1,3 +1,4 @@
+dist: trusty
 language: c
 env:
   - APACHE_PKG=apache2-prefork-dev
