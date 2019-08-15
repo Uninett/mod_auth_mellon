@@ -1,9 +1,6 @@
-dist: trusty
+dist: bionic
 language: c
-env:
-  - APACHE_PKG=apache2-prefork-dev
-  - APACHE_PKG=apache2-threaded-dev
 install:
   - sudo apt-get update -qq
-  - sudo apt-get install -qq "$APACHE_PKG" libglib2.0-dev liblasso3-dev libssl-dev
+  - sudo apt-get install -qq apache2-dev libglib2.0-dev liblasso3-dev libssl-dev
 script: ./autogen.sh && ./configure CFLAGS=-Werror && make && make distfile
