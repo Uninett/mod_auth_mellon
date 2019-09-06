@@ -116,6 +116,10 @@ int am_validate_redirect_url(request_rec *r, const char *url)
 
     /* Sanity check of the scheme of the domain. We only allow http and https. */
     if (uri.scheme) {
+	/* http and https schemes without hostname are invalid. */
+        if (!uri.hostname) {
+            return HTTP_BAD_REQUEST; 
+    	}
         if (strcasecmp(uri.scheme, "http")
             && strcasecmp(uri.scheme, "https")) {
             AM_LOG_RERROR(APLOG_MARK, APLOG_ERR, 0, r,
