@@ -50,6 +50,6 @@ below:
 >
 > * The mailing list will be shut down in a couple of weeks.
 >
-> Best regards,
-> Olav Morken
+> Best regards,  
+> Olav Morken  
 > Uninett / Feide
