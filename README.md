@@ -2,7 +2,13 @@ mod_auth_mellon
 ===============
 
 As of Monday 30 September 2019, this project is no longer maintained
-by Uninett. The code is still available on the master branch at:
+by Uninett.
+
+A maintained fork of the project is available at:
+
+  https://github.com/latchset/mod_auth_mellon
+
+The original code is still available on the master branch at:
 
   https://github.com/Uninett/mod_auth_mellon/tree/master
 
